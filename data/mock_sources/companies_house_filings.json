@@ -1,0 +1,62 @@
+{
+  "filing_history_status": "available",
+  "items": [
+    {
+      "date": "2024-07-15",
+      "type": "AA",
+      "description": "accounts-with-accounts-type-full",
+      "description_values": {"made_up_date": "2024-02-29"},
+      "category": "accounts",
+      "pages": 92
+    },
+    {
+      "date": "2024-02-20",
+      "type": "CS01",
+      "description": "confirmation-statement-with-no-updates",
+      "category": "confirmation-statement",
+      "pages": 4
+    },
+    {
+      "date": "2023-09-12",
+      "type": "AP03",
+      "description": "appointment-of-secretary",
+      "description_values": {"officer_name": "MCINNES, Alain"},
+      "category": "officers",
+      "pages": 2
+    },
+    {
+      "date": "2023-07-10",
+      "type": "AA",
+      "description": "accounts-with-accounts-type-full",
+      "description_values": {"made_up_date": "2023-02-28"},
+      "category": "accounts",
+      "pages": 88
+    },
+    {
+      "date": "2022-11-03",
+      "type": "MR01",
+      "description": "registration-of-charge",
+      "category": "mortgage",
+      "pages": 14
+    },
+    {
+      "date": "2021-01-18",
+      "type": "TM01",
+      "description": "termination-director",
+      "description_values": {"officer_name": "BLOMFIELD, Thomas"},
+      "category": "officers",
+      "pages": 1
+    },
+    {
+      "date": "2020-01-15",
+      "type": "AP01",
+      "description": "appointment-of-director",
+      "description_values": {"officer_name": "BLYTH, TS"},
+      "category": "officers",
+      "pages": 2
+    }
+  ],
+  "items_per_page": 25,
+  "start_index": 0,
+  "total_count": 47
+}

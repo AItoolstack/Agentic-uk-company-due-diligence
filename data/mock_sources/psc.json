@@ -1,0 +1,62 @@
+{
+  "active_count": 2,
+  "ceased_count": 0,
+  "items_per_page": 25,
+  "start_index": 0,
+  "total_results": 2,
+  "items": [
+    {
+      "kind": "corporate-entity-person-with-significant-control",
+      "name": "PASSION CAPITAL FUND I LP",
+      "address": {
+        "address_line_1": "3rd Floor, 5 Cheapside",
+        "locality": "London",
+        "postal_code": "EC2V 6AA",
+        "country": "United Kingdom"
+      },
+      "identification": {
+        "legal_authority": "Limited Partnership Act 1907",
+        "legal_form": "Limited Partnership",
+        "country_registered": "United Kingdom",
+        "place_registered": "Companies House",
+        "registration_number": "LP014440"
+      },
+      "natures_of_control": [
+        "ownership-of-shares-25-to-50-percent",
+        "voting-rights-25-to-50-percent"
+      ],
+      "notified_on": "2016-04-06",
+      "ceased": false,
+      "links": {
+        "self": "/company/08905923/persons-with-significant-control/corporate-entity/mock001"
+      }
+    },
+    {
+      "kind": "corporate-entity-person-with-significant-control",
+      "name": "Y COMBINATOR CONTINUITY II LP",
+      "address": {
+        "address_line_1": "548 Market Street",
+        "locality": "San Francisco",
+        "region": "California",
+        "postal_code": "94104",
+        "country": "United States"
+      },
+      "identification": {
+        "legal_authority": "California Limited Partnership Act",
+        "legal_form": "Limited Partnership",
+        "country_registered": "United States",
+        "place_registered": "California Secretary of State",
+        "registration_number": "201634510187"
+      },
+      "natures_of_control": [
+        "ownership-of-shares-25-to-50-percent",
+        "voting-rights-25-to-50-percent"
+      ],
+      "notified_on": "2017-08-14",
+      "ceased": false,
+      "links": {
+        "self": "/company/08905923/persons-with-significant-control/corporate-entity/mock002"
+      }
+    }
+  ]
+}

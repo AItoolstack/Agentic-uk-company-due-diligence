@@ -1,0 +1,41 @@
+{
+  "firm_reference_number": "730427",
+  "organisation_name": "Monzo Bank Limited",
+  "status": "Authorised",
+  "status_effective_date": "2017-04-06",
+  "firm_type": "Credit Institution",
+  "registered_address": {
+    "address_line_1": "Broadwalk House",
+    "address_line_2": "5 Appold Street",
+    "town": "London",
+    "postcode": "EC2A 2AG",
+    "country": "United Kingdom"
+  },
+  "permissions": [
+    "Accepting deposits",
+    "Administering a benchmark",
+    "Agreeing to carry on a regulated activity",
+    "Arranging (bringing about) deals in investments",
+    "Credit broking",
+    "Dealing in investments as agent",
+    "Issuing electronic money",
+    "Making arrangements with a view to transactions in investments",
+    "Operating an electronic system in relation to lending",
+    "Providing basic bank account services"
+  ],
+  "requirements": [
+    {
+      "requirement_reference": "OR-0000001",
+      "description": "The firm must maintain a minimum capital requirement as per PRA rules.",
+      "effective_date": "2017-04-06"
+    }
+  ],
+  "appointed_representatives": [],
+  "disciplinary_history": [],
+  "regulators": [
+    {"name": "Financial Conduct Authority", "role": "Lead regulator"},
+    {"name": "Prudential Regulation Authority", "role": "Prudential regulator"}
+  ],
+  "pra_regulated": true,
+  "last_verified": "2025-01-10"
+}

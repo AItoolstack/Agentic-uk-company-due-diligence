@@ -1,0 +1,41 @@
+{
+  "company_number": "09446231",
+  "company_name": "MONZO BANK LIMITED",
+  "registered_office_address": {
+    "address_line_1": "Broadwalk House",
+    "address_line_2": "5 Appold Street",
+    "locality": "London",
+    "postal_code": "EC2A 2AG",
+    "country": "England"
+  },
+  "company_status": "active",
+  "company_type": "private-limited-company",
+  "date_of_creation": "2015-02-16",
+  "has_been_liquidated": false,
+  "has_charges": true,
+  "has_insolvency_history": false,
+  "jurisdiction": "england-wales",
+  "sic_codes": ["64191"],
+  "accounts": {
+    "next_due": "2025-09-30",
+    "last_accounts": {
+      "made_up_to": "2024-02-29",
+      "type": "full"
+    },
+    "accounting_reference_date": {
+      "day": "28",
+      "month": "02"
+    }
+  },
+  "confirmation_statement": {
+    "last_made_up_to": "2024-02-16",
+    "next_due": "2025-03-02",
+    "next_made_up_to": "2025-02-16",
+    "overdue": false
+  },
+  "links": {
+    "self": "/company/09446231",
+    "filing_history": "/company/09446231/filing-history",
+    "officers": "/company/09446231/officers"
+  }
+}

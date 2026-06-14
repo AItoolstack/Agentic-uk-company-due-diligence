@@ -1,0 +1,45 @@
+{
+  "note": "Mock news signals for Monzo Bank Limited (categorised, for use_mock=true)",
+  "signals": [
+    {
+      "category": "regulatory",
+      "headline": "FCA issues requirements notice to Monzo over AML controls",
+      "source_url": "https://www.fca.org.uk/news/press-releases/fca-monzo-requirements-2024",
+      "date": "2024-02-20",
+      "severity": "high",
+      "summary": "The FCA issued requirements to Monzo Bank Limited to address weaknesses in anti-money laundering systems and controls identified during a supervisory review. Monzo must implement remediation by Q3 2024."
+    },
+    {
+      "category": "operational_incident",
+      "headline": "Monzo discloses data incident affecting customer contact details",
+      "source_url": "https://monzo.com/blog/2024/05/10/data-incident",
+      "date": "2024-05-10",
+      "severity": "medium",
+      "summary": "Monzo disclosed an incident involving unauthorised access to customer contact information via a third-party tool. No payment card or account data was compromised. ICO notified."
+    },
+    {
+      "category": "governance_change",
+      "headline": "Monzo appoints new CFO ahead of anticipated IPO",
+      "source_url": "https://www.ft.com/content/monzo-cfo-appointment-2024",
+      "date": "2024-07-15",
+      "severity": "low",
+      "summary": "Monzo Bank named a new Chief Financial Officer, widely interpreted as a step toward a public listing on the London Stock Exchange. Incoming CFO joins from a major UK investment bank."
+    },
+    {
+      "category": "financial_distress",
+      "headline": "Monzo narrows losses as annual revenues grow 80% to over GBP 700m",
+      "source_url": "https://www.cityam.com/monzo-annual-results-2024",
+      "date": "2024-09-20",
+      "severity": "low",
+      "summary": "Monzo Bank reported improved results with revenues growing 80% year-on-year. Net loss narrowed by 40%. The bank moved closer to sustained profitability for the first time."
+    },
+    {
+      "category": "ma_activity",
+      "headline": "Monzo raises GBP 430m in Series I funding round at GBP 5bn valuation",
+      "source_url": "https://techcrunch.com/2024/03/monzo-series-i",
+      "date": "2024-03-05",
+      "severity": "low",
+      "summary": "Monzo Bank completed a GBP 430 million funding round led by US institutional investors, valuing the challenger bank at approximately GBP 5 billion and extending its runway for international expansion."
+    }
+  ]
+}

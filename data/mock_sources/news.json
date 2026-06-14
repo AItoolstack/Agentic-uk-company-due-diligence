@@ -1,0 +1,66 @@
+{
+  "query": "Monzo Bank Limited",
+  "total_results": 6,
+  "articles": [
+    {
+      "source": "Financial Times",
+      "author": "Joshua Oliver",
+      "title": "Monzo reports first annual pre-tax profit as customer base surpasses 9 million",
+      "description": "UK challenger bank Monzo has reported its first full-year pre-tax profit of GBP 15.4 million for the year ending February 2024, marking a significant milestone after years of losses.",
+      "url": "https://www.ft.com/monzo-profit-2024",
+      "published_at": "2024-07-16",
+      "sentiment": "positive",
+      "tags": ["profitability", "growth", "challenger-bank"]
+    },
+    {
+      "source": "BBC News",
+      "author": "Theo Leggett",
+      "title": "Monzo faces FCA scrutiny over financial crime controls",
+      "description": "The Financial Conduct Authority has opened an inquiry into Monzo's anti-money laundering controls following concerns raised during a routine supervisory review.",
+      "url": "https://www.bbc.co.uk/news/monzo-fca-inquiry",
+      "published_at": "2023-12-04",
+      "sentiment": "negative",
+      "tags": ["regulatory", "AML", "FCA", "risk"]
+    },
+    {
+      "source": "TechCrunch",
+      "author": "Ingrid Lunden",
+      "title": "Monzo raises $430M at $5B valuation in latest funding round",
+      "description": "Monzo has closed a new funding round valuing the company at $5 billion, with participation from CapitalG and existing investors.",
+      "url": "https://techcrunch.com/monzo-funding-2024",
+      "published_at": "2024-03-08",
+      "sentiment": "positive",
+      "tags": ["funding", "valuation", "venture-capital"]
+    },
+    {
+      "source": "The Guardian",
+      "author": "Kalyeena Makortoff",
+      "title": "Monzo CEO says US expansion remains priority despite regulatory headwinds",
+      "description": "TS Blyth told investors that the company's US banking licence application continues to progress, though he acknowledged regulatory timelines remain uncertain.",
+      "url": "https://www.theguardian.com/monzo-us-expansion",
+      "published_at": "2024-05-22",
+      "sentiment": "neutral",
+      "tags": ["expansion", "US", "strategy"]
+    },
+    {
+      "source": "City A.M.",
+      "author": "Tom Pilkington",
+      "title": "Monzo customers hit by outage amid surge in traffic",
+      "description": "Monzo experienced a 3-hour service outage in February 2024 affecting card payments and app access for an estimated 200,000 customers.",
+      "url": "https://www.cityam.com/monzo-outage-2024",
+      "published_at": "2024-02-13",
+      "sentiment": "negative",
+      "tags": ["operational-risk", "outage", "technology"]
+    },
+    {
+      "source": "Reuters",
+      "author": "Iain Withers",
+      "title": "UK neobanks eye IPO market as valuations stabilise",
+      "description": "Monzo and rival Revolut are both reported to be monitoring public market conditions ahead of potential IPOs, with advisers suggesting a 2025 window.",
+      "url": "https://www.reuters.com/neobank-ipo-2024",
+      "published_at": "2024-09-30",
+      "sentiment": "neutral",
+      "tags": ["IPO", "markets", "fintech"]
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "active_count": 7,
+  "inactive_count": 12,
+  "items": [
+    {
+      "name": "BLYTH, TS",
+      "appointed_on": "2020-01-15",
+      "resigned_on": null,
+      "officer_role": "director",
+      "nationality": "British",
+      "country_of_residence": "United Kingdom",
+      "occupation": "Chief Executive Officer",
+      "date_of_birth": {"month": 6, "year": 1984}
+    },
+    {
+      "name": "CAVANAGH, Gary",
+      "appointed_on": "2021-06-01",
+      "resigned_on": null,
+      "officer_role": "director",
+      "nationality": "British",
+      "country_of_residence": "United Kingdom",
+      "occupation": "Chief Financial Officer",
+      "date_of_birth": {"month": 3, "year": 1977}
+    },
+    {
+      "name": "HENDRA, Sujata",
+      "appointed_on": "2022-03-10",
+      "resigned_on": null,
+      "officer_role": "director",
+      "nationality": "British",
+      "country_of_residence": "United Kingdom",
+      "occupation": "Chief Risk Officer",
+      "date_of_birth": {"month": 9, "year": 1979}
+    },
+    {
+      "name": "BLOMFIELD, Thomas",
+      "appointed_on": "2015-02-16",
+      "resigned_on": "2021-01-18",
+      "officer_role": "director",
+      "nationality": "British",
+      "country_of_residence": "United Kingdom",
+      "occupation": "Chief Executive Officer",
+      "date_of_birth": {"month": 12, "year": 1984}
+    },
+    {
+      "name": "MCINNES, Alain",
+      "appointed_on": "2023-09-01",
+      "resigned_on": null,
+      "officer_role": "secretary",
+      "nationality": "British",
+      "country_of_residence": "United Kingdom",
+      "occupation": "Company Secretary",
+      "date_of_birth": {"month": 5, "year": 1981}
+    }
+  ]
+}

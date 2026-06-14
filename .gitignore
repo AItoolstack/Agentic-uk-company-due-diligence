@@ -1,0 +1,32 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+vvenv/
+
+# Generated and internal working material
+output/
+devlog/
+docs/*.docx
+scripts/build_business_functional_guide.py
+AGENTS.md
+PROJECT_CONTEXT.md
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,10 @@
+{
+  "company_name": "MONZO BANK LIMITED",
+  "officers_checked": 3,
+  "disqualified_officers": [],
+  "phoenix_risk_score": 0.0,
+  "phoenix_evidence": [],
+  "sanctions_hits": [],
+  "sanctions_screened_count": 4,
+  "note": "Mock fraud signals data. No adverse findings."
+}
