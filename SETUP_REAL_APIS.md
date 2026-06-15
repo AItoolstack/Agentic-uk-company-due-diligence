@@ -77,6 +77,7 @@ not require a key:
 
 ```ini
 FCA_API_KEY=
+FCA_API_EMAIL=
 FCA_BASE_URL=https://register.fca.org.uk/services/V0.1
 ```
 

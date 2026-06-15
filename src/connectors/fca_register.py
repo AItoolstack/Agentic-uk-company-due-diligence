@@ -8,9 +8,9 @@ Endpoints covered:
   - GET /Search?q={name}             -> firm name search
 
 Real API: https://register.fca.org.uk/services/V0.1
-Auth: The register.fca.org.uk API is public but requires browser-like
-      headers to avoid 403 from Cloudflare WAF (python-requests UA is
-      blocked). FCA_API_KEY adds an X-Auth-Key header if set.
+Auth: Register through the FCA FS Register API Developer Portal.
+      FCA_API_KEY and FCA_API_EMAIL are sent through the X-Auth-Key
+      and X-Auth-Email headers.
 
 The real API returns PascalCase keys nested under a "Data" object.
 _normalize_firm() maps these to the flat snake_case schema the
@@ -26,7 +26,7 @@ from typing import Any
 from src.config import settings
 from src.connectors.base import BaseConnector, ConnectorError
 
-# Browser-like headers avoid 403 from Cloudflare WAF on register.fca.org.uk
+# Browser-like headers match the Register web client's request format.
 _FCA_HEADERS: dict[str, str] = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -72,14 +72,12 @@ class FCARegisterConnector(BaseConnector):
     # ------------------------------------------------------------------
 
     def _request_headers(self) -> dict[str, str]:
-        """Return browser-like headers, plus X-Auth-Key if configured.
-
-        The FCA Register public API blocks python-requests User-Agent
-        with 403. Sending browser-style headers avoids this.
-        """
+        """Return browser-like headers plus configured FCA credentials."""
         headers = dict(_FCA_HEADERS)
         if settings.fca_api_key:
             headers["X-Auth-Key"] = settings.fca_api_key
+        if settings.fca_api_email:
+            headers["X-Auth-Email"] = settings.fca_api_email
         return headers
 
     def _normalize_firm(self, raw: dict[str, Any]) -> dict[str, Any]:

@@ -15,8 +15,8 @@ and watchlists simultaneously, including:
 API docs: https://www.opensanctions.org/docs/api/
 Endpoint: POST https://api.opensanctions.org/match/default
 
-Auth: X-Api-Key header (optional -- free tier works without a key,
-      subject to lower rate limits).
+Auth: Authorization: ApiKey <key>. Obtain a trial or licensed API key from
+OpenSanctions.
 
 Mock fallback: returns empty hits for all queried names.
 """
@@ -84,7 +84,9 @@ class OpenSanctionsConnector(BaseConnector):
 
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if settings.open_sanctions_api_key:
-            headers["X-Api-Key"] = settings.open_sanctions_api_key
+            headers["Authorization"] = (
+                f"ApiKey {settings.open_sanctions_api_key}"
+            )
 
         try:
             raw = self._post(_MATCH_URL, payload={"queries": queries}, headers=headers)

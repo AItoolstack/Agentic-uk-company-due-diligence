@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     # FCA Register
     fca_api_key: str = Field(default="", alias="FCA_API_KEY")
+    fca_api_email: str = Field(default="", alias="FCA_API_EMAIL")
     fca_base_url: str = Field(
         default="https://register.fca.org.uk/services/V0.1",
         alias="FCA_BASE_URL",
@@ -54,7 +55,7 @@ class Settings(BaseSettings):
     # Brave Search API
     brave_search_api_key: str = Field(default="", alias="BRAVE_SEARCH_API_KEY")
 
-    # OpenSanctions API (optional -- free tier works without a key)
+    # OpenSanctions API
     # https://www.opensanctions.org/docs/api/
     open_sanctions_api_key: str = Field(default="", alias="OPEN_SANCTIONS_API_KEY")
     open_sanctions_base_url: str = Field(

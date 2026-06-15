@@ -58,7 +58,7 @@ def main() -> None:
     results.append(check("fetch filings 09446231", lambda: ch.fetch_filing_history("09446231")))
 
     # --- FCA Register ---
-    print("\nFCA Register (public, no key required):")
+    print("\nFCA Register:")
     fca = FCARegisterConnector()
     fca.use_mock = False
 
