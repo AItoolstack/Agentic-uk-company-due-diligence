@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Awaitable, Callable
 
+from src.prescreen import casefile
 from src.prescreen import checks as C
 from src.prescreen.llm import JSONChat
 from src.prescreen.media import check_media
@@ -292,7 +293,12 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         results.append(trade)
     results.append(C.check_ccj())
 
+    for c in results:
+        c.group = casefile.group_of(c.check_id)
+        for f in c.findings:
+            f.tags = casefile.fraud_tags(f.rule_id)
     route, reasons = decide(results)
+    card = company_card(data)
     unchecked = [c.title for c in results if c.status == CheckStatus.COULDNT_CHECK]
     return PreScreenReport(
         report_id=uuid.uuid4().hex[:16],
@@ -308,7 +314,9 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         summary=rules_summary(route, reasons, results),
         llm_calls=services.llm.calls,
         elapsed_seconds=round(time.perf_counter() - t0, 2),
-        company=company_card(data),
+        company=card,
+        broker_questions=casefile.broker_questions(results),
+        proposal_vs_record=casefile.proposal_vs_record(req, card, results, today),
     )
 
 

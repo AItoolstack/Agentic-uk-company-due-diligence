@@ -57,6 +57,8 @@ class Finding(BaseModel):
     text: str
     detail: dict[str, Any] = Field(default_factory=dict)
     sources: list[SourceRef] = Field(default_factory=list)
+    # Fraud indicators this finding is also evidence of (e.g. "phoenix"). Set by casefile.py.
+    tags: list[str] = Field(default_factory=list)
 
 
 class CheckResult(BaseModel):
@@ -70,6 +72,8 @@ class CheckResult(BaseModel):
     not_checked_reason: str = ""
     # Critical checks: if these can't run, the case can't be "note".
     critical: bool = False
+    # Which underwriter question this check answers (casefile.GROUPS). Set by the engine.
+    group: str = ""
 
     @property
     def worst_route(self) -> Route | None:
@@ -126,6 +130,8 @@ class PreScreenRequest(BaseModel):
     expects_fca_authorisation: bool = False
     cover_lines: list[str] = Field(default_factory=list, max_length=7)
     declared_turnover_gbp: int | None = Field(default=None, ge=0, le=10**12)
+    declared_years_trading: int | None = Field(default=None, ge=0, le=300)
+    declared_directors: str = Field(default="", max_length=600)  # names from the proposal, comma separated
 
     @field_validator("company_number")
     @classmethod
@@ -163,6 +169,8 @@ class PreScreenReport(BaseModel):
     elapsed_seconds: float = 0.0
     decision: dict[str, Any] | None = None
     company: dict[str, Any] = Field(default_factory=dict)  # identity card: what the underwriter confirms first
+    broker_questions: list[dict[str, Any]] = Field(default_factory=list)
+    proposal_vs_record: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class DecisionRequest(BaseModel):

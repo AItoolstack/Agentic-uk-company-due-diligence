@@ -5,6 +5,7 @@ API for the underwriter pre-screen.
   GET  /api/prescreen/search?q=         resolve a name or number (identity gate)
   POST /api/prescreen                   run a pre-screen for one company number
   GET  /api/prescreen/{report_id}       fetch a saved report
+  GET  /api/prescreen/{report_id}/note       plain-text file note for the underwriting system
   POST /api/prescreen/{report_id}/decision   record the underwriter's decision and reason
 """
 
@@ -23,6 +24,7 @@ from fastapi.responses import StreamingResponse
 
 from src.config import settings
 from src.prescreen import demo_cases
+from src.prescreen.casefile import GROUPS, file_note
 from src.prescreen.engine import CompanyNotFound, SourceDown, run_prescreen
 from src.prescreen.identity import resolve
 from src.prescreen.models import DecisionRequest, IdentityResult, PreScreenRequest
@@ -76,6 +78,7 @@ async def config() -> dict:
         "access_required": bool(os.environ.get("PRESCREEN_ACCESS_TOKEN")),
         "storage": get_store().kind,
         "thresholds": THRESHOLDS,
+        "groups": GROUPS,
         "sources": {
             "companies_house": bool(settings.companies_house_api_key) or not live,
             "fca_register": bool(settings.fca_api_key and settings.fca_api_email) or not live,
@@ -212,6 +215,15 @@ async def get_report(report_id: str) -> dict:
     if payload is None:
         raise HTTPException(404, "Report not found.")
     return payload
+
+
+@router.get("/{report_id}/note")
+async def file_note_text(report_id: str) -> dict:
+    """Plain-text file note for the underwriting system, including the latest decision."""
+    payload = await load_report(report_id)
+    if payload is None:
+        raise HTTPException(404, "Report not found.")
+    return {"report_id": report_id, "text": file_note(payload)}
 
 
 @router.post("/{report_id}/decision")
