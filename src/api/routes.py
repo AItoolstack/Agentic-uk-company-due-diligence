@@ -27,6 +27,7 @@ from src.tracing import langsmith_tracing_context
 
 router = APIRouter()
 _FRONTEND_HTML = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
+_PRESCREEN_HTML = Path(__file__).resolve().parents[2] / "frontend" / "prescreen.html"
 
 # Nodes that emit node_complete SSE events
 _GRAPH_NODES = {
@@ -61,7 +62,16 @@ async def health() -> HealthResponse:
 
 
 @router.get("/", response_class=HTMLResponse, tags=["meta"])
+async def serve_prescreen() -> HTMLResponse:
+    """The underwriter pre-screen (current app)."""
+    if _PRESCREEN_HTML.exists():
+        return HTMLResponse(_PRESCREEN_HTML.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>frontend/prescreen.html not found</h1>", status_code=404)
+
+
+@router.get("/legacy", response_class=HTMLResponse, tags=["meta"])
 async def serve_frontend() -> HTMLResponse:
+    """The original agentic research UI, kept for comparison."""
     if _FRONTEND_HTML.exists():
         return HTMLResponse(_FRONTEND_HTML.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>frontend/index.html not found</h1>", status_code=404)
