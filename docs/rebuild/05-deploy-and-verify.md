@@ -3,13 +3,19 @@
 Nothing here has been deployed. The Space still runs the old app.
 
 ## Deploy to the existing Space (keeps its URL and secrets)
-1. Merge the PR, or check out `rebuild/underwriter-prescreen`.
-2. Push to the Space remote: `git push hf rebuild/underwriter-prescreen:main`
-   (GitHub and the Space have different histories; the Space has a few deployment commits GitHub lacks.
-   This branch now carries the Space's README front matter, Dockerfile and .dockerignore, so a
-   force push is safe: `git push --force hf rebuild/underwriter-prescreen:main`. Your call.)
-3. In Space settings, add a secret `PRESCREEN_ACCESS_TOKEN` (any code). Keep the existing secrets.
-   `USE_MOCK_DATA=false` and the gpt-oss model variables are already set.
+Use the GitHub Action, not a manual push: Actions → "deploy to Hugging Face Space" → Run workflow
+(ref `rebuild/underwriter-prescreen`). It pushes a one-commit snapshot with images in Git LFS,
+because Hugging Face rejects plain binary files and this repo's history has three PNGs as plain
+objects. The Space's old history is replaced; GitHub's isn't touched.
+
+Needs, once:
+1. GitHub repo secret `HF_TOKEN`: a Hugging Face **write** token for the AItoolstack account.
+2. Space secrets (Space → Settings → Variables and secrets), keeping the existing ones
+   (`COMPANIES_HOUSE_API_KEY`, `GROQ_API_KEY`, FCA, Brave, `USE_MOCK_DATA=false`, model names):
+   - `PRESCREEN_ACCESS_TOKEN`: any code; the UI, the API and the MCP endpoint all ask for it.
+   - `PRESCREEN_JOB_TOKEN`: any code; for the daily re-check (also add it as a GitHub secret).
+   - `SUPABASE_DB_URL`: Supabase → project uk-company-prescreen → Connect → Session pooler string.
+     Optional: without it, reports are saved to files and lost when the Space restarts.
 
 ## Then I verify on live data (about 10 minutes, ~10 runs)
 | Company | What it proves |
