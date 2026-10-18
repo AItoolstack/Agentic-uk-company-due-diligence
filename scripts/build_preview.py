@@ -155,9 +155,6 @@ def main(out: str) -> None:
     html = re.sub(r'<meta charset="utf-8">\n|<meta name="viewport"[^>]*>\n', "", html)
     html = html.replace("</head>\n<body>\n", "").replace("</body>\n</html>\n", "")
     html = re.sub(r"<title>.*?</title>", "<title>UK Company Pre-Screen</title>", html, count=1)
-    html = html.replace("</style>", ".pv{background:var(--ink);color:#fff;font-size:13px;padding-block:8px;"
-                        "padding-left:max(16px,env(safe-area-inset-left,0px));"
-                        "padding-right:max(16px,env(safe-area-inset-right,0px))}\n</style>", 1)
     html = html.replace('<header class="top">', BANNER + '<header class="top">', 1)
     Path(out).write_text(html, encoding="utf-8")
     print(f"wrote {out}: {len(data['reports'])} reports, {len(data['changes'])} changes")

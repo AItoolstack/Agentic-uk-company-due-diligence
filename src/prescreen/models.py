@@ -171,6 +171,7 @@ class PreScreenReport(BaseModel):
     company: dict[str, Any] = Field(default_factory=dict)  # identity card: what the underwriter confirms first
     broker_questions: list[dict[str, Any]] = Field(default_factory=list)
     proposal_vs_record: list[dict[str, Any]] = Field(default_factory=list)
+    timeline: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class DecisionRequest(BaseModel):

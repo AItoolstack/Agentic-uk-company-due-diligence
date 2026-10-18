@@ -317,7 +317,16 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         company=card,
         broker_questions=casefile.broker_questions(results),
         proposal_vs_record=casefile.proposal_vs_record(req, card, results, today),
+        timeline=_timeline(data),
     )
+
+
+def _timeline(data: C.CompanyData) -> list[dict[str, Any]]:
+    """Cosmetic: a bug here must never fail the report."""
+    try:
+        return casefile.timeline(data)
+    except Exception:  # noqa: BLE001
+        return []
 
 
 async def _gazette_missing() -> SourceError:

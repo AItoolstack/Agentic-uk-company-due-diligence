@@ -328,3 +328,106 @@ def file_note(report: dict[str, Any]) -> str:
                   f"Reason: {d.get('reason')}"]
     lines += ["", "A recommendation from public records only. The underwriter decides."]
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Timeline: what happened when, from the registers already fetched
+# ---------------------------------------------------------------------------
+
+def _date(s: Any) -> date | None:
+    if not s:
+        return None
+    s = str(s)[:10]
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def timeline(data: Any, years: int = 5, limit: int = 30) -> list[dict[str, Any]]:
+    """Dated events from Companies House and the Gazette, newest first.
+    Each event: {date, kind, text, tone} with kind in company | people | owners | money | filings | legal
+    and tone in neutral | watch | serious. Uses only what the run already fetched; no new calls.
+    `data` is checks.CompanyData (typed loosely to avoid an import cycle)."""
+    from src.prescreen.checks import active_officers  # local import: checks imports nothing from here
+
+    today: date = data.today
+    cutoff = date(today.year - years, today.month, min(today.day, 28))
+    p = data.profile or {}
+    ev: list[tuple[date, str, str, str]] = []
+
+    def add(d: date | None, kind: str, text: str, tone: str = "neutral", always: bool = False) -> None:
+        if d and (always or d >= cutoff) and d <= today:
+            ev.append((d, kind, text, tone))
+
+    created = _date(p.get("date_of_creation"))
+    add(created, "company", "Incorporated", always=True)
+    for prev in p.get("previous_company_names") or []:
+        add(_date(prev.get("ceased_on")), "company", f"Renamed from {prev.get('name')}", "watch")
+
+    acc = p.get("accounts") or {}
+    last = acc.get("last_accounts") or {}
+    made_up = _date(last.get("period_end_on") or last.get("made_up_to"))
+    if made_up:
+        add(made_up, "filings", f"Year end of the last accounts filed ({(last.get('type') or 'accounts').replace('-', ' ')})")
+    nxt = acc.get("next_accounts") or {}
+    due = _date(nxt.get("due_on") or acc.get("next_due"))
+    if due and due <= today and nxt.get("overdue", True):
+        add(due, "filings", "Accounts due, not filed", "serious" if (today - due).days > 90 else "watch")
+    cs = p.get("confirmation_statement") or {}
+    cs_due = _date(cs.get("next_due"))
+    if cs.get("overdue") and cs_due:
+        add(cs_due, "filings", "Confirmation statement due, not filed", "watch")
+
+    officers = data.officers.get("items") if isinstance(data.officers, dict) else []
+    current = {o.get("name") for o in active_officers(data)}
+    for o in officers or []:
+        role = (o.get("officer_role") or "officer").replace("-", " ")
+        add(_date(o.get("appointed_on")), "people", f"{o.get('name')} appointed ({role})",
+            "watch" if o.get("name") in current and _date(o.get("appointed_on")) and
+            (today - _date(o.get("appointed_on"))).days < 365 else "neutral")
+        add(_date(o.get("resigned_on")), "people", f"{o.get('name')} resigned ({role})",
+            "watch" if (today - (_date(o.get("resigned_on")) or today)).days < 365 else "neutral")
+
+    pscs = data.pscs.get("items") if isinstance(data.pscs, dict) else []
+    for x in pscs or []:
+        add(_date(x.get("notified_on")), "owners", f"{x.get('name')} became an owner or controller",
+            "watch" if (today - (_date(x.get("notified_on")) or cutoff)).days < 365 else "neutral")
+        add(_date(x.get("ceased_on")), "owners", f"{x.get('name')} stopped being an owner or controller", "watch")
+
+    charges = data.charges.get("items") if isinstance(data.charges, dict) else []
+    for c in charges or []:
+        lenders = ", ".join(x.get("name", "") for x in c.get("persons_entitled") or [] if x.get("name")) or "a lender"
+        add(_date(c.get("created_on")), "money", f"Charge registered to {lenders}",
+            "watch" if (today - (_date(c.get("created_on")) or cutoff)).days < 365 else "neutral")
+        add(_date(c.get("satisfied_on")), "money", f"Charge to {lenders} satisfied")
+
+    ins = data.insolvency.get("cases") if isinstance(data.insolvency, dict) else []
+    for case in ins or []:
+        kind = (case.get("type") or "insolvency case").replace("-", " ")
+        for d in case.get("dates") or []:
+            add(_date(d.get("date")), "legal", f"Insolvency: {kind} ({(d.get('type') or '').replace('-', ' ')})",
+                "serious", always=True)
+
+    notices = data.gazette_notices if isinstance(data.gazette_notices, list) else []
+    for nt in notices:
+        add(_date(nt.get("published")), "legal", f"Gazette notice: {nt.get('title') or nt.get('code') or 'insolvency'}",
+            "serious")
+    gf = data.gazette_filings.get("items") if isinstance(data.gazette_filings, dict) else []
+    for f in gf or []:
+        desc = f.get("description") or ""
+        text = {"gazette-notice-compulsory": "First Gazette notice for compulsory strike-off",
+                "gazette-notice-voluntary": "First Gazette notice for voluntary strike-off",
+                "gazette-dissolved-compulsory": "Struck off and dissolved (compulsory)",
+                "gazette-dissolved-voluntary": "Struck off and dissolved (voluntary)"}.get(
+            desc, desc.replace("-", " ").capitalize() or "Gazette filing")
+        add(_date(f.get("date")), "legal", text, "serious")
+
+    ev.sort(key=lambda e: e[0], reverse=True)
+    out = [{"date": d.isoformat(), "kind": k, "text": t, "tone": tone} for d, k, t, tone in ev]
+    if len(out) > limit:  # keep incorporation even when trimming
+        inc = [e for e in out if e["text"] == "Incorporated"]
+        out = out[:limit - len(inc)] + inc
+    return out

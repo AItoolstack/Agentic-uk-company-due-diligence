@@ -175,3 +175,18 @@ def test_an_info_summary_never_says_nothing_was_found():
         for c in report.checks:
             if c.status.value == "info" and c.check_id == "changes":
                 assert not c.summary.startswith("No "), (number, c.summary)
+
+
+def test_timeline_is_newest_first_and_names_what_happened():
+    tl = _run("ZZ000002").timeline
+    dates = [e["date"] for e in tl]
+    assert dates == sorted(dates, reverse=True)
+    texts = " | ".join(e["text"] for e in tl)
+    assert "compulsory strike-off" in texts and "Charge registered" in texts and "Accounts due, not filed" in texts
+    assert {e["tone"] for e in tl} <= {"neutral", "watch", "serious"}
+
+
+def test_timeline_keeps_incorporation_and_old_renames_out_of_window():
+    tl = _run("09563205", llm_answers=[_all_reviewed(4)]).timeline
+    assert tl[-1]["text"] == "Incorporated"
+    assert any("Renamed from" in e["text"] for e in tl)
