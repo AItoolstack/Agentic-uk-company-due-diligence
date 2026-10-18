@@ -299,6 +299,71 @@ class PgStore:
         return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row.items()}
 
 
+class FallbackStore:
+    """Postgres first; if the database can't be reached or refuses the login, use files for a while.
+
+    Why: a wrong password made every page load retry the database several times, which tripped
+    Supabase's pooler into blocking all new connections ("too many authentication failures"), and
+    every report failed to save. Now the first connection failure switches to files for
+    `cooldown` seconds, the reason is shown (config + UI), and the database is tried again after.
+    Reports saved to files during an outage stay in files; they are not copied back.
+    """
+
+    def __init__(self, primary: Any, fallback: Any, cooldown: float = 300) -> None:
+        self.primary, self.fallback, self.cooldown = primary, fallback, cooldown
+        self.down_until = 0.0
+        self.reason = ""
+
+    @property
+    def kind(self) -> str:
+        return "files" if self._down() else getattr(self.primary, "kind", "postgres")
+
+    def _down(self) -> bool:
+        import time
+        return time.monotonic() < self.down_until
+
+    def status(self) -> dict[str, Any]:
+        return {"kind": self.kind, "database_ok": not self._down(), "reason": self.reason if self._down() else ""}
+
+    def __getattr__(self, name: str) -> Any:
+        target = getattr(self.primary, name)
+        if not callable(target):
+            return target
+
+        async def call(*args: Any, **kwargs: Any) -> Any:
+            import time
+            if self._down():
+                return await getattr(self.fallback, name)(*args, **kwargs)
+            try:
+                return await target(*args, **kwargs)
+            except Exception as exc:  # noqa: BLE001 - only connection-level failures switch over
+                if not _is_connection_error(exc):
+                    raise
+                self.down_until = time.monotonic() + self.cooldown
+                self.reason = _plain_db_error(exc)
+                return await getattr(self.fallback, name)(*args, **kwargs)
+        return call
+
+
+def _is_connection_error(exc: Exception) -> bool:
+    try:
+        import psycopg
+        return isinstance(exc, psycopg.OperationalError)
+    except ImportError:  # pragma: no cover
+        return type(exc).__name__ == "OperationalError"
+
+
+def _plain_db_error(exc: Exception) -> str:
+    text = str(exc).lower()
+    if "password authentication failed" in text or "auth_error" in text or "too many authentication" in text:
+        return "the database refused the login (check the password in SUPABASE_DB_URL)"
+    if "timeout" in text or "timed out" in text:
+        return "the database didn't answer in time"
+    if "could not translate host" in text or "name or service not known" in text or "network is unreachable" in text:
+        return "the database host couldn't be reached (use the Supabase session pooler string)"
+    return f"the database connection failed ({type(exc).__name__})"
+
+
 _STORE: Store | None = None
 
 
@@ -306,8 +371,13 @@ def get_store() -> Store:
     global _STORE
     if _STORE is None:
         dsn = os.environ.get("SUPABASE_DB_URL", "").strip()
-        _STORE = PgStore(dsn) if dsn else FileStore()
+        _STORE = FallbackStore(PgStore(dsn), FileStore()) if dsn else FileStore()
     return _STORE
+
+
+def store_status() -> dict[str, Any]:
+    s = get_store()
+    return s.status() if hasattr(s, "status") else {"kind": s.kind, "database_ok": None, "reason": ""}
 
 
 def set_store(store: Store | None) -> None:

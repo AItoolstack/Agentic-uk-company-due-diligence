@@ -32,7 +32,7 @@ from src.prescreen.rules import RULES_VERSION, THRESHOLDS
 from src.prescreen.engine import STAGES
 from src.prescreen.service import (build_services, demo_mode, list_recent, load_report, recheck_all,
                                    record_decision, save_report, watch_from_report)
-from src.prescreen.store import get_store
+from src.prescreen.store import get_store, store_status
 
 def require_access(request: Request) -> None:
     """If PRESCREEN_ACCESS_TOKEN is set, every pre-screen API call needs it (header X-Access-Token).
@@ -77,6 +77,7 @@ async def config() -> dict:
         "rules_version": RULES_VERSION,
         "access_required": bool(os.environ.get("PRESCREEN_ACCESS_TOKEN")),
         "storage": get_store().kind,
+        "storage_status": store_status(),
         "thresholds": THRESHOLDS,
         "groups": GROUPS,
         "sources": {

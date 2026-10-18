@@ -137,3 +137,48 @@ def test_recheck_needs_job_token_in_live_mode(monkeypatch, tmp_path):
         assert client.post("/api/jobs/recheck").status_code == 401
         assert client.post("/api/jobs/recheck", headers={"x-job-token": "nope"}).status_code == 401
     set_store(None)
+
+
+# ---------------------------------------------------------------- database outage fallback
+
+def test_store_falls_back_to_files_on_a_refused_login_and_stops_retrying(tmp_path):
+    import psycopg
+
+    from src.prescreen.store import FallbackStore, FileStore
+
+    class Refusing:
+        kind = "postgres"
+        calls = 0
+
+        async def recent(self, limit=12):
+            Refusing.calls += 1
+            raise psycopg.OperationalError('password authentication failed for user "postgres"')
+
+        async def save_report(self, payload):
+            Refusing.calls += 1
+            raise psycopg.OperationalError("password authentication failed")
+
+    store = FallbackStore(Refusing(), FileStore(tmp_path))
+    assert asyncio.run(store.recent()) == []
+    assert store.kind == "files" and "refused the login" in store.status()["reason"]
+    asyncio.run(store.recent())
+    asyncio.run(store.recent())
+    assert Refusing.calls == 1, "after one refused login it must not hammer the database"
+
+
+def test_store_fallback_doesnt_hide_ordinary_bugs(tmp_path):
+    from src.prescreen.store import FallbackStore, FileStore
+
+    class Buggy:
+        kind = "postgres"
+
+        async def recent(self, limit=12):
+            raise KeyError("payload")
+
+    store = FallbackStore(Buggy(), FileStore(tmp_path))
+    try:
+        asyncio.run(store.recent())
+        raise AssertionError("a KeyError must not be swallowed as an outage")
+    except KeyError:
+        pass
+    assert store.kind == "postgres"

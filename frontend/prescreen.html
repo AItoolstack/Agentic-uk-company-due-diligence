@@ -609,7 +609,9 @@ async function showStart(prefill) {
   const superseded = c => c.created_at < newest[c.company_number];
   const watchBadge = n => { const w = WATCHED.get(n); if (!w) return ""; return w.unseen_changes ? `<span class="wb new">${w.unseen_changes} new</span>` : `<span class="wb">watching</span>`; };
 
+  const ss = (CONFIG && CONFIG.storage_status) || {};
   $("#main").innerHTML = `
+    ${ss.database_ok === false ? `<div class="msg err" style="margin-bottom:16px">Saving to temporary files: ${esc(ss.reason)}. Reports made now are lost when the service restarts. The database is tried again in a few minutes.</div>` : ""}
     <div class="desk">
       <section class="panel newcase"><div class="body">
         <h1>Anything on the public record that changes how you'd treat this risk?</h1>
