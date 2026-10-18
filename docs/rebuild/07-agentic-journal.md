@@ -140,3 +140,37 @@ plus a stdio launch check. Full suite 156.
 8. "What MCP 2 changed, and four ways a deployed MCP server fails": the SDK and transport gotchas above.
 9. Coming: the multi-agent orchestrator, and the three-way comparison (rules + 1 call vs
    multi-agent vs the old graph) on cost, latency, coverage and correctness.
+
+---
+
+## First live deploy (18–19 Oct, 23:30–00:30)
+
+**Deploy path.** PR merged; a GitHub Action pushes a one-commit snapshot to the Space with images in
+Git LFS (Hugging Face rejects plain binaries; the GitHub history has three PNGs as plain objects).
+
+**Database: three failures, one lesson.**
+1. Wrong password. Supabase's pooler logged "password authentication failed"; each page load retried
+   several times until the pooler's circuit breaker blocked *all* new connections for minutes.
+2. Then the direct connection string: `db.<ref>.supabase.co` is IPv6-only and a Space can't reach it.
+   The app said "host couldn't be reached"; the pooler logs showed no attempts at all.
+3. Then the value was saved as a public Space *variable* rather than a secret.
+**Change made:** `FallbackStore`. On a connection-level error (psycopg OperationalError only, so
+real bugs still raise) it switches to files for 5 minutes, says why in plain words (config + banner),
+and stops hammering the database. Lesson: a dependency failing *loudly and repeatedly* can turn one
+misconfiguration into an outage for everyone sharing the pooler.
+**Debugging route worth a post:** the app's own error was vague; the provider's logs (read through
+the Supabase MCP connector) named the cause each time in one query.
+
+**First five live runs (Monzo, Wilko, Thames Water, Carillion, BrewDog), what they showed:**
+| Found | Cause | Fix |
+|---|---|---|
+| Sanctions "couldn't check" on every company, so every company was Refer | Live CSV calls the type column "Designation Type"; parser looked for "entity type", got blanks, and (correctly) refused | Column name fixed against the real header, read from the FCDO site in the browser; test uses the real header line |
+| Thames Water director checks "couldn't check" | Officers read one page (100); old companies have more | Officers paged |
+| Carillion: 7 reasons for one collapse; "accounts 3,032 days overdue" under "in liquidation" | One finding per article; consequences listed as causes | One news finding per severity; consequences of an ended company leave the reasons |
+| Monzo: a paragraph of FCA text as a reason | Register text used verbatim | Kind, date and gist; final notice linked |
+| Wilko: 2023 collapse article marked "about this company" | The rename guard passes it (published after the rename) | Collapse news about an active company with no insolvency record → "possibly about", never "about" |
+| Wilko trade check "not asked" though a trade was declared | Model chose the escape value | Prompt forbids it when a trade is given |
+
+Note the pattern: the coverage invariant did its job. Sanctions failing showed as "couldn't check",
+never as "clear". The cost was a Refer on every case — noisy, but safe. That's the trade-off the design
+chose on purpose, and the live run is the evidence for it.
