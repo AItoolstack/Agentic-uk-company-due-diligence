@@ -141,10 +141,17 @@ def company_card(data: C.CompanyData) -> dict[str, Any]:
                      for o in C.active_officers(data)][:8],
         "officer_count": len(C.active_officers(data)),
         "owners": [p2.get("name") for p2 in C.active_pscs(data)][:4],
+        # Full lists, for the daily re-check to compare against.
+        "officer_names": sorted(o.get("name", "") for o in C.active_officers(data)),
+        "owner_names": sorted(p2.get("name", "") for p2 in C.active_pscs(data)),
+        "officers_read": isinstance(data.officers, dict),
+        "owners_read": isinstance(data.pscs, dict),
     }
 
 
-async def run_prescreen(req: PreScreenRequest, services: Services, progress: Progress | None = None) -> PreScreenReport:
+async def run_prescreen(req: PreScreenRequest, services: Services, progress: Progress | None = None,
+                        skip_media: bool = False) -> PreScreenReport:
+    """skip_media: the daily re-check doesn't re-read news (it would cost a model call per company)."""
     def tick(stage: str, state: str, detail: str = "") -> None:
         if progress:
             try:
@@ -238,9 +245,14 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
 
     prev_names = [p.get("name", "") for p in profile.get("previous_company_names") or []]
     tick("fca", "start" if fca_needed else "skip", "" if fca_needed else "not a regulated trade")
-    tick("news", "start")
-    (firms, discipline), news = await asyncio.gather(
-        fca_lookup(), _safe(services.news.search(data.name, previous_names=prev_names)))
+    tick("news", "skip" if skip_media else "start", "not re-read in the daily check" if skip_media else "")
+
+    async def news_lookup() -> Any:
+        if skip_media:
+            return None
+        return await _safe(services.news.search(data.name, previous_names=prev_names))
+
+    (firms, discipline), news = await asyncio.gather(fca_lookup(), news_lookup())
     if fca_needed:
         tick("fca", "error" if isinstance(firms, SourceError) else "done")
 
@@ -260,15 +272,21 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         _guard("fca", "FCA authorisation", lambda: C.check_fca(data, req, firms, discipline)),
     ]
     try:
-        media, trade, media_items = await check_media(data, news, services.llm, req.declared_trade,
-                                                      services.news.provider_used)
+        if skip_media:
+            media = CheckResult(check_id="media", title="Adverse media", status=CheckStatus.NOT_APPLICABLE,
+                                summary="Not re-read in the daily check; open a full pre-screen to read news.")
+            trade, media_items = None, []
+        else:
+            media, trade, media_items = await check_media(data, news, services.llm, req.declared_trade,
+                                                          services.news.provider_used)
     except Exception as exc:  # noqa: BLE001
         media = CheckResult(check_id="media", title="Adverse media", status=CheckStatus.COULDNT_CHECK,
                             summary=f"Couldn't check: internal error ({type(exc).__name__}).",
                             not_checked_reason=f"internal error ({type(exc).__name__})")
         trade, media_items = None, []
-    tick("news", "error" if media.status == CheckStatus.COULDNT_CHECK else "done",
-         f"{len(media_items)} results" if media_items else "")
+    if not skip_media:
+        tick("news", "error" if media.status == CheckStatus.COULDNT_CHECK else "done",
+             f"{len(media_items)} results" if media_items else "")
     results.append(media)
     if trade:
         results.append(trade)

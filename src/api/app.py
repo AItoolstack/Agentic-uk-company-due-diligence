@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from src.api.prescreen_routes import router as prescreen_router
+from src.api.prescreen_routes import jobs_router, router as prescreen_router
 from src.api.routes import router
 
 _FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(prescreen_router)
+    app.include_router(jobs_router)
     app.include_router(router)
     app.mount(
         "/frontend",

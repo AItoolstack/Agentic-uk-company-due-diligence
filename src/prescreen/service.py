@@ -5,46 +5,26 @@ reports and underwriter decisions as JSON files.
 
 from __future__ import annotations
 
-import json
-import os
 import re
-import tempfile
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 import httpx
 
 from src.config import settings
 from src.prescreen import demo_cases
-from src.prescreen.engine import Services
+from src.prescreen.engine import Services, run_prescreen
+from src.prescreen.monitor import diff, snapshot
+from src.prescreen.store import _writable_dir, get_store
 from src.prescreen.llm import JSONChat
-from src.prescreen.models import DecisionRequest, PreScreenReport, utcnow
+from src.prescreen.models import DecisionRequest, PreScreenReport, PreScreenRequest, utcnow
 from src.prescreen.sources.companies_house import CompaniesHouse, FixtureTransport, LiveTransport
 from src.prescreen.sources.fca import FCARegister
 from src.prescreen.sources.gazette import Gazette
 from src.prescreen.sources.news import NewsSearch
 from src.prescreen.sources.sanctions import load_list, parse_csv
 
-ROOT = Path(__file__).resolve().parents[2]
-
-
-def _writable_dir() -> Path:
-    """output/ next to the code if we can write there, else the temp folder (e.g. a read-only container)."""
-    preferred = Path(os.environ.get("PRESCREEN_DATA_DIR", ROOT / "output"))
-    try:
-        preferred.mkdir(parents=True, exist_ok=True)
-        probe = preferred / ".write-test"
-        probe.write_text("ok")
-        probe.unlink()
-        return preferred
-    except OSError:
-        return Path(tempfile.gettempdir()) / "prescreen"
-
-
-_BASE = _writable_dir()
-STORE = _BASE / "prescreens"
-CACHE = _BASE / "cache"
+CACHE = _writable_dir() / "cache"
 
 
 class DemoTransport(FixtureTransport):
@@ -72,10 +52,12 @@ def demo_mode() -> bool:
     return settings.use_mock_data
 
 
-def build_services(client: httpx.AsyncClient, company_number: str = "") -> tuple[Services, dict[str, Any]]:
-    """Return services plus metadata shown on the report ("data": "live" | "demo")."""
+def build_services(client: httpx.AsyncClient, company_number: str = "",
+                   demo_day: int = 1) -> tuple[Services, dict[str, Any]]:
+    """Return services plus metadata shown on the report ("data": "live" | "demo").
+    demo_day=2 applies the demo cases' "next day" changes, so monitoring can be shown offline."""
     if demo_mode():
-        all_cases = demo_cases.cases()
+        all_cases = demo_cases.cases(day=demo_day)
         ch_data: dict[str, Any] = {}
         for case in all_cases.values():
             ch_data.update({k.lower() if "?q=" in k else k: v for k, v in case["ch"].items()})
@@ -114,33 +96,23 @@ def _llm(client: httpx.AsyncClient) -> JSONChat:
 
 
 # ---------------------------------------------------------------------------
-# Storage: one JSON file per report; decisions are appended to the report.
+# Storage (see store.py: Postgres when SUPABASE_DB_URL is set, else JSON files)
 # ---------------------------------------------------------------------------
 
-def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
-
-
-def save_report(report: PreScreenReport, meta: dict[str, Any]) -> None:
-    STORE.mkdir(parents=True, exist_ok=True)
+async def save_report(report: PreScreenReport, meta: dict[str, Any]) -> dict[str, Any]:
     payload = report.model_dump(mode="json")
     payload["meta"] = meta
-    payload["decisions"] = []
-    _atomic_write(STORE / f"{report.report_id}.json", payload)
+    await get_store().save_report(payload)
+    return payload
 
 
-def load_report(report_id: str) -> dict[str, Any] | None:
-    if not re.fullmatch(r"[0-9a-f]{16}", report_id or ""):
-        return None
-    path = STORE / f"{report_id}.json"
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+async def load_report(report_id: str) -> dict[str, Any] | None:
+    return await get_store().load_report(report_id)
 
 
-def record_decision(report_id: str, req: DecisionRequest) -> dict[str, Any] | None:
+async def record_decision(report_id: str, req: DecisionRequest) -> dict[str, Any] | None:
     """Append-only: a later decision is added beside the earlier ones, never over them."""
-    payload = load_report(report_id)
+    payload = await get_store().load_report(report_id)
     if payload is None:
         return None
     entry = {
@@ -149,28 +121,50 @@ def record_decision(report_id: str, req: DecisionRequest) -> dict[str, Any] | No
         "recommended_route": payload.get("route"),
         "rules_version": payload.get("rules_version"),
     }
-    payload.setdefault("decisions", []).append(entry)
-    payload["decision"] = entry  # latest, for convenience
-    _atomic_write(STORE / f"{report_id}.json", payload)
-    return entry
+    return await get_store().add_decision(report_id, entry)
 
 
-def list_recent(limit: int = 12) -> list[dict[str, Any]]:
-    """Newest reports first: enough to show a case list, not the reports themselves."""
-    if not STORE.exists():
-        return []
-    files = sorted(STORE.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)[:limit]
-    out = []
-    for f in files:
+async def list_recent(limit: int = 12) -> list[dict[str, Any]]:
+    return await get_store().recent(limit)
+
+
+# ---------------------------------------------------------------------------
+# Watching and the daily re-check
+# ---------------------------------------------------------------------------
+
+async def watch_from_report(report_id: str) -> dict[str, Any] | None:
+    payload = await get_store().load_report(report_id)
+    if payload is None:
+        return None
+    snap = snapshot(payload)
+    await get_store().watch(payload["company_number"], payload["company_name"], report_id, snap, payload["route"])
+    return await get_store().get_watch(payload["company_number"])
+
+
+async def recheck_all(client: httpx.AsyncClient, limit: int = 100) -> dict[str, Any]:
+    """Re-run the rule-based checks for every watched company and record what changed."""
+    store = get_store()
+    watched = (await store.list_watch())[:limit]
+    summary = {"checked": 0, "changed": 0, "failed": [], "changes": 0, "purged": 0}
+    for w in watched:
+        number = w["company_number"]
+        old = w.get("snapshot") or {}
         try:
-            d = json.loads(f.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            req = PreScreenRequest(**{**(old.get("request") or {}), "company_number": number})
+            services, meta = build_services(client, number, demo_day=2)
+            report = await run_prescreen(req, services, skip_media=True)
+        except Exception as exc:  # noqa: BLE001 - one company failing mustn't stop the rest
+            summary["failed"].append({"company_number": number, "error": type(exc).__name__})
             continue
-        last = (d.get("decisions") or [None])[-1]
-        out.append({
-            "report_id": d.get("report_id"), "company_number": d.get("company_number"),
-            "company_name": d.get("company_name"), "route": d.get("route"), "created_at": d.get("created_at"),
-            "decision": last.get("decision") if last else None,
-            "data": (d.get("meta") or {}).get("data", ""),
-        })
-    return out
+        meta["source"] = "daily re-check"
+        payload = await save_report(report, meta)
+        new = snapshot(payload)
+        changes = [{**c, "report_id": report.report_id} for c in diff(old, new)]
+        if changes:
+            await store.add_changes(number, changes)
+            summary["changed"] += 1
+            summary["changes"] += len(changes)
+        await store.update_watch(number, new, report.route.value)
+        summary["checked"] += 1
+    summary["purged"] = await store.purge()
+    return summary

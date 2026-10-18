@@ -86,8 +86,12 @@ def _news(title: str, published: str, source: str, snippet: str = "", url: str =
             "url": url or f"https://{source}/article-{abs(hash(title)) % 10**6}"}
 
 
-def cases() -> dict[str, dict[str, Any]]:
-    """number -> {"label", "kind", "ch": {path: json}, "fca": {...}, "news": [...] | SourceError}"""
+def cases(day: int = 1) -> dict[str, dict[str, Any]]:
+    """number -> {"label", "kind", "ch": {path: json}, "fca": {...}, "news": [...] | SourceError}
+
+    day=2 is "the next day" for the monitoring demo: the invented Pennine Advisory LLP gets a new
+    member, a new offshore owner and a winding-up petition. Real-profile cases never change.
+    """
     out: dict[str, dict[str, Any]] = {}
 
     # --- REAL: Wilko Limited (09563205) -----------------------------------
@@ -250,6 +254,16 @@ def cases() -> dict[str, dict[str, Any]]:
         },
         "news": [],
     }
+    if day >= 2:
+        llp = out[zl]
+        llp["ch"][f"/company/{zl}/officers"]["items"].append(
+            _officer("KHAN, Bilal", "zzllp4", (7, 1979), _d(0), role="llp-designated-member"))
+        llp["ch"]["/officers/zzllp4/appointments"] = {"items": [_appt(zl, "PENNINE ADVISORY LLP", "active", _d(0))]}
+        llp["ch"][f"/company/{zl}/persons-with-significant-control"]["items"].append(
+            {**_psc_corp("Harbour Nominees Ltd", "Seychelles"), "notified_on": _d(0)})
+        llp["gazette"] = [{"code": "2450", "title": "Petitions to Wind Up (Companies)", "published": _d(0),
+                           "url": "https://www.thegazette.co.uk/notice/EXAMPLE-0002",
+                           "snippet": "PENNINE ADVISORY LLP"}]
     return out
 
 

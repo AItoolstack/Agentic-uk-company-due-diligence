@@ -1,0 +1,30 @@
+name: deploy to Hugging Face Space
+
+# Pushes this branch to the Space, which rebuilds it.
+# Needs the repository secret HF_TOKEN (a Hugging Face write token for the AItoolstack account).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag to deploy
+        default: rebuild/underwriter-prescreen
+        required: true
+
+concurrency: deploy-space
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          test -n "$HF_TOKEN" || { echo "HF_TOKEN secret is not set"; exit 1; }
+          git push --force "https://AItoolstack:${HF_TOKEN}@huggingface.co/spaces/AItoolstack/agentic-uk-company-due-diligence" HEAD:main

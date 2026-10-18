@@ -28,8 +28,9 @@ from src.prescreen.identity import resolve
 from src.prescreen.models import DecisionRequest, IdentityResult, PreScreenRequest
 from src.prescreen.rules import RULES_VERSION, THRESHOLDS
 from src.prescreen.engine import STAGES
-from src.prescreen.service import (build_services, demo_mode, list_recent, load_report, record_decision,
-                                   save_report)
+from src.prescreen.service import (build_services, demo_mode, list_recent, load_report, recheck_all,
+                                   record_decision, save_report, watch_from_report)
+from src.prescreen.store import get_store
 
 def require_access(request: Request) -> None:
     """If PRESCREEN_ACCESS_TOKEN is set, every pre-screen API call needs it (header X-Access-Token).
@@ -73,6 +74,7 @@ async def config() -> dict:
         "data": "live" if live else "demo",
         "rules_version": RULES_VERSION,
         "access_required": bool(os.environ.get("PRESCREEN_ACCESS_TOKEN")),
+        "storage": get_store().kind,
         "thresholds": THRESHOLDS,
         "sources": {
             "companies_house": bool(settings.companies_house_api_key) or not live,
@@ -107,10 +109,7 @@ async def prescreen(req: PreScreenRequest) -> dict:
         except SourceDown as err:
             raise HTTPException(503, f"Couldn't start the pre-screen: {err}") from err
     meta["news_queries"] = services.news.queries
-    save_report(report, meta)
-    payload = report.model_dump(mode="json")
-    payload["meta"] = meta
-    return payload
+    return await save_report(report, meta)
 
 
 @router.post("/stream")
@@ -137,9 +136,11 @@ async def prescreen_stream(req: PreScreenRequest) -> StreamingResponse:
                 await queue.put({"type": "error", "status": 500, "detail": f"Unexpected error ({type(err).__name__})."})
                 return
         meta["news_queries"] = services.news.queries
-        save_report(report, meta)
-        payload = report.model_dump(mode="json")
-        payload["meta"] = meta
+        try:
+            payload = await save_report(report, meta)
+        except Exception as err:  # noqa: BLE001 - a storage outage shouldn't lose the screen itself
+            payload = report.model_dump(mode="json")
+            payload["meta"] = {**meta, "not_saved": f"couldn't save the report ({type(err).__name__})"}
         await queue.put({"type": "report", "report": payload})
 
     async def lines():
@@ -158,12 +159,56 @@ async def prescreen_stream(req: PreScreenRequest) -> StreamingResponse:
 
 @router.get("/recent")
 async def recent() -> list[dict]:
-    return list_recent()
+    return await list_recent()
+
+
+# ---------------------------------------------------------------------------
+# Watching
+# ---------------------------------------------------------------------------
+
+@router.get("/watch")
+async def watch_list() -> list[dict]:
+    store = get_store()
+    rows = await store.list_watch()
+    changes = await store.list_changes(limit=500)
+    unseen: dict[str, int] = {}
+    for c in changes:
+        if not c.get("seen"):
+            unseen[c["company_number"]] = unseen.get(c["company_number"], 0) + 1
+    return [{k: v for k, v in r.items() if k != "snapshot"} | {"unseen_changes": unseen.get(r["company_number"], 0)}
+            for r in rows]
+
+
+@router.post("/watch")
+async def watch_add(body: dict) -> dict:
+    report_id = str(body.get("report_id", ""))
+    row = await watch_from_report(report_id)
+    if row is None:
+        raise HTTPException(404, "Report not found.")
+    return {k: v for k, v in row.items() if k != "snapshot"}
+
+
+@router.delete("/watch/{company_number}")
+async def watch_remove(company_number: str) -> dict:
+    await get_store().unwatch(company_number.upper())
+    return {"ok": True}
+
+
+@router.get("/changes")
+async def changes(company_number: str | None = None, limit: int = 30) -> list[dict]:
+    return await get_store().list_changes(limit=max(1, min(limit, 200)),
+                                          number=company_number.upper() if company_number else None)
+
+
+@router.post("/changes/{company_number}/seen")
+async def changes_seen(company_number: str) -> dict:
+    await get_store().mark_seen(company_number.upper())
+    return {"ok": True}
 
 
 @router.get("/{report_id}")
 async def get_report(report_id: str) -> dict:
-    payload = load_report(report_id)
+    payload = await load_report(report_id)
     if payload is None:
         raise HTTPException(404, "Report not found.")
     return payload
@@ -171,7 +216,24 @@ async def get_report(report_id: str) -> dict:
 
 @router.post("/{report_id}/decision")
 async def decision(report_id: str, req: DecisionRequest) -> dict:
-    entry = record_decision(report_id, req)
+    entry = await record_decision(report_id, req)
     if entry is None:
         raise HTTPException(404, "Report not found.")
     return entry
+
+
+# ---------------------------------------------------------------------------
+# Daily re-check: called by a schedule, protected by its own token.
+# ---------------------------------------------------------------------------
+
+jobs_router = APIRouter(prefix="/api/jobs", tags=["jobs"])
+
+
+@jobs_router.post("/recheck")
+async def recheck(request: Request) -> dict:
+    token = os.environ.get("PRESCREEN_JOB_TOKEN", "")
+    given = request.headers.get("x-job-token", "")
+    if not demo_mode() and (not token or not hmac.compare_digest(given, token)):
+        raise HTTPException(401, "Job token needed.")
+    async with _client() as client:
+        return await recheck_all(client)

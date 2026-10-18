@@ -490,7 +490,8 @@ def test_stream_endpoint_sends_progress_then_report(monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
     from src.api.app import app
     from src.prescreen import service
-    monkeypatch.setattr(service, "STORE", tmp_path)
+    from src.prescreen.store import FileStore, set_store
+    set_store(FileStore(tmp_path))
     monkeypatch.setattr(service.settings, "use_mock_data", True)
     with TestClient(app) as client:
         r = client.post("/api/prescreen/stream", json={"company_number": "ZZ000001"})

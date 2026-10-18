@@ -22,3 +22,6 @@ uvicorn[standard]>=0.30.0
 
 # Utilities
 rich>=13.7.0
+
+# Storage (Supabase / Postgres)
+psycopg[binary]>=3.2,<4
