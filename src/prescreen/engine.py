@@ -295,6 +295,18 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         results.append(trade)
     results.append(C.check_ccj())
 
+    # News coverage of an FCA action the Register already shows is the same fact (Monzo, live): keep it as a
+    # note pointing at the FCA finding instead of a second referral reason.
+    if any(f.rule_id == "fca_discipline" for c in results for f in c.findings):
+        for c in results:
+            for f in c.findings:
+                if f.rule_id == "media_high" and set(f.detail.get("categories", [])) <= {"regulatory_action"}:
+                    f.route = Route.NOTE
+                    f.text = "News coverage of the FCA action above: " + f.text
+            if c.check_id == "media" and c.status == CheckStatus.FLAG and not any(
+                    f.route != Route.NOTE for f in c.findings):
+                c.status = CheckStatus.INFO
+
     for c in results:
         c.group = casefile.group_of(c.check_id)
         for f in c.findings:

@@ -117,9 +117,19 @@ COMPLIANCE_ONLY = {"sanctions_strong", "sanctions_possible"}
 OWN_GAPS = {"fca_unchecked"}
 
 
+MAX_QUESTIONS = 5
+# Once a company is closed or insolvent, only a few questions still matter (Carillion, live: six questions
+# including "why are your accounts overdue?" for a company in liquidation since 2018).
+ENDED = {"company_closed", "company_insolvent"}
+ENDED_KEEP = {"company_closed", "company_insolvent", "winding_up_petition", "phoenix_pattern",
+              "director_disqualified", "trade_mismatch"}
+
+
 def broker_questions(checks: list[Any]) -> list[dict[str, Any]]:
-    """One question per rule that needs an answer, worst route first, then in check order.
-    `checks` are CheckResult models or their dicts."""
+    """One question per rule that needs an answer, worst route first, then in check order; at most
+    MAX_QUESTIONS, with notes only filling spare places. `checks` are CheckResult models or their dicts."""
+    ids = {f.get("rule_id") for c in checks for f in (_d(c).get("findings") or [])}
+    ended = bool(ids & ENDED)
     seen: set[str] = set()
     out: list[tuple[int, int, dict[str, Any]]] = []
     for ci, c in enumerate(checks):
@@ -127,6 +137,12 @@ def broker_questions(checks: list[Any]) -> list[dict[str, Any]]:
         for f in c.get("findings") or []:
             rid = f.get("rule_id", "")
             if rid in COMPLIANCE_ONLY or rid in seen or rid not in BROKER_QUESTIONS:
+                continue
+            if ended and rid not in ENDED_KEEP:
+                continue
+            if rid == "media_medium" and "media_high" in ids:
+                continue
+            if rid == "trade_mismatch" and "dormant_but_trading" in ids:
                 continue
             # Notes only get a question where a note is still worth asking about.
             if f.get("route") == "note" and rid not in {"company_new", "officers_joined", "officers_left",
@@ -138,7 +154,10 @@ def broker_questions(checks: list[Any]) -> list[dict[str, Any]]:
             out.append((-rank, ci, {"rule_id": rid, "check_id": c.get("check_id"), "route": f.get("route"),
                                     "group": group_of(c.get("check_id", "")),
                                     "question": BROKER_QUESTIONS[rid], "because": f.get("text", "")}))
-    return [q for _, _, q in sorted(out, key=lambda x: (x[0], x[1]))]
+    ranked = [q for _, _, q in sorted(out, key=lambda x: (x[0], x[1]))]
+    serious = [q for q in ranked if q["route"] != "note"]
+    notes = [q for q in ranked if q["route"] == "note"]
+    return (serious + notes[: max(0, MAX_QUESTIONS - len(serious))])[:MAX_QUESTIONS]
 
 
 # ---------------------------------------------------------------------------

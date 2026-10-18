@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from src.prescreen.models import CheckResult, CheckStatus, Route
 
-RULES_VERSION = "draft-2026-10-19a"
+RULES_VERSION = "draft-2026-10-19b"
 
 THRESHOLDS = {
     # Company age
@@ -53,23 +53,45 @@ CONSEQUENCES_OF_ENDING = {"accounts_overdue", "accounts_overdue_serious", "accou
                           "accounts_size_mismatch", "strike_off_compulsory", "strike_off_unknown"}
 
 
+def _surname(name: str) -> str:
+    """'DE BRUNNER, Aidan Whiteman' -> 'De Brunner'."""
+    return (name.split(",")[0] if "," in name else name.split(" ")[-1]).strip().title() or "a director"
+
+
 def decide(checks: list[CheckResult]) -> tuple[Route, list[str]]:
     """Return the recommended route and the reasons, worst first."""
     route = Route.NOTE
     reasons: list[tuple[int, str]] = []
     ended = any(f.rule_id in ENDED for c in checks for f in c.findings)
 
+    all_ids = {f.rule_id for c in checks for f in c.findings}
+    directors = [f for c in checks for f in c.findings if f.rule_id == "director_insolvent_links"]
     for c in checks:
         for f in c.findings:
-            if f.route.rank > Route.NOTE.rank and not (ended and f.rule_id in CONSEQUENCES_OF_ENDING):
-                reasons.append((f.route.rank, f.text))
             if f.route.rank > route.rank:
                 route = f.route
+            if f.route.rank <= Route.NOTE.rank or (ended and f.rule_id in CONSEQUENCES_OF_ENDING):
+                continue
+            # Same fact twice (Wilko, live): "dormant but trading" already says the SIC doesn't fit.
+            if f.rule_id == "trade_mismatch" and "dormant_but_trading" in all_ids:
+                continue
+            # Several directors with insolvent companies are one reason, not a line each (Thames Water, live).
+            if f.rule_id == "director_insolvent_links" and len(directors) > 1:
+                continue
+            reasons.append((f.route.rank, f.text))
         if c.status == CheckStatus.COULDNT_CHECK and c.critical:
             reasons.append((Route.REFER.rank,
                             f"{c.title} couldn't be checked: {c.not_checked_reason.rstrip('.')}."))
             if route.rank < Route.REFER.rank:
                 route = Route.REFER
+    if len(directors) > 1:
+        top = max(directors, key=lambda f: f.route.rank)
+        total = sum(int(f.detail.get("count", 0)) for f in directors)
+        who = ", ".join(f"{_surname(f.detail.get('name', ''))} ({f.detail.get('count', '?')})"
+                        for f in sorted(directors, key=lambda f: -int(f.detail.get("count", 0))))
+        reasons.append((top.route.rank, f"{len(directors)} directors were directors of companies that became "
+                                        f"insolvent in the last {THRESHOLDS['director_lookback_years']} years "
+                                        f"({total} in all): {who}. Details under Directors: other companies."))
 
     # Combination rule (DRAFT): seriously overdue accounts plus another distress
     # signal is outside appetite even though each alone is a referral.

@@ -185,7 +185,8 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                 text=(f"{len(group)} {'serious ' if severity == 'high' else ''}adverse news item"
                       f"{'s' if len(group) != 1 else ''} about this company ({', '.join(cats)}); latest "
                       f"{latest.published[:10] or 'undated'}: {latest.title}"),
-                detail={"titles": [it.title for it in group][:10]},
+                detail={"titles": [it.title for it in group][:10],
+                        "categories": sorted({it.category for it in group})},
                 sources=[SourceRef(label=it.source or "article", url=it.url) for it in group[:3]]))
     unsure = [it for it in adverse if it.about_this_company == "unsure" and it.severity == "high"]
     if unsure:

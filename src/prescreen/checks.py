@@ -704,7 +704,7 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
                  + ", ".join(label(c) for c in insolvent[:4]) +
                  (f". They hold {res.get('total_results')} appointments (likely a group or non-executive), so "
                   "this is capped at refer" if many and count >= T["director_insolvent_decline"] else ""),
-            detail={"count": count}, sources=[ref]))
+            detail={"count": count, "name": name}, sources=[ref]))
 
     if notes:
         findings.append(Finding(
