@@ -912,11 +912,11 @@ def check_sanctions(data: CompanyData, sl: SanctionsList | SourceError | None) -
             findings.append(Finding(rule_id="sanctions_discounted", route=Route.NOTE,
                                     text=f"{who}: {h.reason}. Discounted on date of birth; confirm.",
                                     sources=src))
-    base = (f"{len(screened)} names screened (company, previous names, directors, PSCs, parent owners) "
+    base = (f"{len(screened)} name{'' if len(screened) == 1 else 's'} screened (company, previous names, directors, PSCs, parent owners) "
             f"against {sl.size:,} list entries; list fetched {sl.fetched_at}.")
     if missing:
         result = _couldnt("sanctions", title,
-                          f"{' and '.join(missing)} couldn't be read, so only {len(screened)} names were screened",
+                          f"{' and '.join(missing)} couldn't be read, so only {len(screened)} name{'' if len(screened) == 1 else 's'} {'was' if len(screened) == 1 else 'were'} screened",
                           True, src)
         result.findings = findings
         return result

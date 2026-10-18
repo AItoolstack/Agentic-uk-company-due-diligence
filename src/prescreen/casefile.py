@@ -83,18 +83,18 @@ BROKER_QUESTIONS: dict[str, str] = {
     "confirmation_overdue": "The confirmation statement is overdue at Companies House. Is the company still trading as presented?",
     "director_disqualified": "A director appears on the disqualified directors register. Please confirm the full board and dates of birth.",
     "director_previously_disqualified": "A director was disqualified in the past. Please confirm their role in the business now.",
-    "director_insolvent_links": "A director has been involved with companies that went into insolvency. What happened, and what is different here?",
+    "director_insolvent_links": "A director was involved with companies that went into insolvency. Please give details, and say what is different about this business.",
     "disq_possible": "A director's name matches the disqualified register but we can't confirm it's the same person. Please confirm their date of birth.",
     "dormant_but_trading": "The company files as dormant, but the proposal describes a trading business. Which company actually trades?",
     "fca_discipline": "The firm has a history of FCA disciplinary action. What changed afterwards?",
     "fca_not_found": "We couldn't find the firm on the FCA Register. Is it authorised, or an appointed representative of another firm (and which)?",
     "fca_not_authorised": "The FCA Register doesn't show the firm as currently authorised. What is its regulatory status today?",
     "gazette_insolvency_notice": "There is an insolvency notice in The Gazette for this company. What is the current position?",
-    "insolvency_history": "Companies House shows an insolvency history. What happened, and is it closed?",
+    "insolvency_history": "Companies House shows an insolvency history. Please give details and confirm whether it is closed.",
     "no_psc": "No one is registered as owning or controlling the company. Who are the owners?",
     "officers_joined": "New directors joined in the last year. Who are they, and what do they bring?",
     "officers_left": "Directors left in the last year. Why?",
-    "phoenix_pattern": "A director's earlier company with a similar name went into insolvency. Is this business a continuation of it?",
+    "phoenix_pattern": "A director's earlier company with a similar name went into insolvency. Please confirm whether this business continues it, and give details.",
     "psc_changed": "Ownership changed in the last year. Who bought in, and was anything else about the business changed?",
     "psc_secrecy_jurisdiction": "An owner is registered in a jurisdiction where ownership is hard to see. Who are the ultimate owners?",
     "psc_statement": "The company has told Companies House it can't identify or confirm its owners. Who are they?",
@@ -209,8 +209,10 @@ def proposal_vs_record(request: Any, company: dict[str, Any], checks: list[Any],
               ) if ltype else "No accounts filed yet"
     if turnover is None:
         v, note = "not_given", ""
+    elif not ltype:
+        v, note = "unknown", "No accounts on file yet, so turnover can't be compared. Ask for management accounts."
     elif not band:
-        v, note = "unknown", "The accounts type doesn't limit turnover, or there are no accounts."
+        v, note = "unknown", f"{ltype.replace('-', ' ').capitalize()} accounts don't cap turnover, so they can't be compared."
     elif band[0] == "dormant":
         v, note = ("differs", "Dormant accounts mean no trading.") if turnover else ("match", "")
     elif turnover > band[1]:
@@ -240,6 +242,10 @@ def proposal_vs_record(request: Any, company: dict[str, Any], checks: list[Any],
     # Directors named on the proposal vs current directors.
     declared = [n.strip() for n in re.split(r"[,;\n]+", req.get("declared_directors") or "") if n.strip()]
     on_record = company.get("officer_names") or [o.get("name", "") for o in company.get("officers") or []]
+    if not company.get("officers_read", True):
+        rows.append({"item": "Directors", "proposal": ", ".join(declared) or "—", "record": "Couldn't read the officer list",
+                     "verdict": "unknown", "note": "Not checked, so not compared. This is not the same as no directors."})
+        return rows
     if not declared:
         v, note = "not_given", ""
     elif not company.get("officers_read", True):
@@ -270,11 +276,19 @@ STATUS_WORDS = {"clear": "clear", "info": "info", "flag": "FLAG", "couldnt_check
                 "not_applicable": "n/a"}
 
 
+def _is_sanctions_text(text: str, checks: list[dict[str, Any]]) -> bool:
+    return any(f.get("text") == text and f.get("rule_id") in COMPLIANCE_ONLY
+               for c in checks for f in c.get("findings") or [])
+
+
 def file_note(report: dict[str, Any]) -> str:
     """Plain text for the underwriting system. Short lines, no markdown."""
     r = report
     when = str(r.get("created_at", ""))[:16].replace("T", " ")
+    checks_all = r.get("checks") or []
+    hold = any(f.get("rule_id") in COMPLIANCE_ONLY for c in checks_all for f in c.get("findings") or [])
     lines = [
+        "INTERNAL: NOT FOR THE BROKER OR CLIENT",
         f"PRE-SCREEN: {r.get('company_name')} ({r.get('company_number')})",
         f"Run {when} UTC · report {r.get('report_id')} · rules {r.get('rules_version')}",
     ]
@@ -282,6 +296,8 @@ def file_note(report: dict[str, Any]) -> str:
         lines.append("DEMO DATA: not a real assessment.")
     lines += ["", f"Recommended route: {ROUTE_WORDS.get(r.get('route'), r.get('route'))}"]
     for reason in (r.get("route_reasons") or [])[:6]:
+        if hold and _is_sanctions_text(reason, checks_all):
+            reason = "Potential sanctions match: details held by compliance."
         lines.append(f"- {reason}")
 
     checks = r.get("checks") or []
@@ -296,6 +312,9 @@ def file_note(report: dict[str, Any]) -> str:
                          + (f": {c.get('not_checked_reason')}" if c.get("status") == "couldnt_check"
                             and c.get("not_checked_reason") else ""))
             for f in c.get("findings") or []:
+                if f.get("rule_id") in COMPLIANCE_ONLY:
+                    lines.append("      - Potential sanctions match: details held by compliance.")
+                    continue
                 if f.get("route") != "note" or c.get("status") == "flag":
                     tags = f.get("tags") or fraud_tags(f.get("rule_id", ""))
                     lines.append(f"      - {f.get('text')}" + (f" [fraud indicator: {', '.join(tags)}]" if tags else ""))

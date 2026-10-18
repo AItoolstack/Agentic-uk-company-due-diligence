@@ -80,7 +80,7 @@ h1,h2,h3{text-wrap:balance}
 .btn{border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;padding:9px 15px;font-weight:600;font-size:14px}
 .btn.quiet{background:var(--paper);color:var(--ink);border-color:var(--rule2);font-weight:500}
 .btn.small{padding:5px 11px;font-size:13px}
-.btn:disabled{opacity:.55;cursor:wait}
+.btn:disabled{opacity:.55;cursor:not-allowed}
 label.lb{display:block;font-size:13px;color:var(--ink2);margin-bottom:5px;font-weight:500}
 .hint{font-size:12.5px;color:var(--muted)}
 input[type=text],textarea{font:inherit;color:var(--ink);border:1px solid var(--rule2);border-radius:8px;padding:9px 11px;background:#fff;width:100%}
@@ -142,6 +142,8 @@ table.cases td{padding:10px 18px;white-space:nowrap;border-bottom:1px solid var(
 table.cases tr:last-child td{border-bottom:0}
 table.cases tr[data-id]{cursor:pointer}
 table.cases tr[data-id]:hover td{background:var(--wash)}
+table.cases tr.old td{color:var(--muted)}
+table.cases tr.old .rt{opacity:.6}
 .wb{font-size:11.5px;padding:1px 7px;border-radius:99px;border:1px solid var(--rule2);color:var(--ink2);margin-left:6px;white-space:nowrap}
 .wb.new{background:var(--ink);border-color:var(--ink);color:#fff}
 .tablewrap{overflow-x:auto}
@@ -164,11 +166,11 @@ table.cases tr[data-id]:hover td{background:var(--wash)}
 .case{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
 .maincol{display:grid;gap:20px;min-width:0}
 .maincol>*{min-width:0}
-.rail{display:grid;gap:16px;position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto;padding-bottom:4px;min-width:0}
+.rail{display:grid;gap:16px;min-width:0;align-content:start}
 
 /* ---------- Verdict ---------- */
 .verdict{display:grid;grid-template-columns:auto minmax(0,1fr);gap:20px;padding:20px;border-radius:var(--r);border:1px solid var(--rule);background:var(--paper)}
-.stamp{width:200px;border:2px solid currentColor;border-radius:8px;padding:12px 14px;display:grid;gap:6px;align-content:start;outline:1px solid currentColor;outline-offset:3px}
+.stamp{align-self:start;width:200px;border:2px solid currentColor;border-radius:8px;padding:12px 14px;display:grid;gap:6px;align-content:start;outline:1px solid currentColor;outline-offset:3px}
 .stamp .k{font-size:12.5px;font-weight:500;opacity:.85}
 .stamp .v{font-size:23px;overflow-wrap:anywhere;font-weight:800;line-height:1.05;letter-spacing:-.02em;display:flex;gap:8px;align-items:flex-start}
 .stamp .v .ico{width:22px;height:22px;margin-top:2px}
@@ -182,7 +184,12 @@ table.cases tr[data-id]:hover td{background:var(--wash)}
 .verdict .why p{margin:0 0 10px;color:var(--ink2)}
 .verdict.compliance_hold .why p,.verdict.compliance_hold .why ol{color:#E4E6EA}
 .verdict ol{margin:0;padding-left:20px;display:grid;gap:6px}
-.verdict ol a{color:inherit;text-decoration-color:var(--rule2)}
+.verdict ol a{color:inherit;text-decoration:none}
+.verdict ol a:hover{text-decoration:underline}
+.verdict ol li:first-child{font-weight:600}
+.verdict .pdiff{margin-top:10px;font-size:14px;display:flex;gap:8px;align-items:flex-start;color:var(--refer)}
+.verdict.compliance_hold .pdiff{color:var(--amber)}
+.verdict .pdiff a{color:inherit}
 .verdict.compliance_hold ol a{text-decoration-color:rgba(255,255,255,.35)}
 .verdict .clean{font-size:14px;color:var(--ink2)}
 
@@ -243,6 +250,13 @@ table.pvr td.v{white-space:nowrap;font-size:13px;font-weight:600}
 .v.differs{color:var(--refer)} .v.match{color:var(--note)} .v.not_given,.v.unknown{color:var(--muted);font-weight:400}
 
 /* ---------- Groups ---------- */
+details.rest>summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:10px;margin:4px 2px 0;padding:6px 0}
+details.rest>summary::-webkit-details-marker{display:none}
+details.rest>summary h2{font-size:17px;margin:0;letter-spacing:-.015em}
+details.rest>summary .ct{font-size:13px;color:var(--muted)}
+details.rest>summary::after{content:"Show";margin-left:auto;font-size:13px;color:var(--accent);font-weight:500}
+details.rest[open]>summary::after{content:"Hide"}
+details.rest>.groups{margin-top:12px}
 .groups{display:grid;gap:12px}
 .gsec{scroll-margin-top:90px}
 .gsec>header .aside{font-size:12.5px}
@@ -301,6 +315,9 @@ table.pvr td.v{white-space:nowrap;font-size:13px;font-weight:600}
 .switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(26,29,36,.3);transition:left .15s}
 .switch[aria-checked="true"]{background:var(--ink);border-color:var(--ink)}
 .switch[aria-checked="true"]::after{left:18px}
+.desk-prop{border-top:1px solid var(--rule);padding-top:12px}
+.desk-prop>summary::after{content:"Optional"!important;color:var(--muted)!important}
+.desk-prop .fromprop>h3{display:none}
 details.prop>summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;font-weight:600;font-size:15px}
 details.prop>summary::-webkit-details-marker{display:none}
 details.prop>summary::after{content:"Edit";margin-left:auto;font-weight:500;font-size:13px;color:var(--accent)}
@@ -340,6 +357,8 @@ details.prop[open]>summary::after{content:"Close"}
 }
 @media (max-width:640px){
   .qsearch{display:none}
+  table.cases th:nth-child(4),table.cases td:nth-child(4){display:none}
+  table.cases td{white-space:normal}
   .brand span{display:none}
   .casehead h1{font-size:24px}
   .facts{grid-template-columns:minmax(0,1fr)}
@@ -422,12 +441,15 @@ details.prop[open]>summary::after{content:"Close"}
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const safeUrl = u => /^https?:\/\//i.test(String(u || "")) ? esc(u) : "#";
-const ROUTE = {note:"Note only", refer:"Refer", outside_appetite:"Outside appetite", compliance_hold:"Compliance hold"};
+// Route names as an underwriter says them. "note" is the internal id; on screen it is "No referral".
+const ROUTE = {note:"No referral", refer:"Refer", outside_appetite:"Outside appetite", compliance_hold:"Compliance hold"};
+// The same ids on a single finding mean how much that finding alone weighs.
+const FINDING = {note:"For the file", refer:"Refer", outside_appetite:"Outside appetite", compliance_hold:"Compliance"};
 const ROUTE_LINE = {
-  note: "Nothing in what was checked changes how you'd treat this risk. Read the notes, then quote as normal.",
+  note: "Nothing in what was checked needs a referral. Read anything marked for the file, then quote as normal.",
   refer: "Needs an answer from the broker or a senior underwriter before you quote.",
   outside_appetite: "Decline, unless a senior underwriter overrides with reasons on file.",
-  compliance_hold: "A possible sanctions match is confirmed by date of birth. Don't bind, don't pay, and don't tell the broker why. Compliance decides.",
+  compliance_hold: "Potential sanctions match: the name and date of birth agree with a listed person. Don't quote, bind or pay, and don't tell the broker why. Compliance decides.",
 };
 const STATUS = {clear:"Nothing found", info:"Worth reading", flag:"Flag", couldnt_check:"Couldn't check", not_applicable:"Not applicable"};
 const CLOSED = new Set(["dissolved","liquidation","administration","receivership","removed","closed","converted-closed","insolvency-proceedings","voluntary-arrangement"]);
@@ -467,6 +489,16 @@ function checkIcon(c) {
 }
 const groupOf = c => c.group || "identity";
 const routeTag = r => `<span class="rt ${esc(r)}">${icon(ROUTE_ICON[r])}${esc(ROUTE[r] || r)}</span>`;
+const findingTag = r => `<span class="rt ${esc(r)}">${icon(r === "note" ? "ring" : ROUTE_ICON[r])}${esc(FINDING[r] || r)}</span>`;
+// Source errors in words an underwriter can act on.
+function humanReason(t) {
+  const s = String(t || "").replace(/\.$/, "");
+  if (/HTTP 5\d\d|unavailable|ReadTimeout|timed? ?out|ConnectError/i.test(s)) return s.replace(/^([^:]+):.*$/, "$1 didn't respond") + "; try again shortly";
+  if (/rate limit|429/i.test(s)) return s.replace(/^([^:]+):.*$/, "$1 is busy") + "; try again in a few minutes";
+  if (/no_key|not connected|paid source/i.test(s)) return s;
+  return s;
+}
+const notCovered = c => c.check_id === "ccj" && /not connected|paid/i.test(c.not_checked_reason || c.summary || "");
 const order = c => c.status === "flag" ? -RANK[worst(c)] - 1 : ({couldnt_check: 0, info: 1, clear: 2, not_applicable: 3}[c.status]);
 function fmtDate(s) { if (!s) return ""; const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}); }
 function yearsSince(s) { const d = new Date(s); if (isNaN(d)) return ""; const y = Math.floor((Date.now() - d) / 31557600000); return y < 1 ? "under a year" : `${y} year${y === 1 ? "" : "s"}`; }
@@ -515,6 +547,9 @@ function setProposal(p) {
   $("#dirs").value = p.declared_directors || "";
   $("#fca").checked = !!p.expects_fca_authorisation;
   document.querySelectorAll("#lines .chip").forEach(b => b.setAttribute("aria-pressed", (p.cover_lines || []).includes(b.dataset.v) ? "true" : "false"));
+}
+function proposalLines(p) {
+  return (p.cover_lines || []).map(v => ({property:"Property", liability:"EL/PL", professional_indemnity:"PI", management_liability:"D&O", financial_institutions:"Financial institutions", cyber:"Cyber", motor_fleet:"Fleet"}[v] || v)).join(", ");
 }
 function proposalSummary(p) {
   const lines = (p.cover_lines || []).map(v => ({property:"Property", liability:"EL/PL", professional_indemnity:"PI", management_liability:"D&O", financial_institutions:"FI", cyber:"Cyber", motor_fleet:"Fleet"}[v] || v));
@@ -568,6 +603,10 @@ async function showStart(prefill) {
   byCo.forEach(list => list.sort((a, b) => (RANK[b.severity] || 0) - (RANK[a.severity] || 0) || (b.kind === "route") - (a.kind === "route") || b.id - a.id));
   const cos = [...byCo.entries()].sort((a, b) => (a[1].some(x => !x.seen) ? 0 : 1) - (b[1].some(x => !x.seen) ? 0 : 1));
   const sevColour = s => ({refer: "var(--refer)", outside_appetite: "var(--out)", compliance_hold: "var(--hold)"}[s] || "var(--note)");
+  // A newer report on the same company supersedes older ones: only the newest carries the watch badge.
+  const newest = {};
+  recent.forEach(c => { if (!newest[c.company_number] || c.created_at > newest[c.company_number]) newest[c.company_number] = c.created_at; });
+  const superseded = c => c.created_at < newest[c.company_number];
   const watchBadge = n => { const w = WATCHED.get(n); if (!w) return ""; return w.unseen_changes ? `<span class="wb new">${w.unseen_changes} new</span>` : `<span class="wb">watching</span>`; };
 
   $("#main").innerHTML = `
@@ -581,7 +620,7 @@ async function showStart(prefill) {
         </form>
         <div id="search-msg"></div>
         <div id="cands" class="cands"></div>
-        <div id="prop-slot"></div>
+        <details class="prop desk-prop"><summary>Add details from the broker's proposal</summary><div id="prop-slot"></div></details>
         <div class="sources">
           <div><b>Companies House</b>Status, filings, charges, directors and their other companies, owners</div>
           <div><b>Gazette and sanctions</b>Insolvency notices and the UK Sanctions List</div>
@@ -603,7 +642,7 @@ async function showStart(prefill) {
 
         ${recent.length ? `<section class="panel"><header><h2>Recent cases</h2></header><div class="tablewrap"><table class="cases">
           <thead><tr><th>Company</th><th>Route</th><th>Decision</th><th>When</th></tr></thead><tbody>
-          ${recent.map(c => `<tr data-id="${esc(c.report_id)}"><td>${esc(c.company_name)}${watchBadge(c.company_number)}<br><span class="mono" style="font-size:12.5px;color:var(--muted)">${esc(c.company_number)}</span></td>
+          ${recent.map(c => `<tr data-id="${esc(c.report_id)}"${superseded(c) ? ' class="old"' : ""}><td>${esc(c.company_name)}${superseded(c) ? `<span class="wb">superseded by a newer report</span>` : watchBadge(c.company_number)}<br><span class="mono" style="font-size:12.5px;color:var(--muted)">${esc(c.company_number)}</span></td>
             <td>${routeTag(c.route)}</td><td>${esc(c.decision ? c.decision[0].toUpperCase() + c.decision.slice(1) : "None yet")}</td>
             <td style="white-space:nowrap">${esc(new Date(c.created_at).toLocaleString("en-GB", {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}))}</td></tr>`).join("")}
           </tbody></table></div></section>` : ""}
@@ -694,12 +733,12 @@ function anchorFor(reason, checks) {
 
 function card(c) {
   const w = c.status === "flag" ? worst(c) : "";
-  const list = c.findings.length ? `<ul class="finds">${c.findings.map(f => `<li>${routeTag(f.route)}
+  const list = c.findings.length ? `<ul class="finds">${c.findings.map(f => `<li>${findingTag(f.route)}
     <span>${esc(f.text)}${fraudChips(f)}${f.sources && f.sources[0] && f.sources[0].url ? ` <a href="${safeUrl(f.sources[0].url)}" target="_blank" rel="noopener noreferrer">source</a>` : ""}</span></li>`).join("")}</ul>` : "";
-  const why = c.status === "couldnt_check" ? `<div class="cwhy">${esc(c.not_checked_reason ? "Why: " + c.not_checked_reason.replace(/\.$/, "") + "." : c.summary)} Not checked is not the same as nothing found.</div>` : "";
+  const why = c.status === "couldnt_check" ? `<div class="cwhy">${esc(c.not_checked_reason ? "Why: " + humanReason(c.not_checked_reason) + "." : c.summary)} Not checked is not the same as nothing found.</div>` : "";
   return `<article class="card ${esc(w || c.status)}" id="c-${esc(c.check_id)}">
     <div class="ch">${c.status === "couldnt_check" ? `<span class="rt gap">${icon("hatch")}Couldn't check</span>` : ""}<h3>${esc(c.title)}</h3>
-      ${c.critical && c.status === "couldnt_check" ? '<span class="crit">needed for "Note only"</span>' : ""}<span class="grp">${esc(GTITLE[groupOf(c)])}</span></div>
+      ${c.critical && c.status === "couldnt_check" ? '<span class="crit">must run before a no-referral route</span>' : ""}<span class="grp">${esc(GTITLE[groupOf(c)])}</span></div>
     ${why}${list}${srcLinks(c.sources)}</article>`;
 }
 
@@ -720,10 +759,11 @@ function renderCaseHead(r) {
         ${c.status_detail ? `<span class="pill closed">${esc(c.status_detail.replace(/-/g, " "))}</span>` : ""}
         ${type ? `<span>${esc(type)}</span>` : ""}
         ${c.incorporated ? `<span>Incorporated ${esc(fmtDate(c.incorporated))} (${esc(yearsSince(c.incorporated))})</span>` : ""}</div>
+      <div class="ids" style="margin-top:4px">${(r.request || {}).cover_lines && r.request.cover_lines.length ? `<span>Quoting: <b>${esc(proposalLines(r.request))}</b></span>` : `<span style="color:var(--muted)">No cover lines given</span>`}</div>
     </div>
     <div class="acts">
       <button class="btn quiet small" type="button" id="watch-btn" aria-pressed="${w ? "true" : "false"}">${w ? "Watching" : "Watch this company"}</button>
-      <button class="btn quiet small" type="button" id="note-btn">Copy file note</button>
+      <button class="btn quiet small" type="button" id="note-btn" title="Internal: not for the broker or client">Copy internal file note</button>
     </div>
     <dl class="facts">
       <div><dt>Registered office</dt><dd>${esc(c.registered_office || "Not given")}</dd></div>
@@ -736,15 +776,15 @@ function renderCaseHead(r) {
 }
 
 function renderLedger(r, byGroup) {
-  const counts = {flag: 0, couldnt_check: 0, info: 0, clear: 0, not_applicable: 0};
-  r.checks.forEach(c => counts[c.status]++);
+  const counts = {flag: 0, couldnt_check: 0, info: 0, clear: 0, not_applicable: 0, not_covered: 0};
+  r.checks.forEach(c => notCovered(c) ? counts.not_covered++ : counts[c.status]++);
   return `<section class="panel ledger" aria-label="Everything that was checked">
     <header><h2>What was checked</h2><span class="aside">${r.checks.length - counts.not_applicable} of ${r.checks.length} checks applied to this company</span></header>
     <div class="body"><div class="lgrid">${byGroup.map(g => `<div class="lcol">
       <h3><a href="#g-${g.id}" data-jumpg="${g.id}" style="color:inherit;text-decoration:none">${esc(g.title)}</a></h3><div class="q">${esc(g.question)}</div>
       ${g.checks.map(c => { const w = c.status === "flag" ? " " + worst(c) : "";
         return `<a class="lcell ${c.status}${w}" href="#c-${esc(c.check_id)}" data-jump="${esc(c.check_id)}">${icon(checkIcon(c))}
-          <span>${esc(c.title)}<span class="st">${esc(c.status === "flag" ? ROUTE[worst(c)] : STATUS[c.status])}</span></span></a>`; }).join("") || `<div class="hint">No checks in this group.</div>`}
+          <span>${esc(c.title)}<span class="st">${esc(c.status === "flag" ? ROUTE[worst(c)] : notCovered(c) ? "Not covered: use your credit tool" : STATUS[c.status])}</span></span></a>`; }).join("") || `<div class="hint">No checks in this group.</div>`}
     </div>`).join("")}</div></div>
     <div class="lfoot">
       <span>${icon("tri")}<b>${counts.flag}</b> flagged</span>
@@ -752,6 +792,7 @@ function renderLedger(r, byGroup) {
       <span>${icon("ring")}<b>${counts.info}</b> worth reading</span>
       <span>${icon("tick")}<b>${counts.clear}</b> nothing found</span>
       ${counts.not_applicable ? `<span style="color:var(--muted)">${icon("dash")}<b>${counts.not_applicable}</b> not applicable</span>` : ""}
+      ${counts.not_covered ? `<span style="color:var(--muted);margin-left:auto">County court judgments aren't covered yet: check your credit reference service.</span>` : ""}
     </div>
   </section>`;
 }
@@ -763,21 +804,28 @@ function groupRow(c, inAttention) {
   return `<div class="grow${c.status === "not_applicable" ? " na" : ""}" ${inAttention ? "" : `id="c-${esc(c.check_id)}"`}>
     <span style="color:${col}">${icon(checkIcon(c))}</span>
     <span><b>${esc(c.title)}</b>${inAttention ? `<a class="up" href="#c-${esc(c.check_id)}" data-jump="${esc(c.check_id)}">see above</a>` : tags}<br>
-    <span class="s">${esc(c.status === "couldnt_check" ? "Couldn't check: " + (c.not_checked_reason || c.summary).replace(/\.$/, "") + "." : (findText || c.summary))}</span>${inAttention ? "" : srcLinks(c.sources)}</span></div>`;
+    <span class="s">${esc(c.status === "couldnt_check" ? (notCovered(c) ? "Not covered by this tool: check your credit reference service." : "Couldn't check: " + humanReason(c.not_checked_reason || c.summary) + ".") : (findText || c.summary))}</span>${inAttention ? "" : srcLinks(c.sources)}</span></div>`;
 }
 
 function renderRail(r, qs, sanctionsHit) {
   const last = (r.decisions || []).slice(-1)[0];
+  const hold = r.route === "compliance_hold";
   const w = WATCHED.get(r.company_number);
   return `
     <section class="panel"><header><h2>Next steps</h2><span class="aside">${routeTag(r.route)}</span></header>
       ${sanctionsHit ? `<div class="compl">${icon("hold")}<span>Refer the sanctions match to compliance now. Don't mention it to the broker or the client${qs.length ? ", and hold these questions until compliance has cleared the case" : ""}.</span></div>` : ""}
-      ${qs.length ? `<div style="padding:12px 16px 0;display:flex;align-items:center;gap:8px"><b style="font-size:14px">Ask the broker</b><button class="btn quiet small" style="margin-left:auto" type="button" id="copy-qs">${sanctionsHit ? "Copy (after clearance)" : "Copy questions"}</button></div>
+      ${qs.length ? `<div style="padding:12px 16px 0;display:flex;align-items:center;gap:8px"><b style="font-size:14px">Ask the broker</b><button class="btn quiet small" style="margin-left:auto" type="button" id="copy-qs" ${sanctionsHit ? "disabled title=\"Held until compliance clears the case\"" : ""}>${sanctionsHit ? "Held for compliance" : "Copy questions"}</button></div>
         <ol class="qs">${qs.map(q => `<li>${esc(q.question)}<span class="bc">Because: ${esc(q.because)}</span></li>`).join("")}</ol>`
         : `<div class="body hint">${r.route === "note" ? "No questions for the broker." : "No broker questions. The route comes from checks that couldn't run: try again later, or check those sources by hand."}</div>`}
     </section>
 
-    <section class="panel"><header><h2>Your decision</h2></header><form class="body stack" id="decision-form">
+    ${hold ? `<section class="panel"><header><h2>Refer to compliance</h2></header><form class="body stack" id="decision-form" data-hold="1">
+      <p class="hint" style="margin:0">Quoting, binding and declining are switched off until compliance clears the case. Record that you've referred it.</p>
+      <div class="field"><label class="lb" for="reason">Compliance reference or note</label>
+        <textarea id="reason" rows="2" minlength="5" required placeholder="e.g. Referred to J. Ahmed, compliance ref C-2026-0412"></textarea></div>
+      <div class="row2"><input class="grow1" type="text" id="uw" maxlength="120" placeholder="Your name"><button class="btn" type="submit">Record referral</button></div>
+      <div id="recorded">${last ? `<div class="recorded">Last recorded: ${esc(last.decision)}, ${esc(new Date(last.recorded_at).toLocaleString("en-GB"))}</div>` : ""}</div>
+    </form></section>` : `<section class="panel"><header><h2>Your decision</h2></header><form class="body stack" id="decision-form">
       <div class="choices">
         <label><input type="radio" name="d" value="proceed" required>Proceed</label>
         <label><input type="radio" name="d" value="refer">Refer</label>
@@ -788,7 +836,7 @@ function renderRail(r, qs, sanctionsHit) {
         <textarea id="reason" rows="3" minlength="5" required placeholder="e.g. Charges are mainstream bank debt; broker confirmed loss payee."></textarea></div>
       <div class="row2"><input class="grow1" type="text" id="uw" maxlength="120" placeholder="Your name"><button class="btn" type="submit">Record</button></div>
       <div id="recorded">${last ? `<div class="recorded">Last recorded: ${esc(last.decision)}, ${esc(new Date(last.recorded_at).toLocaleString("en-GB"))}</div>` : ""}</div>
-    </form></section>
+    </form></section>`}
 
     <section class="panel"><div class="body watchrow">
       <button type="button" class="switch" role="switch" id="watch-sw" aria-checked="${w ? "true" : "false"}" aria-label="Watch this company"></button>
@@ -803,7 +851,7 @@ function render(r) {
   $("#qsearch").hidden = false;
   setProposal(r.request || {}); $("#rerun-row").hidden = true; parkProposal();
   const checks = r.checks;
-  const attention = checks.filter(c => c.status === "flag" || c.status === "couldnt_check").sort((a, b) => order(a) - order(b));
+  const attention = checks.filter(c => c.status === "flag" || (c.status === "couldnt_check" && !notCovered(c))).sort((a, b) => order(a) - order(b));
   const attentionIds = new Set(attention.map(c => c.check_id));
   const byGroup = GROUPS.map(g => ({...g, checks: checks.filter(c => groupOf(c) === g.id).sort((a, b) => order(a) - order(b))}));
   const reasons = r.route_reasons.slice(0, 6);
@@ -820,6 +868,8 @@ function render(r) {
   const sanctionsHit = checks.some(c => c.findings.some(f => f.rule_id === "sanctions_strong" || f.rule_id === "sanctions_possible"));
   const pvr = r.proposal_vs_record || [];
   const pvrGiven = pvr.filter(x => x.verdict !== "not_given");
+  const pdiff = pvr.filter(x => x.verdict === "differs");
+  const pvrUnknown = pvrGiven.filter(x => x.verdict === "unknown").length;
   const gsum = cs => {
     const f = cs.filter(c => c.status === "flag").length, u = cs.filter(c => c.status === "couldnt_check").length, i = cs.filter(c => c.status === "info").length;
     const ran = cs.filter(c => c.status !== "not_applicable").length;
@@ -829,6 +879,7 @@ function render(r) {
 
   $("#main").innerHTML = `
     ${demo ? `<div class="demo-note">Demo data: ${esc(r.meta.case_label || "")}</div>` : ""}
+    ${r.meta && r.meta.source === "daily re-check" ? `<div class="msg" style="margin-bottom:16px;border-color:var(--refer-line);background:var(--refer-bg);color:var(--ink)"><b>Daily re-check of a watched company.</b> The route shows how this would be treated as new business today. If the policy is already bound, treat it as a mid-term review: check the policy conditions and note it for renewal. News wasn't re-read.</div>` : ""}
     ${r.meta && r.meta.not_saved ? `<div class="msg err" style="margin-bottom:16px">This report wasn't saved: ${esc(r.meta.not_saved)}. Copy the file note before you leave.</div>` : ""}
     ${renderCaseHead(r)}
     <div class="case">
@@ -838,22 +889,25 @@ function render(r) {
           <div class="why"><h2>Why</h2><p>${esc(ROUTE_LINE[r.route])}</p>
             ${reasons.length ? `<ol>${reasons.map(x => { const id = anchorFor(x, checks); return `<li>${id ? `<a href="#c-${esc(id)}" data-jump="${esc(id)}">${esc(x)}</a>` : esc(x)}</li>`; }).join("")}</ol>`
               : `<div class="clean">${attention.length ? `${attention.length} check${attention.length === 1 ? "" : "s"} couldn't run; ${attention.length === 1 ? "it's" : "they're"} listed below.` : "Every check that applied found nothing that changes the route."}</div>`}
+            ${pdiff.length ? `<div class="pdiff">${icon("tri")}<span>The proposal differs from the public record on ${esc(pdiff.map(x => x.item.toLowerCase()).join(", "))}. <a href="#pvr" data-jumpid="pvr">Check the presentation</a></span></div>` : ""}
           </div>
         </section>
 
-        ${renderLedger(r, byGroup)}
-
-        ${attention.length ? `<div class="sech"><h2>Needs your attention</h2><span class="ct">${attention.length}</span></div><div class="cards">${attention.map(card).join("")}</div>` : ""}
-
-        ${pvrGiven.length ? `<section class="panel"><header><h2>Proposal against the public record</h2><span class="aside">${(n => n ? `${n} differ${n === 1 ? "s" : ""}` : "nothing differs")(pvr.filter(x => x.verdict === "differs").length)}</span></header><div class="tablewrap"><table class="pvr">
+${pvrGiven.length ? `<section class="panel" id="pvr" style="scroll-margin-top:90px"><header><h2>Proposal against the public record</h2><span class="aside">${[pdiff.length ? `${pdiff.length} differ${pdiff.length === 1 ? "s" : ""}` : "", pvrUnknown ? `can't compare ${pvrUnknown} of ${pvrGiven.length}` : "", !pdiff.length && !pvrUnknown ? "nothing differs" : ""].filter(Boolean).join(", ")}</span></header><div class="tablewrap"><table class="pvr">
           <thead><tr><th></th><th>Proposal says</th><th>Public record</th><th>Result</th></tr></thead><tbody>
           ${pvr.map(x => `<tr><td class="item">${esc(x.item)}</td><td>${esc(x.proposal)}</td><td>${esc(x.record)}${x.note ? `<span class="n">${esc(x.note)}</span>` : ""}</td>
             <td class="v ${esc(x.verdict)}">${x.verdict === "differs" ? icon("tri") + " " : x.verdict === "match" ? icon("tick") + " " : ""}${esc(VERDICT[x.verdict] || x.verdict)}</td></tr>`).join("")}
           </tbody></table></div></section>` : ""}
 
-        <div class="sech"><h2>Everything we looked at</h2><span class="ct">by the question it answers</span></div>
-        <div class="groups">${byGroup.filter(g => g.checks.length).map(g => `<section class="panel gsec" id="g-${g.id}"><header><h2>${esc(g.title)}</h2><span class="aside">${esc(gsum(g.checks))}</span></header>
-          ${g.checks.map(c => groupRow(c, attentionIds.has(c.check_id))).join("")}</section>`).join("")}</div>
+        ${renderLedger(r, byGroup)}
+
+        ${attention.length ? `<div class="sech"><h2>Needs your attention</h2><span class="ct">${attention.length}</span></div><div class="cards">${attention.map(card).join("")}</div>` : ""}
+
+
+
+        <details class="rest" id="rest"><summary><h2>Everything else we looked at</h2><span class="ct">${checks.length - attention.length} checks, by the question they answer</span></summary>
+        <div class="groups">${byGroup.map(g => ({...g, rest: g.checks.filter(c => !attentionIds.has(c.check_id))})).filter(g => g.rest.length).map(g => `<section class="panel gsec" id="g-${g.id}"><header><h2>${esc(g.title)}</h2><span class="aside">${esc(gsum(g.checks))}</span></header>
+          ${g.rest.map(c => groupRow(c, false)).join("")}</section>`).join("")}</div></details>
 
         ${tl.length ? `<section class="panel"><header><h2>What happened when</h2><span class="aside">last 5 years, Companies House and the Gazette</span></header>
           <ol class="tl">${tl.map(e => `<li class="${esc(e.tone)}"><span class="d">${esc(fmtDate(e.date))}</span><span class="dot" aria-hidden="true"></span>
@@ -862,7 +916,7 @@ function render(r) {
         ${media.length ? `<section class="panel news"><header><h2>News and web</h2><span class="aside">${media.length} result${media.length === 1 ? "" : "s"}, read against this company</span></header>
           ${about.length ? `<h4>About this company</h4>${about.map(m => newsItem(m)).join("")}` : ""}
           ${unread.length ? `<h4>Not reviewed</h4>${unread.map(m => newsItem(m)).join("")}` : ""}
-          ${aside.length ? `<h4>Set aside: about a different company</h4>${aside.map(m => newsItem(m, "set-aside")).join("")}` : ""}
+          ${aside.length ? `<h4>Before this company took its name: probably a different business, but worth a look</h4>${aside.map(m => newsItem(m, "set-aside")).join("")}` : ""}
         </section>` : ""}
 
         <div class="foot"><span>Report <span class="mono">${esc(r.report_id)}</span>, ${esc(new Date(r.created_at).toLocaleString("en-GB"))}, ${esc(r.elapsed_seconds)}s, ${r.llm_calls} model call${r.llm_calls === 1 ? "" : "s"}</span>
@@ -872,9 +926,19 @@ function render(r) {
     </div>`;
 
   $("#prop-rail").appendChild(PROP);
+  placeRail();
   wireReport(r, qs);
   window.scrollTo({top: 0});
 }
+
+// On narrow screens the rail goes straight after the verdict, so the decision isn't 8,000px down.
+const NARROW = window.matchMedia("(max-width:1100px)");
+function placeRail() {
+  const rail = $("#rail"), verdict = $(".verdict"), caseEl = $(".case");
+  if (!rail || !verdict) return;
+  if (NARROW.matches) verdict.after(rail); else caseEl.appendChild(rail);
+}
+NARROW.addEventListener ? NARROW.addEventListener("change", placeRail) : NARROW.addListener(placeRail);
 
 function wireReport(r, qs) {
   const cq = $("#copy-qs");
@@ -908,20 +972,24 @@ function wireReport(r, qs) {
   });
   form.addEventListener("submit", async e => {
     e.preventDefault();
-    const v = form.querySelector("input[name=d]:checked").value;
+    const v = form.dataset.hold ? "refer" : form.querySelector("input[name=d]:checked").value;
     try {
       const d = await api(`/api/prescreen/${r.report_id}/decision`, {method: "POST", body: JSON.stringify({
-        decision: v, reason: $("#reason").value.trim(), underwriter: $("#uw").value.trim(), overrides_route: !same(v)})});
+        decision: v, reason: (form.dataset.hold ? "Referred to compliance (sanctions). " : "") + $("#reason").value.trim(),
+        underwriter: $("#uw").value.trim(), overrides_route: form.dataset.hold ? false : !same(v)})});
       r.decisions = [...(r.decisions || []), d];
       $("#recorded").innerHTML = `<div class="recorded">Recorded ${esc(new Date(d.recorded_at).toLocaleString("en-GB"))}: ${esc(d.decision)}${d.overrides_route ? ", against the recommendation" : ""}. It's in the file note.</div>`;
     } catch (err) { $("#recorded").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
   });
   $("#main").onclick = e => {
     const g = e.target.closest("[data-jumpg]");
-    if (g) { e.preventDefault(); const el = document.getElementById("g-" + g.dataset.jumpg); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); return; }
+    if (g) { e.preventDefault(); const el = document.getElementById("g-" + g.dataset.jumpg) || $("#rest"); if (el) { const d = el.closest("details"); if (d) d.open = true; el.scrollIntoView({behavior: "smooth", block: "start"}); } return; }
+    const j = e.target.closest("[data-jumpid]");
+    if (j) { e.preventDefault(); const el = document.getElementById(j.dataset.jumpid); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); return; }
     const a = e.target.closest("[data-jump]"); if (!a) return;
     e.preventDefault();
     const el = document.getElementById("c-" + a.dataset.jump);
+    if (el && el.closest("details") && !el.closest("details").open) el.closest("details").open = true;
     if (el) { el.scrollIntoView({behavior: "smooth", block: "center"}); el.classList.add("target"); setTimeout(() => el.classList.remove("target"), 1600); }
   };
 }

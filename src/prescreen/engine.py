@@ -274,8 +274,10 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
     ]
     try:
         if skip_media:
-            media = CheckResult(check_id="media", title="Adverse media", status=CheckStatus.NOT_APPLICABLE,
-                                summary="Not re-read in the daily check; open a full pre-screen to read news.")
+            # Not "not applicable": news applies, it just wasn't read today. Not critical, so the route is unchanged.
+            media = CheckResult(check_id="media", title="Adverse media", status=CheckStatus.COULDNT_CHECK,
+                                summary="Not re-read in the daily re-check; run a full pre-screen to read news.",
+                                not_checked_reason="news isn't re-read in the daily re-check")
             trade, media_items = None, []
         else:
             media, trade, media_items = await check_media(data, news, services.llm, req.declared_trade,

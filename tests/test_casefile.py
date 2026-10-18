@@ -104,7 +104,7 @@ def test_report_carries_proposal_rows_and_file_note_lists_gaps():
     report = asyncio.run(run_prescreen(req, _services("ZZ000003")))
     assert {r["item"] for r in report.proposal_vs_record} == {"Trade", "Turnover", "Years trading", "Directors"}
     note = casefile.file_note(report.model_dump(mode="json"))
-    assert note.startswith("PRE-SCREEN:")
+    assert note.startswith("INTERNAL") and "PRE-SCREEN:" in note
     if report.couldnt_check:
         assert "Not checked" in note and "not a clear" in note
     for g in casefile.GROUPS:
@@ -190,3 +190,26 @@ def test_timeline_keeps_incorporation_and_old_renames_out_of_window():
     tl = _run("09563205", llm_answers=[_all_reviewed(4)]).timeline
     assert tl[-1]["text"] == "Incorporated"
     assert any("Renamed from" in e["text"] for e in tl)
+
+
+def test_file_note_is_internal_and_withholds_sanctions_detail():
+    report = _run("ZZ000004")
+    hit = next(f for c in report.checks for f in c.findings if f.rule_id in casefile.COMPLIANCE_ONLY)
+    note = casefile.file_note(report.model_dump(mode="json"))
+    assert note.startswith("INTERNAL: NOT FOR THE BROKER")
+    assert hit.text not in note and "FICTIONOV" not in note
+    assert "details held by compliance" in note
+
+
+def test_unreadable_officer_list_is_not_zero_directors():
+    rows = _rows(_req(), {"officer_names": [], "officers_read": False})
+    assert rows["Directors"]["record"] == "Couldn't read the officer list"
+    assert rows["Directors"]["verdict"] == "unknown"
+
+
+def test_daily_recheck_marks_news_as_not_checked_not_not_applicable():
+    from src.prescreen.engine import run_prescreen
+    r = asyncio.run(run_prescreen(PreScreenRequest(company_number="ZZ000002"), _services("ZZ000002"), skip_media=True))
+    m = _check(r, "media")
+    assert m.status.value == "couldnt_check" and "re-check" in m.not_checked_reason
+    assert r.route == _run("ZZ000002").route
