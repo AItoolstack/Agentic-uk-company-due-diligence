@@ -1,0 +1,30 @@
+name: daily re-check of watched companies
+
+# Calls the Space's re-check endpoint once a day. The Space wakes if it's asleep.
+# Needs repository secrets: HF_TOKEN (to reach the private Space) and PRESCREEN_JOB_TOKEN
+# (the same value as the Space secret of that name).
+on:
+  schedule:
+    - cron: "17 6 * * *"   # 06:17 UTC every day
+  workflow_dispatch:
+
+jobs:
+  recheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake the Space and run the re-check
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          JOB_TOKEN: ${{ secrets.PRESCREEN_JOB_TOKEN }}
+          SPACE_URL: https://aitoolstack-agentic-uk-company-due-diligence.hf.space
+        run: |
+          test -n "$HF_TOKEN" && test -n "$JOB_TOKEN" || { echo "HF_TOKEN / PRESCREEN_JOB_TOKEN not set"; exit 1; }
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $HF_TOKEN" "$SPACE_URL/health")
+            [ "$code" = "200" ] && break
+            echo "Space not ready ($code), waiting..."; sleep 15
+          done
+          curl -sS --fail-with-body -X POST "$SPACE_URL/api/jobs/recheck" \
+            -H "Authorization: Bearer $HF_TOKEN" -H "X-Job-Token: $JOB_TOKEN" | tee result.json
+          echo
+          python3 -c "import json; d=json.load(open('result.json')); print(f\"checked {d['checked']}, changed {d['changed']}, failed {len(d['failed'])}\")"

@@ -1,4 +1,138 @@
-# UK Company Due Diligence and Risk Intelligence
+---
+title: UK Company Pre-Screen
+colorFrom: green
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# UK company pre-screen for commercial underwriters
+
+Before quoting a UK limited company, a commercial underwriter wants to know one thing:
+is there anything on the public record that means I should refer this, decline it, or ask
+the broker a question first? This app answers that in about a minute, on one screen, with
+links to every source.
+
+It recommends a route. The underwriter decides, and the decision and reason are kept with the report.
+
+| Route | Meaning |
+|---|---|
+| Note only | Nothing on the record changes the route. Read the notes. |
+| Refer | Needs a senior underwriter, or a question to the broker. |
+| Outside appetite | Decline unless a senior underwriter overrides with reasons. |
+| Compliance hold | A sanctions match confirmed by date of birth. Don't bind; compliance decides. |
+
+## What it checks
+
+Every check ends in one of five states: **Clear**, **Info**, **Flag**, **Couldn't check** (with
+the reason) or **Not applicable**. A check is Clear only when it actually saw everything: a source
+that failed, a capped list, a truncated page or a news result nobody reviewed is "couldn't check",
+never clear. If any of the critical checks couldn't run, the best a case can be is Refer.
+
+| Check | Source |
+|---|---|
+| Identity: one Companies House number, or the user picks | Companies House |
+| Status, strike-off (voluntary vs compulsory), registered office | Companies House profile, filing history |
+| Age and name history (recent renames) | Companies House |
+| Filings and accounts: overdue tiers, dormant vs trading, size vs declared turnover | Companies House |
+| Insolvency: case record and Gazette notices (winding-up petitions) | Companies House, The Gazette |
+| Charges: outstanding, new lenders in 12 months | Companies House |
+| Directors / LLP members: disqualification (name + date of birth) | Companies House disqualified register |
+| Directors: other companies that became insolvent (incl. liquidated then dissolved), phoenix pattern | Companies House appointments |
+| Board and ownership changes in 12 months | Companies House |
+| Ownership: PSCs, overseas owners by jurisdiction, one level of UK parent | Companies House PSC register |
+| Sanctions: company, previous names, directors, PSCs, parent's owners | UK Sanctions List (FCDO), matched locally |
+| FCA authorisation and disciplinary history (regulated trades only) | FCA Register |
+| Adverse media, read against the company's identity | Brave Search (GDELT fallback) + one model call |
+| Declared trade vs SIC codes (if given) | same model call |
+| County court judgments | Not connected (paid source); always shown as not checked |
+
+Thresholds live in `src/prescreen/rules.py`. Most are marked DRAFT: they are a starting point
+from public guidance and need an underwriting authority holder to confirm them.
+
+## Run it
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env          # USE_MOCK_DATA=true runs the offline demo cases
+python api_server.py          # http://localhost:8000
+python -m pytest -q -m "not eval"
+```
+
+With `USE_MOCK_DATA=true` the app runs on two real Companies House profiles (Wilko, Monzo,
+captured 18 Oct 2026) and five invented companies that show each route and failure mode.
+For live data set `USE_MOCK_DATA=false` and the keys below.
+
+| Variable | Needed for |
+|---|---|
+| `COMPANIES_HOUSE_API_KEY` | everything (free key) |
+| `FCA_API_KEY`, `FCA_API_EMAIL` | FCA check (free registration) |
+| `BRAVE_SEARCH_API_KEY` | news search (GDELT is used without it, ~3 months only) |
+| `GROQ_API_KEY` (or `OPENAI_API_KEY`), `CHAT_MODEL_FAST=openai/gpt-oss-20b` | reading news results |
+| `PRESCREEN_ACCESS_TOKEN` | optional access code for the API and UI; set it on any shared deployment |
+| `PRESCREEN_RUNS_PER_HOUR` | service-wide cap (default 30) |
+
+The Gazette and the UK Sanctions List need no key.
+
+## Use it from an agent (MCP)
+
+The same checks are an MCP server, so any MCP client (Claude Desktop or Code, a LangGraph or
+OpenAI Agents app, Copilot Studio) can use them as tools.
+
+| Tool | What it does |
+|---|---|
+| `find_company` | name or number → one company, or candidates for a human to choose |
+| `prescreen_company` | full pre-screen with the proposal details; returns a ~3–5 KB summary and saves the report |
+| `get_report_section` | one part of a saved report: checks, proposal, broker questions, timeline, news, company, file note |
+| `company_record`, `gazette_notices`, `sanctions_screen`, `fca_firm_search` | one source each: evidence, not verdicts |
+| `watch_company`, `list_changes` | daily re-check of the registers |
+
+Also a `prescreen://rules` and `prescreen://checks` resource and a `prescreen_case` prompt.
+
+What an agent can't do, by design: change the route (the rules decide it), record an underwriting
+decision (a named person does that in the UI), or get sanctions-match detail on a compliance hold
+(it's held for compliance, so nothing an agent drafts can tip off the broker). Every result that
+has a gap says "not checked, which is not a clear result".
+
+**Local (stdio)**, for example in Claude Desktop's `claude_desktop_config.json`:
+
+```json
+{"mcpServers": {"uk-company-prescreen": {
+  "command": "python", "args": ["-m", "src.prescreen.mcp_server"],
+  "cwd": "/path/to/agentic-uk-company-due-diligence",
+  "env": {"USE_MOCK_DATA": "true"}}}}
+```
+
+**Remote (streamable HTTP)** at `https://<your-host>/mcp`, served by the same API. Send
+`Authorization: Bearer <PRESCREEN_ACCESS_TOKEN>` when the token is set. On Hugging Face the
+Space's host is allowed automatically (`SPACE_HOST`); elsewhere list hosts in `MCP_ALLOWED_HOSTS`.
+MCP runs share the `PRESCREEN_RUNS_PER_HOUR` limit with the API.
+
+## How it's built
+
+`src/prescreen/`: `identity.py` (the identity gate), `sources/` (one small client per source; a
+source returns data, NOT_FOUND, or raises SourceError, never an empty "all clear"), `checks.py`
+(plain functions over the fetched data), `rules.py` (thresholds and route), `media.py` (the only
+model call), `engine.py` (fetches in parallel and runs the checks), `service.py` (wiring and storage).
+The UI is `frontend/prescreen.html`, served at `/`. The original agentic research UI is kept at
+`/legacy` for comparison.
+
+Why it was rebuilt, with the live runs that showed the problems, is in `docs/rebuild/`.
+
+## Limits
+
+- CCJs aren't checked (paid data).
+- HSE and Environment Agency enforcement aren't connected yet.
+- Reports are stored as JSON files; on a Hugging Face Space they are lost when it restarts.
+- The sanctions screen is a name and date-of-birth match against the UK list only; it is a
+  pre-screen, not a substitute for the insurer's own sanctions process.
+- Not a decision: the underwriter decides.
+
+---
+
+## Legacy: the agentic research graph
 
 An evidence-driven, agentic research application for UK company due diligence
 and insurance underwriting pre-screening.
@@ -11,7 +145,7 @@ an evidence trail.
 This is a research framework, not an autonomous underwriting authority. Final
 risk acceptance remains with an authorised human reviewer.
 
-## What It Produces
+### What It Produces
 
 - Canonical company identity and Companies House number
 - Company, officer, filing, regulatory, news, fraud, and ownership summaries
@@ -21,7 +155,7 @@ risk acceptance remains with an authorised human reviewer.
 - Referral triggers, possible exclusions, loading indicators, and decline indicators
 - Missing dimensions, contradictions, research iterations, and evidence trace
 
-## Research Flow
+### Research Flow
 
 ```mermaid
 flowchart TD
@@ -44,7 +178,7 @@ The graph is implemented with LangGraph. Agent outputs are validated with
 Pydantic models, and connector failures are represented as missing evidence
 instead of terminating the complete research run.
 
-## Research Dimensions
+### Research Dimensions
 
 | Dimension | Primary evidence |
 |---|---|
@@ -57,7 +191,7 @@ instead of terminating the complete research run.
 | Fraud signals | Director disqualification, appointment history, OpenSanctions |
 | Beneficial ownership | Companies House PSC register and OpenSanctions |
 
-## Technology
+### Technology
 
 - Python 3.10+
 - LangGraph and LangChain
@@ -67,7 +201,7 @@ instead of terminating the complete research run.
 - Companies House, FCA Register, Brave Search, and OpenSanctions
 - Pytest
 
-## Quick Start
+### Quick Start
 
 ### 1. Create an environment
 
@@ -100,8 +234,8 @@ Groq example:
 
 ```ini
 CHAT_MODEL_PROVIDER=groq
-CHAT_MODEL=llama-3.3-70b-versatile
-CHAT_MODEL_FAST=llama-3.1-8b-instant
+CHAT_MODEL=openai/gpt-oss-120b
+CHAT_MODEL_FAST=openai/gpt-oss-20b
 GROQ_API_KEY=your_key
 USE_MOCK_DATA=true
 ```
@@ -133,7 +267,7 @@ API documentation is available at
 python app.py --query "Create an underwriting assessment for Monzo Bank Limited"
 ```
 
-## API
+### API
 
 | Endpoint | Purpose |
 |---|---|
@@ -152,7 +286,7 @@ curl -X POST http://localhost:8000/research/sync \
   -d "{\"query\":\"Create a due diligence assessment for Monzo Bank Limited\"}"
 ```
 
-## Live Data
+### Live Data
 
 The application starts with `USE_MOCK_DATA=true`. To use live sources:
 
@@ -163,7 +297,7 @@ The application starts with `USE_MOCK_DATA=true`. To use live sources:
 
 See [SETUP_REAL_APIS.md](SETUP_REAL_APIS.md) for source-specific instructions.
 
-## Testing
+### Testing
 
 Offline tests use mock evidence and do not call a real LLM:
 
@@ -189,7 +323,7 @@ Run one evaluation case:
 python scripts/run_eval.py monzo_full
 ```
 
-## Configuration
+### Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -204,7 +338,7 @@ python scripts/run_eval.py monzo_full
 
 All secrets are loaded through `src.config.settings`. Never commit `.env`.
 
-## Project Structure
+### Project Structure
 
 ```text
 src/
@@ -225,13 +359,13 @@ scripts/           API checks and evaluation tools
 docs/              Business and operational documentation
 ```
 
-## Documentation
+### Documentation
 
 - [Business and functional guide](docs/BUSINESS_FUNCTIONAL_GUIDE.md)
 - [Operational flow and system segregation](docs/OPERATIONAL_FLOW.md)
 - [Live API setup](SETUP_REAL_APIS.md)
 
-## Current Limitations
+### Current Limitations
 
 - Overall confidence is currently an LLM assessment, not a calibrated formula.
 - Overall risk is not yet generated from an approved deterministic aggregation rule.
@@ -244,7 +378,7 @@ docs/              Business and operational documentation
 Do not use the output as a binding underwriting, legal, compliance, sanctions,
 credit, or investment decision.
 
-## AI Tool Stack
+### AI Tool Stack
 
 This project is part of [AI Tool Stack](https://www.ai-toolstack.com):
 where AI demos become working systems.

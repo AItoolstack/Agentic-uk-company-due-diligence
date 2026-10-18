@@ -1,0 +1,44 @@
+name: deploy to Hugging Face Space
+
+# Pushes this branch to the Space, which rebuilds it.
+# Needs the repository secret HF_TOKEN (a Hugging Face write token for the AItoolstack account).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag to deploy
+        default: rebuild/underwriter-prescreen
+        required: true
+
+concurrency: deploy-space
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          lfs: true
+
+      # Hugging Face rejects binary files (PNGs here) that aren't in Git LFS, and the GitHub history has
+      # them as plain objects. So deploy a one-commit snapshot of this ref with images in LFS; GitHub's
+      # history is untouched and the Space's history is replaced (it's a deploy target, not a source).
+      - name: Push a snapshot to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          REF: ${{ inputs.ref }}
+        run: |
+          test -n "$HF_TOKEN" || { echo "HF_TOKEN secret is not set"; exit 1; }
+          SHA=$(git rev-parse --short HEAD)
+          git config user.name "deploy-space"
+          git config user.email "deploy-space@users.noreply.github.com"
+          git lfs install --local
+          git checkout --orphan space-deploy
+          git lfs track "*.png" "*.jpg" "*.jpeg" "*.gif" "*.webp" "*.pdf" "*.ico"
+          git rm -r --cached -q -f .
+          git add -A
+          git commit -q -m "Deploy $REF @ $SHA"
+          git push --force "https://AItoolstack:${HF_TOKEN}@huggingface.co/spaces/AItoolstack/agentic-uk-company-due-diligence" space-deploy:main
+          echo "Deployed $REF @ $SHA. Watch the build: https://huggingface.co/spaces/AItoolstack/agentic-uk-company-due-diligence"

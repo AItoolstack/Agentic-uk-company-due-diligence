@@ -8,3 +8,22 @@ from pathlib import Path
 
 # Ensure project root (containing src/) is importable
 sys.path.insert(0, str(Path(__file__).parent))
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_prescreen_store():
+    """Each test starts with the default store; tests that need one set it themselves."""
+    yield
+    from src.prescreen.store import set_store
+    set_store(None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_run_limit():
+    """The hourly pre-screen limit is process-wide (API and MCP share it); tests mustn't use each other's budget."""
+    from src.api import prescreen_routes
+    prescreen_routes._recent.clear()
+    yield
+    prescreen_routes._recent.clear()

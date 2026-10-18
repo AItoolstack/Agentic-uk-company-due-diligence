@@ -1,0 +1,4 @@
+{"active_count":1,"resigned_count":2,"total_results":3,"items":[
+{"appointed_on":"2015-04-27","date_of_birth":{"month":12,"year":1951},"links":{"officer":{"appointments":"/officers/n5o8c10NjR_CDOroiEe_Fol6AdU/appointments"}},"name":"DAWSON, Christopher Frederick","nationality":"British","officer_role":"director","country_of_residence":"England"},
+{"appointed_on":"2015-04-27","links":{"officer":{"appointments":"/officers/_b3xaseeY-WDYXsiEMnjS4h5iLw/appointments"}},"name":"DAWSON, Sarah Jane","officer_role":"secretary","resigned_on":"2017-03-23"},
+{"appointed_on":"2015-04-27","date_of_birth":{"month":11,"year":1962},"links":{"officer":{"appointments":"/officers/m1iJ8QDFQeTBaHBuLIUEV5KY3G4/appointments"}},"name":"DAWSON, Sarah Jane","nationality":"British","officer_role":"director","resigned_on":"2017-03-23"}]}
