@@ -10,18 +10,17 @@ Provider examples (set in .env):
   CHAT_MODEL_PROVIDER=openai        CHAT_MODEL=gpt-4o
   CHAT_MODEL_PROVIDER=anthropic     CHAT_MODEL=claude-opus-4-8
   CHAT_MODEL_PROVIDER=google_genai  CHAT_MODEL=gemini-2.0-flash
-  CHAT_MODEL_PROVIDER=groq          CHAT_MODEL=llama-3.3-70b-versatile
-                                    CHAT_MODEL_FAST=llama-3.1-8b-instant
+  CHAT_MODEL_PROVIDER=groq          CHAT_MODEL=openai/gpt-oss-120b
+                                    CHAT_MODEL_FAST=openai/gpt-oss-20b
 
 Tiered usage:
   get_llm(tier="quality")  ->  CHAT_MODEL          (default -- analytical agents)
   get_llm(tier="fast")     ->  CHAT_MODEL_FAST      (simple agents; falls back to
                                CHAT_MODEL if CHAT_MODEL_FAST is not set)
 
-Groq model recommendations (June 2026):
-  quality:  llama-3.3-70b-versatile   128k ctx, tool calling, best reasoning
-  fast:     llama-3.1-8b-instant      fastest/cheapest, tool calling supported
-  alt:      llama3-groq-70b-8192-tool-use-preview  (function-call optimised)
+Groq models (Oct 2026): the Llama 3.x models were retired on 16 Aug 2026.
+  quality:  openai/gpt-oss-120b
+  fast:     openai/gpt-oss-20b
 """
 
 from __future__ import annotations
