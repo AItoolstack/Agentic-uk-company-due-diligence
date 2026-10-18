@@ -192,8 +192,13 @@ def proposal_vs_record(request: Any, company: dict[str, Any], checks: list[Any],
     trade = req.get("declared_trade") or ""
     t = check.get("trade")
     verdict = "not_given" if not trade else {"clear": "match", "flag": "differs"}.get((t or {}).get("status"), "unknown")
-    rows.append({"item": "Trade", "proposal": trade or "—", "record": f"SIC {sic}", "verdict": verdict,
-                 "note": "" if verdict in ("match", "not_given") else (t or {}).get("summary", "")})
+    if verdict == "unknown":
+        note = (t or {}).get("summary") or ("Not compared in the daily re-check (it doesn't call the model)."
+                                            if (check.get("media") or {}).get("status") == "not_applicable"
+                                            else "Not compared.")
+    else:
+        note = "" if verdict in ("match", "not_given") else (t or {}).get("summary", "")
+    rows.append({"item": "Trade", "proposal": trade or "—", "record": f"SIC {sic}", "verdict": verdict, "note": note})
 
     # Turnover vs size of last accounts.
     turnover = req.get("declared_turnover_gbp")
@@ -306,11 +311,13 @@ def file_note(report: dict[str, Any]) -> str:
                   for x in rows]
 
     qs = r.get("broker_questions") or []
+    sanctions = any(f.get("rule_id") in COMPLIANCE_ONLY for c in checks for f in c.get("findings") or [])
+    if sanctions:
+        lines += ["", "Sanctions: referred to compliance. Not raised with the broker."
+                  + (" Questions below held until compliance clears the case." if qs else "")]
     if qs:
-        lines += ["", "Questions for the broker:"]
+        lines += ["", "Questions for the broker" + (" (HOLD until compliance clears):" if sanctions else ":")]
         lines += [f"{i}. {q['question']}" for i, q in enumerate(qs, 1)]
-    if any(f.get("rule_id") in COMPLIANCE_ONLY for c in checks for f in c.get("findings") or []):
-        lines += ["", "Sanctions: referred to compliance. Not raised with the broker."]
 
     decisions = r.get("decisions") or []
     if decisions:

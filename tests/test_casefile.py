@@ -46,6 +46,8 @@ def test_sanctions_never_become_a_broker_question():
     assert not [q for q in report.broker_questions if q["rule_id"].startswith("sanctions")]
     note = casefile.file_note(report.model_dump(mode="json"))
     assert "Not raised with the broker" in note
+    if report.broker_questions:
+        assert "HOLD until compliance clears" in note
 
 
 def test_broker_questions_worst_first_one_per_rule():
@@ -163,3 +165,13 @@ def test_trade_is_couldnt_check_not_missing_when_the_model_fails():
 
 def test_no_declared_trade_means_no_model_call_when_there_is_no_news():
     assert _run("ZZ000002", llm_answers=[]).llm_calls == 0
+
+
+def test_an_info_summary_never_says_nothing_was_found():
+    """A check that found notes mustn't summarise itself as 'no changes' / 'nothing found'."""
+    from src.prescreen import demo_cases
+    for number in demo_cases.cases():
+        report = _run(number, llm_answers=[_all_reviewed(10)] * 2)
+        for c in report.checks:
+            if c.status.value == "info" and c.check_id == "changes":
+                assert not c.summary.startswith("No "), (number, c.summary)

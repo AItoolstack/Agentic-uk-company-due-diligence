@@ -128,7 +128,9 @@ textarea{font:inherit;color:var(--ink);border:1px solid var(--rule2);border-radi
 .bar .not_applicable{background:transparent;border:1px dashed var(--unk-line)}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
-.verdict.compliance_hold .legend{color:#E9D6D6}
+.verdict.compliance_hold .legend{color:#D9DBE0}
+.verdict.compliance_hold .bar .flag.hold{background:#fff}
+.verdict.compliance_hold .bar span{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 
 /* Sections */
 .sec-h{display:flex;align-items:baseline;gap:10px;margin:2px 2px -6px}
@@ -450,10 +452,13 @@ async function showStart() {
   ]);
   const demo = (CONFIG && CONFIG.demo_cases) || [];
   // Changes feed: newest first, grouped by company, unseen companies on top.
+  // Within a company, worst change first: a route change must never be the one cut off.
+  const SEV = {note: 0, refer: 1, outside_appetite: 2, compliance_hold: 3};
   const byCo = new Map();
   changes.forEach(c => { if (!byCo.has(c.company_number)) byCo.set(c.company_number, []); byCo.get(c.company_number).push(c); });
+  byCo.forEach(list => list.sort((a, b) => (SEV[b.severity] || 0) - (SEV[a.severity] || 0) || (b.kind === "route") - (a.kind === "route") || b.id - a.id));
   const cos = [...byCo.entries()].sort((a, b) => (a[1].some(x => !x.seen) ? 0 : 1) - (b[1].some(x => !x.seen) ? 0 : 1));
-  const sevIcon = s => icon(ROUTE_ICON[s] || "tick");
+  const sevIcon = s => icon(s === "note" ? "ring" : (ROUTE_ICON[s] || "ring"));
   const sevColour = s => ({refer: "var(--accent)", outside_appetite: "var(--stop)", compliance_hold: "var(--hold)"}[s] || "var(--clear)");
   const watchBadge = n => { const w = WATCHED.get(n); if (!w) return ""; return w.unseen_changes ? `<span class="wb new">${w.unseen_changes} new</span>` : `<span class="wb">watching</span>`; };
   $("#main").innerHTML = `
@@ -473,7 +478,8 @@ async function showStart() {
         <div class="chg${c.seen ? " seen" : ""}"><span style="color:${sevColour(c.severity)}">${sevIcon(c.severity)}</span>
           <span>${i === 0 ? `<span class="who">${esc(name)}</span> <span class="mono" style="font-size:12px;color:var(--muted)">${esc(num)}</span><br>` : ""}${esc(c.summary)}
             <br><span class="m">${esc(new Date(c.detected_at).toLocaleString("en-GB", {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"}))}${c.report_id ? ` · <a href="#" data-report="${esc(c.report_id)}">open the re-check</a>` : ""}</span></span>
-          <span>${i === 0 && unseen ? `<button type="button" data-seen="${esc(num)}">Mark seen</button>` : ""}</span></div>`).join(""); }).join("")
+          <span>${i === 0 && unseen ? `<button type="button" data-seen="${esc(num)}">Mark seen</button>` : ""}</span></div>`).join("")
+        + (list.length > 4 ? `<div class="chg seen"><span></span><span class="m">+${list.length - 4} smaller change(s); open the re-check to see them all.</span><span></span></div>` : ""); }).join("")
         : `<div class="empty">Nothing has changed since you started watching. The registers are re-checked every morning.</div>`}
     </section>` : ""}
     ${recent.length ? `<section class="panel"><div class="hd"><h2>Recent cases</h2></div><div class="tablewrap"><table class="cases">
@@ -777,9 +783,9 @@ function render(r) {
 
     ${attention.length ? `<div class="sec-h"><h2>Needs your attention</h2><span class="ct">${attention.length}</span></div><div class="cards">${attention.map(card).join("")}</div>` : ""}
 
-    ${qs.length || sanctionsHit ? `<section class="panel"><div class="hd"><h2>Questions for the broker</h2><span class="spacer"></span>${qs.length ? `<button class="copy" type="button" id="copy-qs">Copy questions</button>` : ""}</div>
+    ${qs.length || sanctionsHit ? `<section class="panel"><div class="hd"><h2>Questions for the broker</h2><span class="spacer"></span>${qs.length ? `<button class="copy" type="button" id="copy-qs">${sanctionsHit ? "Copy (after compliance clears)" : "Copy questions"}</button>` : ""}</div>
+      ${sanctionsHit ? `<div class="compl">${icon("hold")} The sanctions finding is for compliance, not the broker. Don't raise it with the broker or the client${qs.length ? ", and hold the questions below until compliance has cleared the case: some of them could tip the client off" : ""}.</div>` : ""}
       ${qs.length ? `<ol class="qs">${qs.map(q => `<li>${esc(q.question)}<span class="bc">${esc(GTITLE[q.group] || "")} · because: ${esc(q.because)}</span></li>`).join("")}</ol>` : ""}
-      ${sanctionsHit ? `<div class="compl">${icon("hold")} The sanctions finding is for compliance, not the broker. Don't raise it with the broker or the client.</div>` : ""}
     </section>` : ""}
 
     ${pvrGiven.length ? `<section class="panel"><div class="hd"><h2>Proposal vs public record</h2></div><div class="tablewrap"><table class="pvr">

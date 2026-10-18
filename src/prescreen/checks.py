@@ -127,12 +127,14 @@ def _join(parts: list[str]) -> str:
 
 
 def _finish(check_id: str, title: str, findings: list[Finding], clear_summary: str,
-            sources: list[SourceRef], critical: bool) -> CheckResult:
+            sources: list[SourceRef], critical: bool, info_summary: str | None = None) -> CheckResult:
+    """info_summary: what to say when there are only notes, for checks whose clear summary
+    ("no changes") would contradict them. Defaults to the clear summary."""
     flagged = [f for f in findings if f.route != Route.NOTE]
     if flagged:
         status, summary = CheckStatus.FLAG, _join([f.text for f in flagged])
     elif findings:
-        status, summary = CheckStatus.INFO, clear_summary
+        status, summary = CheckStatus.INFO, clear_summary if info_summary is None else info_summary
     else:
         status, summary = CheckStatus.CLEAR, clear_summary
     return CheckResult(check_id=check_id, title=title, status=status, summary=summary,
@@ -757,7 +759,7 @@ def check_changes(data: CompanyData) -> CheckResult:
                                 text="Ownership changes: " + "; ".join(psc_changes[:4]) +
                                      ". At renewal, check this was presented.", sources=src[1:]))
     return _finish("changes", title, findings, "No director or ownership changes in the last 12 months.",
-                   src, critical=False)
+                   src, critical=False, info_summary=_join([f.text for f in findings]))
 
 
 # ---------------------------------------------------------------------------
