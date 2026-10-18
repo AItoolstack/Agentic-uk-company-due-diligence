@@ -76,6 +76,40 @@ For live data set `USE_MOCK_DATA=false` and the keys below.
 
 The Gazette and the UK Sanctions List need no key.
 
+## Use it from an agent (MCP)
+
+The same checks are an MCP server, so any MCP client (Claude Desktop or Code, a LangGraph or
+OpenAI Agents app, Copilot Studio) can use them as tools.
+
+| Tool | What it does |
+|---|---|
+| `find_company` | name or number → one company, or candidates for a human to choose |
+| `prescreen_company` | full pre-screen with the proposal details; returns a ~3–5 KB summary and saves the report |
+| `get_report_section` | one part of a saved report: checks, proposal, broker questions, timeline, news, company, file note |
+| `company_record`, `gazette_notices`, `sanctions_screen`, `fca_firm_search` | one source each: evidence, not verdicts |
+| `watch_company`, `list_changes` | daily re-check of the registers |
+
+Also a `prescreen://rules` and `prescreen://checks` resource and a `prescreen_case` prompt.
+
+What an agent can't do, by design: change the route (the rules decide it), record an underwriting
+decision (a named person does that in the UI), or get sanctions-match detail on a compliance hold
+(it's held for compliance, so nothing an agent drafts can tip off the broker). Every result that
+has a gap says "not checked, which is not a clear result".
+
+**Local (stdio)**, for example in Claude Desktop's `claude_desktop_config.json`:
+
+```json
+{"mcpServers": {"uk-company-prescreen": {
+  "command": "python", "args": ["-m", "src.prescreen.mcp_server"],
+  "cwd": "/path/to/agentic-uk-company-due-diligence",
+  "env": {"USE_MOCK_DATA": "true"}}}}
+```
+
+**Remote (streamable HTTP)** at `https://<your-host>/mcp`, served by the same API. Send
+`Authorization: Bearer <PRESCREEN_ACCESS_TOKEN>` when the token is set. On Hugging Face the
+Space's host is allowed automatically (`SPACE_HOST`); elsewhere list hosts in `MCP_ALLOWED_HOSTS`.
+MCP runs share the `PRESCREEN_RUNS_PER_HOUR` limit with the API.
+
 ## How it's built
 
 `src/prescreen/`: `identity.py` (the identity gate), `sources/` (one small client per source; a

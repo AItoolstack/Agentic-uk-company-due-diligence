@@ -18,6 +18,8 @@ pytest-asyncio>=0.23.0
 
 # API layer
 fastapi>=0.111.0
+# MCP server (src/prescreen/mcp_server.py). 2.x renamed FastMCP to MCPServer; v1 code won't run.
+mcp>=2.2,<3
 uvicorn[standard]>=0.30.0
 
 # Utilities

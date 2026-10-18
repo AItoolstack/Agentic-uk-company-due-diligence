@@ -18,3 +18,12 @@ def _reset_prescreen_store():
     yield
     from src.prescreen.store import set_store
     set_store(None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_run_limit():
+    """The hourly pre-screen limit is process-wide (API and MCP share it); tests mustn't use each other's budget."""
+    from src.api import prescreen_routes
+    prescreen_routes._recent.clear()
+    yield
+    prescreen_routes._recent.clear()
