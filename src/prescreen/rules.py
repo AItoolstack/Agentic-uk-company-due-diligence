@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from src.prescreen.models import CheckResult, CheckStatus, Route
 
-RULES_VERSION = "draft-2026-10-18b"
+RULES_VERSION = "draft-2026-10-19a"
 
 THRESHOLDS = {
     # Company age
@@ -45,15 +45,23 @@ THRESHOLDS = {
 
 DISTRESS_SIGNALS = {"charges_burst", "insolvency_history", "winding_up_petition", "gazette_insolvency_notice"}
 
+# Once a company is closed or insolvent, these are consequences, not separate reasons (Carillion, live:
+# "accounts 3032 days overdue" under "in liquidation"). They stay in the checks; they leave the reasons.
+ENDED = {"company_closed", "company_insolvent"}
+CONSEQUENCES_OF_ENDING = {"accounts_overdue", "accounts_overdue_serious", "accounts_late", "confirmation_overdue",
+                          "no_psc", "psc_statement", "psc_none_statement", "dormant", "dormant_but_trading",
+                          "accounts_size_mismatch", "strike_off_compulsory", "strike_off_unknown"}
+
 
 def decide(checks: list[CheckResult]) -> tuple[Route, list[str]]:
     """Return the recommended route and the reasons, worst first."""
     route = Route.NOTE
     reasons: list[tuple[int, str]] = []
+    ended = any(f.rule_id in ENDED for c in checks for f in c.findings)
 
     for c in checks:
         for f in c.findings:
-            if f.route.rank > Route.NOTE.rank:
+            if f.route.rank > Route.NOTE.rank and not (ended and f.rule_id in CONSEQUENCES_OF_ENDING):
                 reasons.append((f.route.rank, f.text))
             if f.route.rank > route.rank:
                 route = f.route
@@ -69,9 +77,10 @@ def decide(checks: list[CheckResult]) -> tuple[Route, list[str]]:
     if "accounts_overdue_serious" in rule_ids and rule_ids & DISTRESS_SIGNALS:
         if route.rank < Route.OUTSIDE_APPETITE.rank:
             route = Route.OUTSIDE_APPETITE
-        reasons.append((Route.OUTSIDE_APPETITE.rank,
-                        f"Accounts more than {THRESHOLDS['overdue_serious_days']} days overdue together with "
-                        "another distress signal."))
+        if not ended:
+            reasons.append((Route.OUTSIDE_APPETITE.rank,
+                            f"Accounts more than {THRESHOLDS['overdue_serious_days']} days overdue together with "
+                            "another distress signal."))
     # A new company is only a note on its own; with a director's insolvency history it refers.
     if "company_new" in rule_ids and "director_insolvent_links" in rule_ids and route.rank < Route.REFER.rank:
         route = Route.REFER

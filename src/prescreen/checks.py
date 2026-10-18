@@ -126,6 +126,22 @@ def _join(parts: list[str]) -> str:
     return " ".join(p.strip() if p.strip().endswith((".", "?", "!")) else p.strip() + "." for p in parts if p.strip())
 
 
+def _short_discipline(line: str) -> tuple[str, str]:
+    """'Fines | 07/07/2025 | A final notice has been issued ... https://...pdf' -> ('fine, 7 Jul 2025: <gist>', url).
+    The Register's text runs to a paragraph; the underwriter needs the kind, the date and the link."""
+    url = (re.findall(r"https?://\S+", line) or [""])[0].rstrip(".,;)")
+    parts = [p.strip() for p in re.sub(r"https?://\S+", "", line).split("|")]
+    kind = (parts[0] if parts else "action").rstrip("s").lower() or "action"
+    when = _parse_date(parts[1]) if len(parts) > 1 else None
+    gist = parts[2] if len(parts) > 2 else ""
+    m = re.search(r"because (?:it|they|the firm)?\s*(.+?)(?:\.|;| \(| during |$)", gist)
+    gist = (m.group(1) if m else gist.split(".")[0]).strip()
+    if len(gist) > 140:
+        gist = gist[:137].rsplit(" ", 1)[0] + "…"
+    head = f"{kind}, {when:%d %b %Y}" if when else kind
+    return head + (f" ({gist})" if gist else ""), url
+
+
 def _finish(check_id: str, title: str, findings: list[Finding], clear_summary: str,
             sources: list[SourceRef], critical: bool, info_summary: str | None = None) -> CheckResult:
     """info_summary: what to say when there are only notes, for checks whose clear summary
@@ -977,12 +993,13 @@ def check_fca(data: CompanyData, req: PreScreenRequest, firms: Any, discipline: 
                 recent.append(line)
         if recent:
             financial = req.financial_lines or not req.cover_lines
+            short = [_short_discipline(line) for line in recent[:3]]
             findings.append(Finding(
                 rule_id="fca_discipline", route=Route.REFER if financial else Route.NOTE,
-                text=f"FCA disciplinary history in the last {T['fca_discipline_years']} years ({len(recent)}): "
-                     + "; ".join(recent[:3]) +
-                     ("" if financial else ". Relevant mainly for PI, D&O and financial institutions cover"),
-                sources=fsrc))
+                text=f"FCA action in the last {T['fca_discipline_years']} years: " + "; ".join(t for t, _ in short) +
+                     ("." if financial else ". Relevant mainly for PI, D&O and financial institutions cover."),
+                detail={"actions": recent[:5]},
+                sources=fsrc + [SourceRef(label="FCA final notice", url=u) for _, u in short if u]))
     elif isinstance(discipline, SourceError):
         findings.append(Finding(rule_id="fca_discipline_unchecked", route=Route.NOTE,
                                 text=f"FCA disciplinary history couldn't be read ({discipline.plain}).", sources=fsrc))

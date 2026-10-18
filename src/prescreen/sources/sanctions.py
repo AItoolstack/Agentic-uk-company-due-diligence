@@ -82,7 +82,9 @@ def parse_csv(text: str, fetched_at: str = "", source_note: str = "") -> Sanctio
     c_id = _col(header, "unique id")
     c_n6 = _col(header, "name 6")
     c_names = [_col(header, f"name {i}") for i in range(1, 6)]
-    c_kind = _col(header, "individual, entity, ship", "entity type", "group type")
+    # The live file (checked 19 Oct 2026) calls it "Designation Type": Individual / Entity / Ship.
+    # Don't match "Type of entity", which is a business description.
+    c_kind = _col(header, "designation type", "individual, entity, ship", "entity type", "group type")
     c_dob = _col(header, "d.o.b", "dob", "date of birth")
     c_regime = _col(header, "regime name", "regime")
     if c_id is None or c_n6 is None:

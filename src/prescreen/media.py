@@ -43,6 +43,9 @@ For each result decide:
 - reason: one short sentence in plain English, saying what the article reports and why it is or
   isn't about this company.
 Base everything on the title, outlet, date and snippet given. Do not invent facts.
+trade_consistency: when declared_trade is given, answer "consistent", "inconsistent" or "unclear" by comparing it
+with the SIC codes; use "not_asked" only when declared_trade is "(not given)". A dormant SIC (99999) with a
+trading business declared is "inconsistent".
 Reply with JSON only: {"items": [{"i": <index>, "about_this_company": "...", "category": "...",
 "severity": "...", "reason": "..."}], "trade_consistency": {"verdict": "consistent|inconsistent|unclear|not_asked",
 "reason": "..."}}""".replace("CATEGORIES", ", ".join(CATEGORIES))
@@ -155,22 +158,42 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
         it.severity = row.get("severity", "low") if row.get("severity") in ("low", "medium", "high") else "low"
         it.reason = str(row.get("reason", ""))[:300]
 
+    # Guard (the Wilko trap, seen live): news of a collapse can't be about this legal entity when Companies
+    # House shows it active with no insolvency record. It's usually a predecessor that used the brand.
+    status = (data.profile.get("company_status") or "").lower()
+    no_insolvency = not data.profile.get("has_insolvency_history") and "insolvency" not in (data.profile.get("links") or {})
+    if status == "active" and no_insolvency:
+        for it in items:
+            if it.about_this_company == "yes" and it.category == "insolvency_or_distress":
+                it.about_this_company = "unsure"
+                it.reason = ("Reports a collapse or insolvency, but Companies House shows this company active with no "
+                             "insolvency record; probably about another company that used the name. " + it.reason)[:300]
+
+    # One finding per severity, not one per article: seven articles about one collapse are one fact.
     findings: list[Finding] = []
     unreviewed = [it for it in items if it.about_this_company == "not_reviewed"]
-    for it in items:
-        if it.about_this_company == "not_reviewed" or it.category in ("", "neutral") or it.severity == "low":
-            continue
-        src = [SourceRef(label=it.source or "article", url=it.url)]
-        label = it.category.replace("_", " ")
-        if it.about_this_company == "yes":
-            findings.append(Finding(rule_id=f"media_{it.severity}", route=Route.REFER if it.severity == "high"
-                                    else Route.NOTE,
-                                    text=f"{label.capitalize()} ({it.published[:10] or 'undated'}): {it.title}",
-                                    detail={"reason": it.reason}, sources=src))
-        elif it.about_this_company == "unsure" and it.severity == "high":
-            findings.append(Finding(rule_id="media_unsure", route=Route.NOTE,
-                                    text=f"Possibly about this company ({label}); open and check: {it.title}",
-                                    detail={"reason": it.reason}, sources=src))
+    adverse = [it for it in items if it.about_this_company in ("yes", "unsure")
+               and it.category not in ("", "neutral") and it.severity != "low"]
+    for severity, route in (("high", Route.REFER), ("medium", Route.NOTE)):
+        group = [it for it in adverse if it.about_this_company == "yes" and it.severity == severity]
+        if group:
+            group.sort(key=lambda it: it.published or "", reverse=True)
+            cats = sorted({it.category.replace("_", " ") for it in group})
+            latest = group[0]
+            findings.append(Finding(
+                rule_id=f"media_{severity}", route=route,
+                text=(f"{len(group)} {'serious ' if severity == 'high' else ''}adverse news item"
+                      f"{'s' if len(group) != 1 else ''} about this company ({', '.join(cats)}); latest "
+                      f"{latest.published[:10] or 'undated'}: {latest.title}"),
+                detail={"titles": [it.title for it in group][:10]},
+                sources=[SourceRef(label=it.source or "article", url=it.url) for it in group[:3]]))
+    unsure = [it for it in adverse if it.about_this_company == "unsure" and it.severity == "high"]
+    if unsure:
+        findings.append(Finding(
+            rule_id="media_unsure", route=Route.NOTE,
+            text=(f"{len(unsure)} serious news item{'s' if len(unsure) != 1 else ''} may be about this company; "
+                  f"open and check: {unsure[0].title}"),
+            sources=[SourceRef(label=it.source or "article", url=it.url) for it in unsure[:3]]))
     excluded = sum(1 for it in items if it.about_this_company == "no")
     summary_clear = (f"{len(items)} results reviewed ({provider}); nothing adverse about this company"
                      + (f"; {excluded} excluded as about a different entity." if excluded else "."))

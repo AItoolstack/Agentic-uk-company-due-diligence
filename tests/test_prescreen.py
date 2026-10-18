@@ -510,3 +510,108 @@ def test_identity_card_has_sic_labels():
     report = _run("ZZ000001")
     assert report.company["sic"][0] == {"code": "10710", "label": "Manufacture of bread, fresh pastry and cakes"}
     assert report.company["officers"][0]["name"] == "EXAMPLE, Jordan Alex"
+
+
+# ---------------------------------------------------------------- the live UK Sanctions List layout
+
+REAL_HEADER = ("Last Updated,Unique ID,OFSI Group ID,UN Reference Number,Name 6,Name 1,Name 2,Name 3,Name 4,Name 5,"
+               "Name type,Alias strength,Title,Name non-latin script,Non-latin script type,Non-latin script language,"
+               "Regime Name,Designation Type,Designation source,Sanctions Imposed,Other Information,"
+               "UK Statement of Reasons,Address Line 1,Address Line 2,Address Line 3,Address Line 4,Address Line 5,"
+               "Address Line 6,Address Postal Code,Address Country,Phone number,Website,Email address,Date Designated,"
+               "D.O.B,Nationality(/ies),National Identifier number,National Identifier additional information,"
+               "Passport number,Passport additional information,Position,Gender,Town of birth,Country of birth,"
+               "Type of entity,Subsidiaries,Parent company,Business registration number (s),IMO number,"
+               "Current owner/operator (s),Previous owner/operator (s),Current believed flag of ship,Previous flags,"
+               "Type of ship,Tonnage of ship,Length of ship,Year Built,Hull identification number (HIN)")
+
+
+def _real_row(uid, name6, name1, kind, dob="", type_of_entity=""):
+    cols = REAL_HEADER.split(",")
+    row = [""] * len(cols)
+    row[cols.index("Unique ID")], row[cols.index("Name 6")], row[cols.index("Name 1")] = uid, name6, name1
+    row[cols.index("Designation Type")], row[cols.index("D.O.B")] = kind, dob
+    row[cols.index("Type of entity")] = type_of_entity
+    row[cols.index("Regime Name")] = "Test Regime"
+    return ",".join(row)
+
+
+def test_live_sanctions_csv_layout_parses_and_matches():
+    text = "\n".join([
+        "Report Date: 16-Oct-2026", REAL_HEADER,
+        _real_row("TST0001", "EXAMPLOV", "Ivan", "Individual", "dd/mm/1961"),
+        _real_row("TST0002", "EXAMPLE TRADING LLC", "", "Entity", type_of_entity="Trading company"),
+        _real_row("TST0003", "SEA EXAMPLE", "", "Ship"),
+    ])
+    sl = parse_csv(text, "test", "test")
+    kinds = {e.unique_id: e.kind for e in sl.entries}
+    assert kinds == {"TST0001": "individual", "TST0002": "entity", "TST0003": "ship"}
+    hits = screen([Screened(name="Ivan EXAMPLOV", role="director", is_person=True, dob_year=1961)], sl)
+    assert hits and hits[0].strength == "strong"
+
+
+def test_officers_are_read_past_the_first_page():
+    class Paged:
+        calls = []
+
+        async def get(self, path, params=None):
+            Paged.calls.append(dict(params or {}))
+            start = (params or {}).get("start_index", 0)
+            items = [{"name": f"OFFICER {i}", "officer_role": "director"} for i in range(start, min(start + 100, 230))]
+            return {"items": items, "total_results": 230}
+
+    r = asyncio.run(CompaniesHouse(Paged()).officers("02366661"))
+    assert len(r["items"]) == 230 and r["total_results"] == 230
+    assert [c.get("start_index", 0) for c in Paged.calls] == [0, 100, 200]
+
+
+# ---------------------------------------------------------------- news: grouped findings, collapse guard
+
+def _media(status="active", insolvency=False, rows=None, n=3):
+    from datetime import date
+
+    from src.prescreen.checks import CompanyData
+    from src.prescreen.media import check_media
+    profile = {"company_number": "00000001", "company_name": "EXAMPLE PLC", "company_status": status,
+               "date_of_creation": "2000-01-01", "has_insolvency_history": insolvency,
+               "links": {"insolvency": "/x"} if insolvency else {}}
+    data = CompanyData(number="00000001", profile=profile, today=date(2026, 10, 19))
+    results = [{"title": f"Example collapse story {i}", "url": f"https://news.example/{i}", "published": f"2026-0{i+1}-01",
+                "source": "news.example", "snippet": "collapse"} for i in range(n)]
+    answer = {"items": rows or [{"i": i, "about_this_company": "yes", "category": "insolvency_or_distress",
+                                 "severity": "high", "reason": "r"} for i in range(n)],
+              "trade_consistency": {"verdict": "not_asked", "reason": ""}}
+    llm = JSONChat(None, "groq", "test", "", scripted=[json.dumps(answer)])
+    return asyncio.run(check_media(data, results, llm, "", "test"))
+
+
+def test_many_articles_about_one_event_are_one_finding():
+    media, _, items = _media(status="liquidation", insolvency=True, n=7)
+    assert len(items) == 7
+    high = [f for f in media.findings if f.rule_id == "media_high"]
+    assert len(high) == 1 and high[0].text.startswith("7 serious adverse news items")
+    assert high[0].route == Route.REFER
+
+
+def test_collapse_news_about_an_active_company_with_no_insolvency_is_only_possible():
+    media, _, items = _media(status="active", insolvency=False, n=2)
+    assert all(it.about_this_company == "unsure" for it in items)
+    assert not [f for f in media.findings if f.route == Route.REFER]
+    assert [f for f in media.findings if f.rule_id == "media_unsure"]
+
+
+def test_closed_company_reasons_dont_list_its_own_consequences():
+    from src.prescreen.models import CheckResult, CheckStatus, Finding
+    from src.prescreen.rules import decide
+    checks = [
+        CheckResult(check_id="status", title="Company status", status=CheckStatus.FLAG, summary="",
+                    findings=[Finding(rule_id="company_insolvent", route=Route.OUTSIDE_APPETITE, text="Company is in liquidation.")]),
+        CheckResult(check_id="filings", title="Filings", status=CheckStatus.FLAG, summary="",
+                    findings=[Finding(rule_id="accounts_overdue_serious", route=Route.REFER, text="Accounts are overdue by 3032 days."),
+                              Finding(rule_id="confirmation_overdue", route=Route.REFER, text="Confirmation statement is overdue.")]),
+        CheckResult(check_id="insolvency", title="Insolvency", status=CheckStatus.FLAG, summary="",
+                    findings=[Finding(rule_id="insolvency_history", route=Route.REFER, text="Insolvency case on record.")]),
+    ]
+    route, reasons = decide(checks)
+    assert route == Route.OUTSIDE_APPETITE
+    assert reasons == ["Company is in liquidation.", "Insolvency case on record."]

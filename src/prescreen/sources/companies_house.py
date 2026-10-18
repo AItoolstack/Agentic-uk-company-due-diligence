@@ -88,8 +88,23 @@ class CompaniesHouse:
     async def search(self, query: str, limit: int = 8) -> Any:
         return await self.t.get("/search/companies", {"q": query, "items_per_page": limit})
 
-    async def officers(self, number: str) -> Any:
-        return await self.t.get(f"/company/{number}/officers", {"items_per_page": 100})
+    async def officers(self, number: str, max_items: int = 500) -> Any:
+        """All officers, paged. Old companies have hundreds (Thames Water: well over 100 counting
+        resigned ones), and the first page alone made the director checks 'couldn't check'."""
+        path = f"/company/{number}/officers"
+        first = await self.t.get(path, {"items_per_page": 100})
+        if not isinstance(first, dict):
+            return first
+        items = list(first.get("items") or [])
+        total = int(first.get("total_results") or len(items))
+        start = len(items)
+        while start < min(total, max_items) and start > 0:
+            page = await self.t.get(path, {"items_per_page": 100, "start_index": start})
+            if not isinstance(page, dict) or not page.get("items"):
+                break
+            items += page["items"]
+            start += len(page["items"])
+        return {**first, "items": items, "total_results": total, "items_per_page": len(items)}
 
     async def pscs(self, number: str) -> Any:
         return await self.t.get(
