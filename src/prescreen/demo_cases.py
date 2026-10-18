@@ -52,11 +52,12 @@ def _appt(number: str, name: str, status: str, appointed: str, resigned: str | N
 def _profile(number: str, name: str, created: str, *, status: str = "active", detail: str = "",
              acc_due: str = "2027-06-30", acc_overdue: bool = False, cs_due: str = "2027-03-01",
              cs_overdue: bool = False, sic: list[str] | None = None, links_extra: dict | None = None,
-             previous: list | None = None, town: str = "Leeds") -> dict[str, Any]:
+             previous: list | None = None, town: str = "Leeds", last: tuple[str, str] | None = None) -> dict[str, Any]:
     p = {
         "company_number": number, "company_name": name, "company_status": status, "date_of_creation": created,
         "type": "ltd", "jurisdiction": "england-wales", "sic_codes": sic or ["10710"],
-        "accounts": {"next_accounts": {"due_on": acc_due, "overdue": acc_overdue}},
+        "accounts": {"next_accounts": {"due_on": acc_due, "overdue": acc_overdue},
+                     **({"last_accounts": {"type": last[0], "made_up_to": last[1]}} if last else {})},
         "confirmation_statement": {"next_due": cs_due, "overdue": cs_overdue},
         "registered_office_address": {"address_line_1": "1 Example Street", "locality": town, "postal_code": "LS1 1AA"},
         "links": {"self": f"/company/{number}", "officers": f"/company/{number}/officers",
@@ -189,6 +190,7 @@ def cases(day: int = 1) -> dict[str, dict[str, Any]]:
         "kind": "synthetic",
         "ch": {
             f"/company/{zd}": _profile(zd, "HALDEN JOINERY LTD", "2011-03-14", detail="active-proposal-to-strike-off",
+                                       last=("micro-entity", "2024-08-31"),
                                        acc_due=_d(140), acc_overdue=True, cs_due=_d(60), cs_overdue=True,
                                        sic=["16230"], links_extra={"charges": f"/company/{zd}/charges"}),
             f"/company/{zd}/officers": {"items": [_officer("SAMPLE, Morgan", "zzofficer2", (8, 1971), "2011-03-14")]},
@@ -212,7 +214,8 @@ def cases(day: int = 1) -> dict[str, dict[str, Any]]:
         "label": "Calder Valley Plumbing Ltd — SYNTHETIC: Companies House partly down, search down",
         "kind": "synthetic",
         "ch": {
-            f"/company/{zs}": _profile(zs, "CALDER VALLEY PLUMBING LTD", "2014-09-01", sic=["43220"]),
+            f"/company/{zs}": _profile(zs, "CALDER VALLEY PLUMBING LTD", "2014-09-01", sic=["43220"],
+                                       last=("total-exemption-full", "2025-08-31")),
             f"/company/{zs}/officers": SourceError("Companies House", "unavailable", "HTTP 503"),
             f"/company/{zs}/persons-with-significant-control": SourceError("Companies House", "unavailable", "ReadTimeout"),
         },
@@ -225,7 +228,8 @@ def cases(day: int = 1) -> dict[str, dict[str, Any]]:
         "label": "Atlas Trade Partners Ltd — SYNTHETIC: BVI owner; a PSC matches a (fictional) sanctions entry",
         "kind": "synthetic",
         "ch": {
-            f"/company/{za}": _profile(za, "ATLAS TRADE PARTNERS LTD", "2019-06-01", sic=["46900"]),
+            f"/company/{za}": _profile(za, "ATLAS TRADE PARTNERS LTD", "2019-06-01", sic=["46900"],
+                                       last=("small", "2025-12-31")),
             f"/company/{za}/officers": {"items": [_officer("SAMPLE, Robin", "zzofficer4", (1, 1975), "2019-06-01")]},
             "/officers/zzofficer4/appointments": {"items": [_appt(za, "ATLAS TRADE PARTNERS LTD", "active", "2019-06-01")]},
             f"/company/{za}/persons-with-significant-control": {"items": [
@@ -240,7 +244,8 @@ def cases(day: int = 1) -> dict[str, dict[str, Any]]:
         "label": "Pennine Advisory LLP — SYNTHETIC: LLP members, a member resigned recently, PI cover",
         "kind": "synthetic",
         "ch": {
-            f"/company/{zl}": {**_profile(zl, "PENNINE ADVISORY LLP", "2009-05-01", sic=["69201"]), "type": "llp"},
+            f"/company/{zl}": {**_profile(zl, "PENNINE ADVISORY LLP", "2009-05-01", sic=["69201"],
+                                       last=("small", "2026-03-31")), "type": "llp"},
             f"/company/{zl}/officers": {"items": [
                 _officer("PATEL, Asha", "zzllp1", (2, 1972), "2009-05-01", role="llp-designated-member"),
                 _officer("HUGHES, Owen", "zzllp2", (9, 1968), "2009-05-01", role="llp-designated-member"),
