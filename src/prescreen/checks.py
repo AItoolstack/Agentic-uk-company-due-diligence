@@ -411,7 +411,9 @@ def check_insolvency(data: CompanyData) -> CheckResult:
             published = _parse_date(nt.get("published"))
             if published is None or published < history_cut:
                 continue
-            name = NOTICE_NAMES.get(nt.get("code", ""), nt.get("title") or "Insolvency notice")
+            # The feed's title is usually just the company name (BrewDog, live), so never use it as the notice name.
+            code = nt.get("code", "")
+            name = NOTICE_NAMES.get(code) or (f"Insolvency notice (code {code})" if code else "Insolvency notice")
             nsrc = [SourceRef(label=f"Gazette notice {nt.get('code', '')}", url=nt.get("url", ""))]
             if nt.get("code") == "2450" and published >= recent_cut:
                 findings.append(Finding(rule_id="winding_up_petition", route=Route.OUTSIDE_APPETITE,
@@ -968,7 +970,10 @@ def check_fca(data: CompanyData, req: PreScreenRequest, firms: Any, discipline: 
         return _finish("fca", title, [Finding(
             rule_id="fca_not_found", route=Route.REFER,
             text="Regulated trade, but no FCA Register firm has this exact name. It may trade under another name "
-                 "or be an appointed representative. Ask for the FRN.", sources=src)], "", src, critical=False)
+                 "or be an appointed representative. Ask for the FRN.",
+            detail={"register_names": [f"{f['name']} (FRN {f['frn']}, {f['status'] or 'status not given'})"
+                                       for f in firms[:5]]},
+            sources=src)], "", src, critical=False)
     firm = exact[0]
     fsrc = [SourceRef(label=f"FCA Register FRN {firm['frn']}",
                       url=f"https://register.fca.org.uk/s/search?q={firm['frn']}&type=Companies")]

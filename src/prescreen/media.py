@@ -20,7 +20,8 @@ import re
 from datetime import date, datetime
 from typing import Any
 
-from src.prescreen.checks import CompanyData, _parse_date, active_officers
+from src.prescreen.checks import CompanyData, _parse_date, _years_ago, active_officers
+from src.prescreen.rules import THRESHOLDS as T
 from src.prescreen.llm import JSONChat, LLMError
 from src.prescreen.models import CheckResult, CheckStatus, Finding, MediaItem, Route, SourceRef
 from src.prescreen.sources.http import SourceError
@@ -39,7 +40,8 @@ For each result decide:
 - category: one of CATEGORIES.
 - severity: "high" (insolvency, fraud, criminal or regulatory penalty, serious injury or death,
   major pollution), "medium" (investigation, lawsuit, warning, significant incident), "low" (neutral,
-  routine, positive, or only a passing mention).
+  routine, positive, or only a passing mention). If the company is only the victim, the place where it
+  happened or a bystander (a shoplifter caught in its store, a fraud committed against it), severity is "low".
 - reason: one short sentence in plain English, saying what the article reports and why it is or
   isn't about this company.
 Base everything on the title, outlet, date and snippet given. Do not invent facts.
@@ -174,8 +176,26 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
     unreviewed = [it for it in items if it.about_this_company == "not_reviewed"]
     adverse = [it for it in items if it.about_this_company in ("yes", "unsure")
                and it.category not in ("", "neutral") and it.severity != "low"]
-    for severity, route in (("high", Route.REFER), ("medium", Route.NOTE)):
-        group = [it for it in adverse if it.about_this_company == "yes" and it.severity == severity]
+    # Serious news older than the look-back is history, not a referral (Tesco's 2017 accounting fine, live).
+    old_cut = _years_ago(data.today, T["media_serious_years"]).isoformat()
+    old = {id(it) for it in adverse if it.severity == "high" and it.published and it.published[:10] < old_cut}
+    for severity, route in (("high", Route.REFER), ("medium", Route.NOTE), ("old", Route.NOTE)):
+        if severity == "old":
+            group = [it for it in adverse if it.about_this_company == "yes" and id(it) in old]
+        else:
+            group = [it for it in adverse if it.about_this_company == "yes" and it.severity == severity
+                     and id(it) not in old]
+        if group and severity == "old":
+            group.sort(key=lambda it: it.published or "", reverse=True)
+            findings.append(Finding(
+                rule_id="media_old", route=route,
+                text=(f"{len(group)} serious news item{'s' if len(group) != 1 else ''} older than "
+                      f"{T['media_serious_years']} years ({', '.join(sorted({it.category.replace('_', ' ') for it in group}))}); "
+                      f"latest {group[0].published[:10]}: {group[0].title}"),
+                detail={"titles": [it.title for it in group][:10],
+                        "categories": sorted({it.category for it in group})},
+                sources=[SourceRef(label=it.source or "article", url=it.url) for it in group[:3]]))
+            continue
         if group:
             group.sort(key=lambda it: it.published or "", reverse=True)
             cats = sorted({it.category.replace("_", " ") for it in group})
@@ -204,7 +224,9 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
         media.status = CheckStatus.FLAG
         media.summary = " ".join(f.text for f in findings if f.route == Route.REFER)
     elif findings:
+        # Never "nothing adverse" above an adverse finding (Greggs, live).
         media.status = CheckStatus.INFO
+        media.summary = f"{len(items)} results reviewed ({provider}). " + " ".join(f.text for f in findings)
     if unreviewed:
         # Never call results clear that nobody (human or model) actually read.
         media.status = CheckStatus.COULDNT_CHECK

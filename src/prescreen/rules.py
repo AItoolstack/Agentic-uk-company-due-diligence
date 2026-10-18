@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from src.prescreen.models import CheckResult, CheckStatus, Route
 
-RULES_VERSION = "draft-2026-10-19b"
+RULES_VERSION = "draft-2026-10-19c"
 
 THRESHOLDS = {
     # Company age
@@ -35,6 +35,8 @@ THRESHOLDS = {
     "gazette_recent_days": 183,        # DRAFT: a winding-up petition this recent -> outside appetite
     # FCA
     "fca_discipline_years": 5,
+    # News
+    "media_serious_years": 5,          # DRAFT: serious news older than this is a note, not a referral (Tesco 2017, live)
     # Names
     "rename_recent_months": 60,        # renames in the last 5 years are shown (they explain mismatched news)
 }
@@ -74,6 +76,9 @@ def decide(checks: list[CheckResult]) -> tuple[Route, list[str]]:
                 continue
             # Same fact twice (Wilko, live): "dormant but trading" already says the SIC doesn't fit.
             if f.rule_id == "trade_mismatch" and "dormant_but_trading" in all_ids:
+                continue
+            # Gazette notices are evidence for an insolvency already on record, not new reasons (BrewDog, live).
+            if f.rule_id == "gazette_insolvency_notice" and all_ids & {"insolvency_history", "company_insolvent"}:
                 continue
             # Several directors with insolvent companies are one reason, not a line each (Thames Water, live).
             if f.rule_id == "director_insolvent_links" and len(directors) > 1:

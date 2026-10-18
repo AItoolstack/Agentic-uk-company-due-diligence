@@ -144,6 +144,8 @@ def broker_questions(checks: list[Any]) -> list[dict[str, Any]]:
                 continue
             if rid == "trade_mismatch" and "dormant_but_trading" in ids:
                 continue
+            if rid == "gazette_insolvency_notice" and "insolvency_history" in ids:
+                continue
             # Notes only get a question where a note is still worth asking about.
             if f.get("route") == "note" and rid not in {"company_new", "officers_joined", "officers_left",
                                                          "psc_changed", "director_previously_disqualified",

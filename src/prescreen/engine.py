@@ -238,8 +238,16 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
             return None, None
         firms = await _safe(services.fca.search_firms(data.name))
         discipline = None
+        target = C.normalise_name(data.name)
+        # The Register's search is word-based; "REVOLUT LTD" can miss "Revolut Ltd" (live), so retry
+        # once with the bare name before calling the firm not found.
+        if isinstance(firms, list) and not any(C.normalise_name(f["name"]) == target for f in firms) \
+                and target and target != data.name.upper().strip():
+            again = await _safe(services.fca.search_firms(target.title()))
+            if isinstance(again, list):
+                firms = firms + again
         if isinstance(firms, list):
-            exact = [f for f in firms if C.normalise_name(f["name"]) == C.normalise_name(data.name)]
+            exact = [f for f in firms if C.normalise_name(f["name"]) == target]
             if exact:
                 discipline = await _safe(services.fca.disciplinary_history(exact[0]["frn"]))
         return firms, discipline
