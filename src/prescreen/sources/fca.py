@@ -5,8 +5,11 @@ Only used when the trade is regulated (SIC 64-66) or the user says the firm
 should be authorised. The register isn't keyed on the Companies House number,
 so a name match is shown with its FRN for the underwriter to confirm.
 
-Response shapes are parsed tolerantly: search results have been seen with both
-"Reference Number" and "FRN" keys, and names can carry a "(Postcode: ...)" suffix.
+Search result items carry 'URL', 'Status', 'Reference Number', 'Type of business or
+Individual' and 'Name' (confirmed against the Register API client docs, 18 Oct 2026).
+The old app read 'FRN', which isn't there, so Monzo came back "FCA status unknown".
+Disciplinary history items: 'TypeofAction', 'EnforcementType', 'ActionEffectiveFrom',
+'TypeofDescription'. Names can carry a "(Postcode: ...)" suffix.
 """
 
 from __future__ import annotations
@@ -76,9 +79,9 @@ class FCARegister:
         for item in data:
             parts = [
                 str(item.get(k, "")).strip()
-                for k in ("ActionType", "Action Type", "TypeofAction", "Type of Action",
-                          "EnforcementType", "Enforcement Type", "ActionEffectiveFrom",
-                          "Action Effective From", "Effective From", "Description")
+                for k in ("TypeofAction", "ActionType", "Type of Action", "EnforcementType",
+                          "Enforcement Type", "ActionEffectiveFrom", "Action Effective From",
+                          "TypeofDescription", "Description")
                 if item.get(k)
             ]
             lines.append(" | ".join(dict.fromkeys(parts)) or str(item)[:200])

@@ -142,8 +142,8 @@ def cases() -> dict[str, dict[str, Any]]:
                 {"Name": "Monzo Bank Limited (Postcode: EC2A 2AG)", "Reference Number": "730427",
                  "Status": "Authorised", "Type of business or Individual": "Firm"}]},
             "/Firm/730427/DisciplinaryHistory": {"Data": [
-                {"ActionType": "Final Notice", "EnforcementType": "Financial penalty (£21.1m)",
-                 "ActionEffectiveFrom": "08/07/2025", "Description": "Failings in financial crime controls"}]},
+                {"TypeofAction": "Final Notice", "EnforcementType": "Financial penalty (£21.1m)",
+                 "ActionEffectiveFrom": "08/07/2025", "TypeofDescription": "Failings in financial crime controls"}]},
         },
         "news": [
             _news("FCA fines Monzo £21m for failings in financial crime controls", "2025-07-08", "fca.org.uk",

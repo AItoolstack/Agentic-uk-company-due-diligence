@@ -60,8 +60,10 @@ prohibited-name rules may apply: ask the broker"; "draft rule" moved from findin
   Searching by *name* is noisy: "Thames Water Utilities" returns a 2001 petition Thames Water brought
   against another company. So the app searches by number only.
 
+- FCA Register search items use `Reference Number` and `Name` (confirmed from the Register API client
+  docs). The old app read `FRN`, which doesn't exist: that is why Monzo came back "FCA status unknown".
+
 ## Still not verified against live services (needs a deploy)
 - UK Sanctions List CSV header names (parser refuses rather than guesses).
-- FCA Register search result keys ("Reference Number" vs "FRN") and disciplinary history fields.
 - Brave news endpoint fields; Groq accepting `reasoning_effort` on gpt-oss-20b (falls back without it).
 - Companies House disqualified-officer search `date_of_birth` format.
