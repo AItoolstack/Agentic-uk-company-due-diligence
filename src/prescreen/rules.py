@@ -10,31 +10,40 @@ from __future__ import annotations
 
 from src.prescreen.models import CheckResult, CheckStatus, Route
 
-RULES_VERSION = "draft-2026-10-18"
+RULES_VERSION = "draft-2026-10-18b"
 
 THRESHOLDS = {
     # Company age
-    "new_company_months": 12,          # DRAFT: under this -> refer
-    "young_company_months": 36,        # DRAFT: under this -> note
+    "new_company_months": 12,          # DRAFT: under this -> note (new-venture question); refer if combined
+    "young_company_months": 36,        # under this -> note
     # Filing
-    "overdue_serious_days": 90,        # DRAFT: accounts overdue by more than this counts as "serious"
+    "overdue_refer_days": 30,          # DRAFT: accounts overdue by more than this -> refer (1-30 days: note)
+    "overdue_serious_days": 90,        # DRAFT: more than this counts as "serious" for the combination rule
     # Directors
     "director_lookback_years": 5,
     "director_insolvent_refer": 1,     # DRAFT: links to this many insolvent companies -> refer
     "director_insolvent_decline": 2,   # DRAFT: this many or more -> outside appetite
+    "many_appointments": 20,           # DRAFT: directors with this many appointments are capped at refer
     "phoenix_young_months": 24,        # DRAFT: similar-name insolvent predecessor + company younger than this
     "max_directors_checked": 15,
+    "max_dissolved_profiles_per_director": 8,
+    "max_dissolved_profiles_total": 30,
     # Charges
-    "charge_burst_count": 3,           # DRAFT: this many new charges ...
+    "charge_burst_lenders": 3,         # DRAFT: charges to this many different lenders ...
     "charge_burst_months": 12,         # ... within this many months -> refer
+    # Gazette
+    "gazette_recent_days": 183,        # DRAFT: a winding-up petition this recent -> outside appetite
+    # FCA
+    "fca_discipline_years": 5,
     # Names
-    "rename_recent_months": 60,       # renames in the last 5 years are shown (they explain mismatched news)
+    "rename_recent_months": 60,        # renames in the last 5 years are shown (they explain mismatched news)
 }
 
-# Checks that must run for a case to be "note". If any of these couldn't be
-# checked, the best a case can be is "refer".
-CRITICAL_CHECKS = {"status", "filings", "insolvency", "directors_disqualified",
-                   "directors_insolvency", "sanctions"}
+# Which checks must run for a case to be "note" is set on each check (`critical=True`):
+# status, filings, insolvency, both director checks and sanctions. If any of those
+# couldn't be checked, the best a case can be is "refer".
+
+DISTRESS_SIGNALS = {"charges_burst", "insolvency_history", "winding_up_petition", "gazette_insolvency_notice"}
 
 
 def decide(checks: list[CheckResult]) -> tuple[Route, list[str]]:
@@ -49,20 +58,24 @@ def decide(checks: list[CheckResult]) -> tuple[Route, list[str]]:
             if f.route.rank > route.rank:
                 route = f.route
         if c.status == CheckStatus.COULDNT_CHECK and c.critical:
-            reasons.append((Route.REFER.rank, f"Couldn't check {c.title.lower()}: {c.not_checked_reason}"))
+            reasons.append((Route.REFER.rank,
+                            f"{c.title} couldn't be checked: {c.not_checked_reason.rstrip('.')}."))
             if route.rank < Route.REFER.rank:
                 route = Route.REFER
 
     # Combination rule (DRAFT): seriously overdue accounts plus another distress
     # signal is outside appetite even though each alone is a referral.
     rule_ids = {f.rule_id for c in checks for f in c.findings}
-    if "accounts_overdue_serious" in rule_ids and rule_ids & {
-        "charges_burst", "insolvency_history", "strike_off_proposed"
-    }:
+    if "accounts_overdue_serious" in rule_ids and rule_ids & DISTRESS_SIGNALS:
         if route.rank < Route.OUTSIDE_APPETITE.rank:
             route = Route.OUTSIDE_APPETITE
         reasons.append((Route.OUTSIDE_APPETITE.rank,
-                        "Accounts seriously overdue together with another distress signal (draft combination rule)."))
+                        f"Accounts more than {THRESHOLDS['overdue_serious_days']} days overdue together with "
+                        "another distress signal."))
+    # A new company is only a note on its own; with a director's insolvency history it refers.
+    if "company_new" in rule_ids and "director_insolvent_links" in rule_ids and route.rank < Route.REFER.rank:
+        route = Route.REFER
+        reasons.append((Route.REFER.rank, "New company and a director linked to an insolvent company."))
 
     ordered = [text for _, text in sorted(reasons, key=lambda r: -r[0])]
     return route, list(dict.fromkeys(ordered))

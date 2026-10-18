@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -81,7 +82,7 @@ def parse_csv(text: str, fetched_at: str = "", source_note: str = "") -> Sanctio
     c_id = _col(header, "unique id")
     c_n6 = _col(header, "name 6")
     c_names = [_col(header, f"name {i}") for i in range(1, 6)]
-    c_kind = _col(header, "individual, entity, ship", "entity type", "type")
+    c_kind = _col(header, "individual, entity, ship", "entity type", "group type")
     c_dob = _col(header, "d.o.b", "dob", "date of birth")
     c_regime = _col(header, "regime name", "regime")
     if c_id is None or c_n6 is None:
@@ -108,14 +109,27 @@ def parse_csv(text: str, fetched_at: str = "", source_note: str = "") -> Sanctio
             entry.dobs.append(dob)
     if not by_id:
         raise SourceError(SOURCE, "bad_response", "the CSV had no entries")
+    kinds = {e.kind.split()[0] if e.kind else "" for e in by_id.values()}
+    if not kinds & {"individual"} or not kinds <= {"individual", "entity", "ship", ""}:
+        # A wrong type column would silently stop all person screening. Refuse instead.
+        raise SourceError(SOURCE, "bad_response", f"unexpected entry types {sorted(kinds)[:5]}")
     return SanctionsList(entries=list(by_id.values()), fetched_at=fetched_at, source_note=source_note)
 
 
+_MEMORY: dict[str, tuple[float, SanctionsList]] = {}
+
+
 async def load_list(client: httpx.AsyncClient, cache_dir: Path, max_age_hours: float = 24) -> SanctionsList:
+    """The parsed list, kept in memory and on disk for up to a day."""
+    held = _MEMORY.get("list")
+    if held and time.time() - held[0] < max_age_hours * 3600:
+        return held[1]
     cache = cache_dir / "UK-Sanctions-List.csv"
     if cache.exists() and (time.time() - cache.stat().st_mtime) < max_age_hours * 3600:
         stamp = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(cache.stat().st_mtime))
-        return parse_csv(cache.read_text(encoding="utf-8-sig"), stamp, "cached copy")
+        parsed = parse_csv(cache.read_text(encoding="utf-8-sig"), stamp, "cached copy")
+        _MEMORY["list"] = (cache.stat().st_mtime, parsed)
+        return parsed
     try:
         resp = await client.get(LIST_URL, timeout=60)
     except httpx.HTTPError as exc:
@@ -124,8 +138,14 @@ async def load_list(client: httpx.AsyncClient, cache_dir: Path, max_age_hours: f
         raise SourceError(SOURCE, "unavailable", f"HTTP {resp.status_code}")
     text = resp.content.decode("utf-8-sig", errors="replace")
     parsed = parse_csv(text, time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()), "downloaded")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache.write_text(text, encoding="utf-8")
+    _MEMORY["list"] = (time.time(), parsed)
+    try:  # write-then-rename, so a reader never sees half a file
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        tmp = cache.with_suffix(".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, cache)
+    except OSError:
+        pass  # read-only disk: the in-memory copy is enough
     return parsed
 
 
@@ -153,11 +173,22 @@ class Hit:
 
 
 def _dob_parts(dob: str) -> tuple[int | None, int | None]:
+    iso = re.match(r"^\s*(\d{4})-(\d{2})-(\d{2})\s*$", dob or "")
+    if iso:
+        return int(iso.group(1)), int(iso.group(2))
     m = re.match(r"^\s*(?:(\d{1,2}|dd)/)?(?:(\d{1,2}|mm)/)?(\d{4})\s*$", dob or "", re.I)
     if not m:
         return None, None
     month = m.group(2)
     return int(m.group(3)), (int(month) if month and month.isdigit() else None)
+
+
+_LEGAL = {"LTD", "PLC", "LLP", "LP", "CO", "INC", "LLC", "SA", "AG", "GMBH", "BV", "NV", "OOO", "JSC", "PJSC", "AO", "PAO", "ZAO"}
+
+
+def _entity_key(name: str) -> str:
+    """Company name without legal-form words, so 'X SHIPPING CO LTD' meets 'X Shipping Company'."""
+    return " ".join(t for t in normalise_name(name).split() if t not in _LEGAL)
 
 
 def _similar(a: str, b: str) -> float:
@@ -173,7 +204,7 @@ def screen(names: list[Screened], sl: SanctionsList) -> list[Hit]:
                 continue
             q_sorted = " ".join(sorted(q))
         else:
-            q_norm = normalise_name(s.name)
+            q_norm = _entity_key(s.name)
             if len(q_norm) < 3:
                 continue
         for e in sl.entries:
@@ -188,7 +219,7 @@ def screen(names: list[Screened], sl: SanctionsList) -> list[Hit]:
                         _similar(" ".join(sorted(t)), q_sorted) >= 0.92 or t <= q or q <= t
                     )
                 else:
-                    ln = normalise_name(listed)
+                    ln = _entity_key(listed)
                     exact = ln == q_norm
                     close = not exact and _similar(ln, q_norm) >= 0.93
                 if not (exact or close):
@@ -205,13 +236,18 @@ def _grade(s: Screened, e: ListEntry, listed: str, exact: bool) -> Hit:
     name_kind = "Exact name match" if exact else "Partial name match"
     if s.dob_year is None or not e.dobs:
         return Hit(s, e, listed, "possible", f"{name_kind}; no date of birth to compare")
+    parsed_any = False
     for dob in e.dobs:
         year, month = _dob_parts(dob)
         if year is None:
             continue
+        parsed_any = True
         if year == s.dob_year and (month is None or s.dob_month is None or month == s.dob_month):
             return Hit(s, e, listed, "strong" if exact else "possible",
                        f"{name_kind} and date of birth match ({dob})")
+    if not parsed_any:
+        return Hit(s, e, listed, "possible",
+                   f"{name_kind}; the list's date of birth ({', '.join(e.dobs)}) couldn't be compared")
     return Hit(s, e, listed, "cleared",
                f"{name_kind} but date of birth differs (list: {', '.join(e.dobs)}; "
                f"Companies House: {s.dob_month or '?'}/{s.dob_year})")

@@ -11,6 +11,7 @@ Two transports share one interface:
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any, Protocol
@@ -32,14 +33,18 @@ class LiveTransport:
         self.client = client
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
+        self.gate = asyncio.Semaphore(6)  # a run fans out ~30 calls; keep it polite
+        self.calls = 0
 
     async def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         if not self.api_key:
             raise SourceError(SOURCE, "no_key", "COMPANIES_HOUSE_API_KEY not set")
-        return await get_json(
-            self.client, SOURCE, f"{self.base_url}{path}",
-            params=params, auth=(self.api_key, ""),
-        )
+        async with self.gate:
+            self.calls += 1
+            return await get_json(
+                self.client, SOURCE, f"{self.base_url}{path}",
+                params=params, auth=(self.api_key, ""),
+            )
 
 
 class FixtureTransport:
@@ -100,11 +105,28 @@ class CompaniesHouse:
     async def insolvency(self, number: str) -> Any:
         return await self.t.get(f"/company/{number}/insolvency")
 
-    async def appointments(self, officer_id: str) -> Any:
-        return await self.t.get(f"/officers/{officer_id}/appointments", {"items_per_page": 100})
+    async def appointments(self, officer_id: str, max_items: int = 300) -> Any:
+        """All appointments for an officer, paged (the API returns at most 100 a page)."""
+        path = f"/officers/{officer_id}/appointments"
+        first = await self.t.get(path, {"items_per_page": 100})
+        if not isinstance(first, dict):
+            return first
+        items = list(first.get("items") or [])
+        total = int(first.get("total_results") or len(items))
+        start = len(items)
+        while start < min(total, max_items) and start > 0:
+            page = await self.t.get(path, {"items_per_page": 100, "start_index": start})
+            if not isinstance(page, dict) or not page.get("items"):
+                break
+            items += page["items"]
+            start += len(page["items"])
+        return {**first, "items": items, "total_results": total, "truncated": total > len(items)}
+
+    async def filing_history(self, number: str, category: str) -> Any:
+        return await self.t.get(f"/company/{number}/filing-history", {"category": category, "items_per_page": 25})
 
     async def search_disqualified(self, name: str) -> Any:
-        return await self.t.get("/search/disqualified-officers", {"q": name, "items_per_page": 10})
+        return await self.t.get("/search/disqualified-officers", {"q": name, "items_per_page": 100})
 
     async def disqualified_natural(self, path: str) -> Any:
         """`path` is the self link from a disqualified-officer search hit."""

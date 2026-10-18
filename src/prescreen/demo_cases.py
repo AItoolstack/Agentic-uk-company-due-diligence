@@ -135,6 +135,7 @@ def cases() -> dict[str, dict[str, Any]]:
             f"/company/{mn}/persons-with-significant-control": {"items": [
                 _psc_corp("Monzo Bank Holding Group Limited", "England And Wales")]},
             f"/company/{mn}/persons-with-significant-control-statements": {"items": []},
+            f"/company/{mn}/charges": {"items": [], "total_count": 0},
         },
         "fca": {
             "/search?q=monzo bank limited": {"Data": [
@@ -162,7 +163,16 @@ def cases() -> dict[str, dict[str, Any]]:
             "/officers/zzofficer1/appointments": {"items": [
                 _appt(zn, "NORTHERN BAKE LTD", "active", _d(213)),
                 _appt("ZZ900001", "NORTHERN BAKES LIMITED", "liquidation", "2016-05-01", _d(240)),
-                _appt("ZZ900002", "EXAMPLE CATERING LTD", "liquidation", "2019-02-01", "2023-01-01")]},
+                _appt("ZZ900002", "EXAMPLE CATERING LTD", "liquidation", "2019-02-01", "2023-01-01"),
+                _appt("ZZ900003", "EXAMPLE EVENTS LTD", "dissolved", "2017-04-01", "2022-06-30"),
+                _appt("ZZ900004", "EXAMPLE PROPERTY LTD", "dissolved", "2015-01-01", "2020-01-01")]},
+            # A company that went through liquidation and is now dissolved still counts.
+            "/company/ZZ900003": {"company_number": "ZZ900003", "company_name": "EXAMPLE EVENTS LTD",
+                                  "company_status": "dissolved", "date_of_cessation": "2023-09-01",
+                                  "links": {"insolvency": "/company/ZZ900003/insolvency"}},
+            # Dissolved without insolvency: housekeeping, not counted.
+            "/company/ZZ900004": {"company_number": "ZZ900004", "company_name": "EXAMPLE PROPERTY LTD",
+                                  "company_status": "dissolved", "date_of_cessation": "2021-03-01", "links": {}},
             f"/company/{zn}/persons-with-significant-control": {"items": [_psc_person("Jordan Alex EXAMPLE", (3, 1980))]},
         },
         "news": [],
@@ -184,7 +194,11 @@ def cases() -> dict[str, dict[str, Any]]:
                 {"status": "outstanding", "created_on": _d(d), "persons_entitled": [{"name": n}]}
                 for d, n in ((30, "Quickcash Finance Ltd"), (90, "Bridge Lending Ltd"), (200, "Asset Funder Ltd"),
                              (2000, "Example Bank plc"))]},
+            f"/company/{zd}/filing-history": {"items": [
+                {"type": "GAZ1", "date": _d(20), "description": "gazette-notice-compulsory"}]},
         },
+        "gazette": [{"code": "2450", "title": "Petitions to Wind Up (Companies)", "published": _d(25),
+                     "url": "https://www.thegazette.co.uk/notice/EXAMPLE-0001", "snippet": "HALDEN JOINERY LTD"}],
         "news": [],
     }
 
@@ -204,7 +218,7 @@ def cases() -> dict[str, dict[str, Any]]:
     # --- SYNTHETIC: sanctions hit on a PSC ----------------------------------
     za = "ZZ000004"
     out[za] = {
-        "label": "Atlas Trade Partners Ltd — SYNTHETIC: overseas owner; a PSC matches a (fictional) list entry",
+        "label": "Atlas Trade Partners Ltd — SYNTHETIC: BVI owner; a PSC matches a (fictional) sanctions entry",
         "kind": "synthetic",
         "ch": {
             f"/company/{za}": _profile(za, "ATLAS TRADE PARTNERS LTD", "2019-06-01", sic=["46900"]),
@@ -213,6 +227,26 @@ def cases() -> dict[str, dict[str, Any]]:
             f"/company/{za}/persons-with-significant-control": {"items": [
                 _psc_corp("Meridian Holdings SA", "British Virgin Islands"),
                 _psc_person("Viktor Ivanovich FICTIONOV", (4, 1966))]},
+        },
+        "news": [],
+    }
+    # --- SYNTHETIC: LLP with members (PI cover) --------------------------
+    zl = "OC000005"
+    out[zl] = {
+        "label": "Pennine Advisory LLP — SYNTHETIC: LLP members, a member resigned recently, PI cover",
+        "kind": "synthetic",
+        "ch": {
+            f"/company/{zl}": {**_profile(zl, "PENNINE ADVISORY LLP", "2009-05-01", sic=["69201"]), "type": "llp"},
+            f"/company/{zl}/officers": {"items": [
+                _officer("PATEL, Asha", "zzllp1", (2, 1972), "2009-05-01", role="llp-designated-member"),
+                _officer("HUGHES, Owen", "zzllp2", (9, 1968), "2009-05-01", role="llp-designated-member"),
+                _officer("BROOK, Sam", "zzllp3", (5, 1985), "2018-01-01", role="llp-member", resigned=_d(60)),
+            ]},
+            "/officers/zzllp1/appointments": {"items": [_appt(zl, "PENNINE ADVISORY LLP", "active", "2009-05-01")]},
+            "/officers/zzllp2/appointments": {"items": [_appt(zl, "PENNINE ADVISORY LLP", "active", "2009-05-01")]},
+            "/officers/zzllp3/appointments": {"items": [_appt(zl, "PENNINE ADVISORY LLP", "active", "2018-01-01", _d(60))]},
+            f"/company/{zl}/persons-with-significant-control": {"items": [
+                {**_psc_person("Asha PATEL", (2, 1972)), "notified_on": "2016-06-30"}]},
         },
         "news": [],
     }

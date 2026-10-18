@@ -12,11 +12,12 @@ Two ideas carry the whole design:
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def utcnow() -> datetime:
@@ -24,8 +25,9 @@ def utcnow() -> datetime:
 
 
 class CheckStatus(str, Enum):
-    CLEAR = "clear"                  # looked, found nothing that matters
-    FLAG = "flag"                    # looked, found something
+    CLEAR = "clear"                  # looked, found nothing
+    INFO = "info"                    # looked, found things worth reading that don't change the route
+    FLAG = "flag"                    # looked, found something that changes the route
     COULDNT_CHECK = "couldnt_check"  # tried and failed, or no key / paid source
     NOT_APPLICABLE = "not_applicable"
 
@@ -35,10 +37,11 @@ class Route(str, Enum):
     NOTE = "note"                          # carry on, read the notes
     REFER = "refer"                        # needs a senior underwriter or a question to the broker
     OUTSIDE_APPETITE = "outside_appetite"  # decline unless overridden with reasons
+    COMPLIANCE_HOLD = "compliance_hold"    # possible sanctions match confirmed by DOB: stop, compliance decides
 
     @property
     def rank(self) -> int:
-        return {Route.NOTE: 0, Route.REFER: 1, Route.OUTSIDE_APPETITE: 2}[self]
+        return {Route.NOTE: 0, Route.REFER: 1, Route.OUTSIDE_APPETITE: 2, Route.COMPLIANCE_HOLD: 3}[self]
 
 
 class SourceRef(BaseModel):
@@ -99,16 +102,47 @@ class MediaItem(BaseModel):
     url: str
     published: str = ""
     source: str = ""
-    about_this_company: str = "unsure"  # yes | no | unsure
+    about_this_company: str = "unsure"  # yes | no | unsure | not_reviewed
     category: str = ""
     severity: str = "low"               # low | medium | high
     reason: str = ""
+
+
+COVER_LINES = {
+    "property": "Property",
+    "liability": "Employers' / public liability",
+    "professional_indemnity": "Professional indemnity",
+    "management_liability": "D&O / management liability",
+    "financial_institutions": "Financial institutions",
+    "cyber": "Cyber",
+    "motor_fleet": "Motor fleet",
+}
+FINANCIAL_LINES = {"professional_indemnity", "management_liability", "financial_institutions"}
 
 
 class PreScreenRequest(BaseModel):
     company_number: str = Field(..., min_length=6, max_length=10)
     declared_trade: str = Field(default="", max_length=300)
     expects_fca_authorisation: bool = False
+    cover_lines: list[str] = Field(default_factory=list, max_length=7)
+    declared_turnover_gbp: int | None = Field(default=None, ge=0, le=10**12)
+
+    @field_validator("company_number")
+    @classmethod
+    def _number(cls, v: str) -> str:
+        n = re.sub(r"\s+", "", v or "").upper()
+        if not re.fullmatch(r"[A-Z]{2}\d{6}|\d{6,8}", n):
+            raise ValueError("Enter a Companies House number: 8 digits, or 2 letters and 6 digits (e.g. SC123456).")
+        return n.zfill(8) if n.isdigit() else n
+
+    @field_validator("cover_lines")
+    @classmethod
+    def _known_lines(cls, v: list[str]) -> list[str]:
+        return [x for x in dict.fromkeys(v) if x in COVER_LINES]
+
+    @property
+    def financial_lines(self) -> bool:
+        return bool(set(self.cover_lines) & FINANCIAL_LINES)
 
 
 class PreScreenReport(BaseModel):

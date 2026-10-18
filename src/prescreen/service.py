@@ -22,6 +22,7 @@ from src.prescreen.llm import JSONChat
 from src.prescreen.models import DecisionRequest, PreScreenReport, utcnow
 from src.prescreen.sources.companies_house import CompaniesHouse, FixtureTransport, LiveTransport
 from src.prescreen.sources.fca import FCARegister
+from src.prescreen.sources.gazette import Gazette
 from src.prescreen.sources.news import NewsSearch
 from src.prescreen.sources.sanctions import load_list, parse_csv
 
@@ -84,6 +85,7 @@ def build_services(client: httpx.AsyncClient, company_number: str = "") -> tuple
             ch=CompaniesHouse(DemoTransport(ch_data)),
             fca=FCARegister(None, "", "", "", fixtures=fca_fx),
             news=NewsSearch(None, fixtures=case.get("news", [])),
+            gazette=Gazette(None, fixtures=case.get("gazette", [])),
             llm=_llm(client),
             sanctions=parse_csv(demo_cases.FICTIONAL_SANCTIONS_CSV, "18 Oct 2026 (fictional demo list)",
                                 "demo"),
@@ -96,6 +98,7 @@ def build_services(client: httpx.AsyncClient, company_number: str = "") -> tuple
                                         settings.companies_house_base_url)),
         fca=FCARegister(client, settings.fca_api_key, settings.fca_api_email, settings.fca_base_url),
         news=NewsSearch(client, brave_key=settings.brave_search_api_key),
+        gazette=Gazette(client),
         llm=_llm(client),
         sanctions=lambda: load_list(client, CACHE),
         today=date.today(),
@@ -114,29 +117,39 @@ def _llm(client: httpx.AsyncClient) -> JSONChat:
 # Storage: one JSON file per report; decisions are appended to the report.
 # ---------------------------------------------------------------------------
 
+def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def save_report(report: PreScreenReport, meta: dict[str, Any]) -> None:
     STORE.mkdir(parents=True, exist_ok=True)
     payload = report.model_dump(mode="json")
     payload["meta"] = meta
-    (STORE / f"{report.report_id}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    payload["decisions"] = []
+    _atomic_write(STORE / f"{report.report_id}.json", payload)
 
 
 def load_report(report_id: str) -> dict[str, Any] | None:
-    if not re.fullmatch(r"[0-9a-f]{12}", report_id or ""):
+    if not re.fullmatch(r"[0-9a-f]{16}", report_id or ""):
         return None
     path = STORE / f"{report_id}.json"
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
 def record_decision(report_id: str, req: DecisionRequest) -> dict[str, Any] | None:
+    """Append-only: a later decision is added beside the earlier ones, never over them."""
     payload = load_report(report_id)
     if payload is None:
         return None
-    payload["decision"] = {
+    entry = {
         **req.model_dump(),
         "recorded_at": utcnow().isoformat(),
         "recommended_route": payload.get("route"),
         "rules_version": payload.get("rules_version"),
     }
-    (STORE / f"{report_id}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return payload
+    payload.setdefault("decisions", []).append(entry)
+    payload["decision"] = entry  # latest, for convenience
+    _atomic_write(STORE / f"{report_id}.json", payload)
+    return entry

@@ -24,6 +24,7 @@ from src.prescreen.checks import CompanyData, _parse_date, active_officers
 from src.prescreen.llm import JSONChat, LLMError
 from src.prescreen.models import CheckResult, CheckStatus, Finding, MediaItem, Route, SourceRef
 from src.prescreen.sources.http import SourceError
+from src.prescreen.sources.news import short_name
 
 CATEGORIES = [
     "insolvency_or_distress", "fraud_or_financial_crime", "regulatory_action", "health_and_safety",
@@ -100,12 +101,14 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                 None, [])
 
     since = current_name_since(data)
+    old_names = [short_name(p.get("name", "")).lower() for p in data.profile.get("previous_company_names") or []]
     items = [MediaItem(title=r.get("title", ""), url=r.get("url", ""), published=r.get("published", ""),
                        source=r.get("source", "")) for r in results]
     pre_rename = set()
     for i, it in enumerate(items):
         d = _published_date(it.published)
-        if since and d and d < since:
+        mentions_old = any(o and o in f"{it.title} {results[i].get('snippet', '')}".lower() for o in old_names)
+        if since and d and d < since and not mentions_old:
             pre_rename.add(i)
             it.about_this_company = "no"
             it.reason = (f"Published {d:%d %b %Y}, before this company took its current name "
@@ -114,7 +117,8 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
     if not llm.available:
         return (CheckResult(check_id="media", title=title, status=CheckStatus.COULDNT_CHECK,
                             summary=f"{len(items)} results found but not reviewed: no model configured.",
-                            not_checked_reason="no model configured"), None, items)
+                            not_checked_reason="no model configured"),
+                _trade_unchecked(data, declared_trade, "no model configured"), items)
 
     to_review = [{"i": i, "title": it.title, "outlet": it.source, "published": it.published,
                   "snippet": results[i].get("snippet", "")[:240]}
@@ -125,8 +129,12 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
     except LLMError as err:
         return (CheckResult(check_id="media", title=title, status=CheckStatus.COULDNT_CHECK,
                             summary=f"{len(items)} results found but the review failed ({err}).",
-                            not_checked_reason=f"model review failed ({err})"), None, items)
+                            not_checked_reason=f"model review failed ({err})"),
+                _trade_unchecked(data, declared_trade, f"model review failed ({err})"), items)
 
+    for it in items:
+        if it.about_this_company != "no":
+            it.about_this_company = "not_reviewed"
     for row in answer.get("items") or []:
         try:
             i = int(row.get("i"))
@@ -142,8 +150,9 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
         it.reason = str(row.get("reason", ""))[:300]
 
     findings: list[Finding] = []
+    unreviewed = [it for it in items if it.about_this_company == "not_reviewed"]
     for it in items:
-        if it.category in ("", "neutral") or it.severity == "low":
+        if it.about_this_company == "not_reviewed" or it.category in ("", "neutral") or it.severity == "low":
             continue
         src = [SourceRef(label=it.source or "article", url=it.url)]
         label = it.category.replace("_", " ")
@@ -154,7 +163,7 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                                     detail={"reason": it.reason}, sources=src))
         elif it.about_this_company == "unsure" and it.severity == "high":
             findings.append(Finding(rule_id="media_unsure", route=Route.NOTE,
-                                    text=f"Possibly about this company, check: {it.title}",
+                                    text=f"Possibly about this company ({label}); open and check: {it.title}",
                                     detail={"reason": it.reason}, sources=src))
     excluded = sum(1 for it in items if it.about_this_company == "no")
     summary_clear = (f"{len(items)} results reviewed ({provider}); nothing adverse about this company"
@@ -163,13 +172,27 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                         findings=findings, sources=[SourceRef(label=provider or "search")])
     if any(f.route == Route.REFER for f in findings):
         media.status = CheckStatus.FLAG
-        media.summary = "; ".join(f.text for f in findings if f.route == Route.REFER)
+        media.summary = " ".join(f.text for f in findings if f.route == Route.REFER)
     elif findings:
-        media.summary = summary_clear + " Notes: " + "; ".join(f.text for f in findings)
+        media.status = CheckStatus.INFO
+    if unreviewed:
+        # Never call results clear that nobody (human or model) actually read.
+        media.status = CheckStatus.COULDNT_CHECK
+        media.not_checked_reason = f"{len(unreviewed)} of {len(items)} results weren't reviewed by the model"
+        media.summary = f"Couldn't check: {media.not_checked_reason}. Open them below."
+    if provider and "gdelt" in provider.lower():
+        media.findings.append(Finding(rule_id="news_fallback", route=Route.NOTE,
+                                      text=("The main news search failed, so results" if "fallback" in provider.lower()
+                                            else "Results") + " come from GDELT, which only covers about the last "
+                                           "3 months."))
+        if media.status == CheckStatus.CLEAR:
+            media.status = CheckStatus.INFO
 
     trade = None
     tc = answer.get("trade_consistency") or {}
-    if declared_trade:
+    if declared_trade and not tc:
+        trade = _trade_unchecked(data, declared_trade, "the model gave no answer on it")
+    if declared_trade and tc:
         verdict = tc.get("verdict", "unclear")
         reason = str(tc.get("reason", ""))[:300]
         sics = ", ".join(data.profile.get("sic_codes") or []) or "none"
@@ -185,3 +208,12 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                                 summary=f"SIC {sics} vs '{declared_trade}': {verdict}. {reason}".strip(),
                                 not_checked_reason="" if verdict == "consistent" else "model couldn't tell")
     return media, trade, items
+
+
+def _trade_unchecked(data: CompanyData, declared_trade: str, why: str) -> CheckResult | None:
+    if not declared_trade:
+        return None
+    sics = ", ".join(data.profile.get("sic_codes") or []) or "none"
+    return CheckResult(check_id="trade", title="Declared trade vs SIC codes", status=CheckStatus.COULDNT_CHECK,
+                       summary=f"Couldn't compare '{declared_trade}' with SIC {sics}: {why}.",
+                       not_checked_reason=why)
