@@ -131,3 +131,35 @@ def test_every_refer_or_worse_rule_in_the_source_has_a_question():
     assert len(pairs) > 20, "regex no longer matches the source; update this test"
     missing = {r for r, _ in pairs} - set(casefile.BROKER_QUESTIONS) - casefile.COMPLIANCE_ONLY - casefile.OWN_GAPS
     assert not missing, f"no broker question for: {sorted(missing)}"
+
+
+# ---------------------------------------------------------------- trade vs SIC when there's no news
+
+def _trade_answer(verdict: str) -> str:
+    import json
+    return json.dumps({"items": [], "trade_consistency": {"verdict": verdict, "reason": "test"}})
+
+
+def test_declared_trade_is_compared_even_with_no_news():
+    report = _run("ZZ000002", declared_trade="Bespoke joinery", llm_answers=[_trade_answer("consistent")])
+    assert _check(report, "media").summary.startswith("No news")
+    assert _check(report, "trade").status.value == "clear"
+    assert report.llm_calls == 1
+    row = next(r for r in report.proposal_vs_record if r["item"] == "Trade")
+    assert row["verdict"] == "match"
+
+
+def test_trade_mismatch_with_no_news_still_refers():
+    report = _run("ZZ000002", declared_trade="Nightclub", llm_answers=[_trade_answer("inconsistent")])
+    assert "trade_mismatch" in {f.rule_id for c in report.checks for f in c.findings}
+
+
+def test_trade_is_couldnt_check_not_missing_when_the_model_fails():
+    report = _run("ZZ000002", declared_trade="Bespoke joinery", llm_answers=[])
+    trade = _check(report, "trade")
+    assert trade.status.value == "couldnt_check"
+    assert "Trade" in {r["item"] for r in report.proposal_vs_record}
+
+
+def test_no_declared_trade_means_no_model_call_when_there_is_no_news():
+    assert _run("ZZ000002", llm_answers=[]).llm_calls == 0

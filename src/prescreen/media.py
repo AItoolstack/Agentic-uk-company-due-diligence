@@ -93,12 +93,12 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
     if isinstance(results, SourceError):
         return (CheckResult(check_id="media", title=title, status=CheckStatus.COULDNT_CHECK,
                             summary=f"Couldn't check: {results.plain}", not_checked_reason=results.plain),
-                None, [])
+                await _trade_only(data, llm, declared_trade), [])
     if not results:
         return (CheckResult(check_id="media", title=title, status=CheckStatus.CLEAR,
                             summary=f"No news or web results for this name ({provider}).",
                             sources=[SourceRef(label=provider or "search")]),
-                None, [])
+                await _trade_only(data, llm, declared_trade), [])
 
     since = current_name_since(data)
     old_names = [short_name(p.get("name", "")).lower() for p in data.profile.get("previous_company_names") or []]
@@ -124,8 +124,14 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                   "snippet": results[i].get("snippet", "")[:240]}
                  for i, it in enumerate(items) if i not in pre_rename]
     user = json.dumps({"company": identity_facts(data, declared_trade), "results": to_review}, ensure_ascii=False)
+    if not to_review:
+        answer: dict[str, Any] = {"items": []}
+        trade_now = await _trade_only(data, llm, declared_trade)
+    else:
+        trade_now = None
     try:
-        answer = await llm.complete_json(SYSTEM, user) if to_review else {"items": []}
+        if to_review:
+            answer = await llm.complete_json(SYSTEM, user)
     except LLMError as err:
         return (CheckResult(check_id="media", title=title, status=CheckStatus.COULDNT_CHECK,
                             summary=f"{len(items)} results found but the review failed ({err}).",
@@ -188,8 +194,28 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
         if media.status == CheckStatus.CLEAR:
             media.status = CheckStatus.INFO
 
+    if not to_review:
+        return media, trade_now, items
+    return media, _trade_from(data, declared_trade, answer.get("trade_consistency") or {}), items
+
+
+async def _trade_only(data: CompanyData, llm: JSONChat, declared_trade: str) -> CheckResult | None:
+    """No articles to read, but a declared trade still needs comparing with the SIC codes.
+    Same prompt with an empty result list, so it is still the run's one model call."""
+    if not declared_trade:
+        return None
+    if not llm.available:
+        return _trade_unchecked(data, declared_trade, "no model configured")
+    user = json.dumps({"company": identity_facts(data, declared_trade), "results": []}, ensure_ascii=False)
+    try:
+        answer = await llm.complete_json(SYSTEM, user)
+    except LLMError as err:
+        return _trade_unchecked(data, declared_trade, f"model review failed ({err})")
+    return _trade_from(data, declared_trade, answer.get("trade_consistency") or {})
+
+
+def _trade_from(data: CompanyData, declared_trade: str, tc: dict[str, Any]) -> CheckResult | None:
     trade = None
-    tc = answer.get("trade_consistency") or {}
     if declared_trade and not tc:
         trade = _trade_unchecked(data, declared_trade, "the model gave no answer on it")
     if declared_trade and tc:
@@ -207,7 +233,7 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                                 status=CheckStatus.CLEAR if verdict == "consistent" else CheckStatus.COULDNT_CHECK,
                                 summary=f"SIC {sics} vs '{declared_trade}': {verdict}. {reason}".strip(),
                                 not_checked_reason="" if verdict == "consistent" else "model couldn't tell")
-    return media, trade, items
+    return trade
 
 
 def _trade_unchecked(data: CompanyData, declared_trade: str, why: str) -> CheckResult | None:
