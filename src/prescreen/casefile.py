@@ -76,6 +76,9 @@ BROKER_QUESTIONS: dict[str, str] = {
     "accounts_overdue": "Accounts at Companies House are overdue. When will they be filed, and can the client send management accounts in the meantime?",
     "accounts_size_mismatch": "The declared turnover is larger than the last filed accounts allow for. Which is right, and has the business grown since?",
     "charges_burst": "Several lenders have taken charges over the company in the last year. What has the business borrowed, and why?",
+    "company_closed": "Companies House shows the company as closed. Which legal entity is actually trading and should be insured?",
+    "company_insolvent": "The company is in an insolvency process. Who is the insolvency practitioner, and is cover being sought by them or for a different entity?",
+    "no_directors": "There are no active directors on the register. Who is running the company, and when will the register be updated?",
     "company_new": "The company is under a year old. Is this a new venture, or a continuation of an earlier business? If a continuation, which company?",
     "confirmation_overdue": "The confirmation statement is overdue at Companies House. Is the company still trading as presented?",
     "director_disqualified": "A director appears on the disqualified directors register. Please confirm the full board and dates of birth.",
@@ -110,6 +113,8 @@ BROKER_QUESTIONS: dict[str, str] = {
 
 # Never put to the broker: compliance handles these without tipping off the client.
 COMPLIANCE_ONLY = {"sanctions_strong", "sanctions_possible"}
+# Route-changing findings that are about our own coverage, not the client: no broker question.
+OWN_GAPS = {"fca_unchecked"}
 
 
 def broker_questions(checks: list[Any]) -> list[dict[str, Any]]:

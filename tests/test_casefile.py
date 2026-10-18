@@ -63,8 +63,8 @@ def test_every_route_changing_rule_has_a_broker_question_or_goes_to_compliance()
         report = _run(number)
         for c in report.checks:
             for f in c.findings:
-                if f.route != Route.NOTE and f.rule_id not in casefile.COMPLIANCE_ONLY:
-                    assert f.rule_id in casefile.BROKER_QUESTIONS or f.rule_id.startswith("fca_unchecked"), f.rule_id
+                if f.route != Route.NOTE and f.rule_id not in casefile.COMPLIANCE_ONLY | casefile.OWN_GAPS:
+                    assert f.rule_id in casefile.BROKER_QUESTIONS, f.rule_id
 
 
 def _req(**kw) -> PreScreenRequest:
@@ -120,3 +120,14 @@ def test_file_note_includes_latest_decision():
 
 def test_wilko_still_one_model_call_with_casefile():
     assert _run("09563205", llm_answers=[_all_reviewed(4)]).llm_calls == 1
+
+
+def test_every_refer_or_worse_rule_in_the_source_has_a_question():
+    """Reads the checks themselves, so a new route-changing rule can't ship without a broker question."""
+    import re
+    from pathlib import Path
+    src = "".join(Path(f"src/prescreen/{m}.py").read_text() for m in ("checks", "media"))
+    pairs = re.findall(r'rule_id="([a-z_]+)",\s*route=Route\.(REFER|OUTSIDE_APPETITE|COMPLIANCE_HOLD)\b', src)
+    assert len(pairs) > 20, "regex no longer matches the source; update this test"
+    missing = {r for r, _ in pairs} - set(casefile.BROKER_QUESTIONS) - casefile.COMPLIANCE_ONLY - casefile.OWN_GAPS
+    assert not missing, f"no broker question for: {sorted(missing)}"
