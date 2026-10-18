@@ -162,6 +162,7 @@ class PreScreenReport(BaseModel):
     llm_calls: int = 0
     elapsed_seconds: float = 0.0
     decision: dict[str, Any] | None = None
+    company: dict[str, Any] = Field(default_factory=dict)  # identity card: what the underwriter confirms first
 
 
 class DecisionRequest(BaseModel):

@@ -31,6 +31,7 @@ from src.prescreen.sources.fca import FCARegister
 from src.prescreen.sources.gazette import Gazette
 from src.prescreen.sources.http import NOT_FOUND, SourceError
 from src.prescreen.sources.news import NewsSearch
+from src.prescreen.sic import label as sic_label
 from src.prescreen.sources.sanctions import SanctionsList
 
 
@@ -107,7 +108,50 @@ def rules_summary(route: Route, reasons: list[str], checks: list[CheckResult]) -
     return " ".join(parts)
 
 
-async def run_prescreen(req: PreScreenRequest, services: Services) -> PreScreenReport:
+Progress = Callable[[str, str, str], None]
+
+STAGES = [
+    ("companies_house", "Companies House: profile, officers, owners, charges"),
+    ("gazette", "The Gazette: insolvency notices"),
+    ("sanctions", "UK Sanctions List"),
+    ("directors", "Directors: disqualification and other companies"),
+    ("fca", "FCA Register"),
+    ("news", "News and web, read against the company"),
+]
+
+
+def company_card(data: C.CompanyData) -> dict[str, Any]:
+    p = data.profile
+    addr = p.get("registered_office_address") or {}
+    last = (p.get("accounts") or {}).get("last_accounts") or {}
+    return {
+        "status": p.get("company_status", ""),
+        "status_detail": p.get("company_status_detail", ""),
+        "type": p.get("type", ""),
+        "jurisdiction": p.get("jurisdiction", ""),
+        "incorporated": p.get("date_of_creation", ""),
+        "registered_office": ", ".join(v for v in (addr.get("premises"), addr.get("address_line_1"),
+                                                   addr.get("address_line_2"), addr.get("locality"),
+                                                   addr.get("postal_code")) if v),
+        "sic": [{"code": c, "label": sic_label(c)} for c in p.get("sic_codes") or []],
+        "previous_names": [{"name": x.get("name"), "until": x.get("ceased_on")}
+                           for x in p.get("previous_company_names") or []][:3],
+        "last_accounts": {"type": last.get("type", ""), "made_up_to": last.get("period_end_on") or last.get("made_up_to", "")},
+        "officers": [{"name": o.get("name"), "role": o.get("officer_role", "").replace("-", " ")}
+                     for o in C.active_officers(data)][:8],
+        "officer_count": len(C.active_officers(data)),
+        "owners": [p2.get("name") for p2 in C.active_pscs(data)][:4],
+    }
+
+
+async def run_prescreen(req: PreScreenRequest, services: Services, progress: Progress | None = None) -> PreScreenReport:
+    def tick(stage: str, state: str, detail: str = "") -> None:
+        if progress:
+            try:
+                progress(stage, state, detail)
+            except Exception:  # noqa: BLE001 - progress is cosmetic; never break a run
+                pass
+
     t0 = time.perf_counter()
     today = services.today or date.today()
     ch = services.ch
@@ -119,6 +163,9 @@ async def run_prescreen(req: PreScreenRequest, services: Services) -> PreScreenR
     if isinstance(profile, SourceError):
         raise SourceDown(profile.plain)
 
+    tick("companies_house", "start", profile.get("company_name", ""))
+    tick("gazette", "start")
+    tick("sanctions", "start")
     links = profile.get("links") or {}
     strike_off = profile.get("company_status_detail") == "active-proposal-to-strike-off"
     gazette = services.gazette
@@ -137,6 +184,11 @@ async def run_prescreen(req: PreScreenRequest, services: Services) -> PreScreenR
     data = C.CompanyData(number=number, profile=profile, today=today, officers=officers, pscs=pscs,
                          psc_statements=statements, charges=charges, insolvency=insolvency,
                          gazette_filings=gazette_filings, gazette_notices=notices)
+    tick("companies_house", "error" if isinstance(officers, SourceError) or isinstance(pscs, SourceError) else "done")
+    tick("gazette", "error" if isinstance(notices, SourceError) else "done")
+    tick("sanctions", "error" if isinstance(sanctions_list, SourceError) else "done",
+         f"{sanctions_list.size:,} entries" if isinstance(sanctions_list, SanctionsList) else "")
+    tick("directors", "start")
 
     # Directors (incl. those resigned in the last 12 months), then their history.
     people, _ = C.people_to_check(data)
@@ -168,6 +220,7 @@ async def run_prescreen(req: PreScreenRequest, services: Services) -> PreScreenR
     data.linked_profiles = dict(zip(linked, linked_profiles))
     data.disq_details = dict(zip(detail_links, details))
     data.parent_pscs = {p: r for p, r in zip(parents, parent_pscs) if isinstance(r, dict)}
+    tick("directors", "done", f"{len(people)} checked")
 
     # FCA only when relevant; news in parallel with it.
     fca_needed = C.fca_applicable(data, req)
@@ -184,8 +237,12 @@ async def run_prescreen(req: PreScreenRequest, services: Services) -> PreScreenR
         return firms, discipline
 
     prev_names = [p.get("name", "") for p in profile.get("previous_company_names") or []]
+    tick("fca", "start" if fca_needed else "skip", "" if fca_needed else "not a regulated trade")
+    tick("news", "start")
     (firms, discipline), news = await asyncio.gather(
         fca_lookup(), _safe(services.news.search(data.name, previous_names=prev_names)))
+    if fca_needed:
+        tick("fca", "error" if isinstance(firms, SourceError) else "done")
 
     results: list[CheckResult] = [
         _guard("status", "Company status", lambda: C.check_status(data), True),
@@ -210,6 +267,8 @@ async def run_prescreen(req: PreScreenRequest, services: Services) -> PreScreenR
                             summary=f"Couldn't check: internal error ({type(exc).__name__}).",
                             not_checked_reason=f"internal error ({type(exc).__name__})")
         trade, media_items = None, []
+    tick("news", "error" if media.status == CheckStatus.COULDNT_CHECK else "done",
+         f"{len(media_items)} results" if media_items else "")
     results.append(media)
     if trade:
         results.append(trade)
@@ -231,6 +290,7 @@ async def run_prescreen(req: PreScreenRequest, services: Services) -> PreScreenR
         summary=rules_summary(route, reasons, results),
         llm_calls=services.llm.calls,
         elapsed_seconds=round(time.perf_counter() - t0, 2),
+        company=company_card(data),
     )
 
 

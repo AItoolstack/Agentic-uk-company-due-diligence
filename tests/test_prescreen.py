@@ -482,3 +482,30 @@ def test_gazette_parses_live_shaped_response():
 def test_short_name_for_search():
     assert short_name("WILKO LIMITED") == "Wilko"
     assert short_name("Monzo Bank Ltd") == "Monzo Bank"
+
+
+# ---------------------------------------------------------------- API (demo mode)
+
+def test_stream_endpoint_sends_progress_then_report(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+    from src.prescreen import service
+    monkeypatch.setattr(service, "STORE", tmp_path)
+    monkeypatch.setattr(service.settings, "use_mock_data", True)
+    with TestClient(app) as client:
+        r = client.post("/api/prescreen/stream", json={"company_number": "ZZ000001"})
+        events = [json.loads(line) for line in r.text.splitlines() if line.strip()]
+        assert events[0]["type"] == "stages"
+        assert any(e["type"] == "progress" and e["stage"] == "directors" and e["state"] == "done" for e in events)
+        report = events[-1]["report"]
+        assert report["route"] == "outside_appetite" and report["company"]["incorporated"]
+        recent = client.get("/api/prescreen/recent").json()
+        assert recent[0]["report_id"] == report["report_id"]
+        bad = client.post("/api/prescreen/stream", json={"company_number": "ZZ999999"})
+        assert json.loads(bad.text.splitlines()[-1])["status"] == 404
+
+
+def test_identity_card_has_sic_labels():
+    report = _run("ZZ000001")
+    assert report.company["sic"][0] == {"code": "10710", "label": "Manufacture of bread, fresh pastry and cakes"}
+    assert report.company["officers"][0]["name"] == "EXAMPLE, Jordan Alex"

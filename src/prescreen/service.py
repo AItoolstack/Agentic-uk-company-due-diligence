@@ -153,3 +153,24 @@ def record_decision(report_id: str, req: DecisionRequest) -> dict[str, Any] | No
     payload["decision"] = entry  # latest, for convenience
     _atomic_write(STORE / f"{report_id}.json", payload)
     return entry
+
+
+def list_recent(limit: int = 12) -> list[dict[str, Any]]:
+    """Newest reports first: enough to show a case list, not the reports themselves."""
+    if not STORE.exists():
+        return []
+    files = sorted(STORE.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)[:limit]
+    out = []
+    for f in files:
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        last = (d.get("decisions") or [None])[-1]
+        out.append({
+            "report_id": d.get("report_id"), "company_number": d.get("company_number"),
+            "company_name": d.get("company_name"), "route": d.get("route"), "created_at": d.get("created_at"),
+            "decision": last.get("decision") if last else None,
+            "data": (d.get("meta") or {}).get("data", ""),
+        })
+    return out

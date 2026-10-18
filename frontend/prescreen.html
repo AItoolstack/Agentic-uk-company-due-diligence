@@ -2,411 +2,604 @@
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Company Pre-Screen · ai·toolstack</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+/* Layout: a case file. Left rail = the company and your decision; main = what was found, worst first. */
 :root{
-  --ink:#1A1D24; --ink2:#4A5160; --muted:#5B6270; --rule:#ECEAE5; --rule2:#DEDBD3;
-  --paper:#FFFFFF; --bg:#F7F6F3; --accent:#8F5A0E; --amber:#E0A946;
-  --clear:#2F6B45; --clear-bg:#EAF3EC;
-  --flag:#8F5A0E; --flag-bg:#FBF1DF;
-  --stop:#9B2C2C; --stop-bg:#FBEAEA;
-  --unk:#4A5160; --unk-bg:#EEEDEA;
-  --radius:10px;
+  --ink:#1A1D24; --ink2:#4A5160; --muted:#6B7280; --rule:#ECEAE5; --rule2:#DDD9D0;
+  --bg:#F6F5F1; --paper:#FFFFFF; --wash:#FAF9F6; --accent:#8F5A0E; --amber:#E0A946;
+  --clear:#2F6B45; --clear-bg:#EAF3EC; --clear-line:#BFD9C7;
+  --flag:#8F5A0E; --flag-bg:#FBF1DF; --flag-line:#EED7AE;
+  --stop:#9B2C2C; --stop-bg:#FBEAEA; --stop-line:#EBC3C3;
+  --hold:#3A1013; --hold-bg:#2A1416;
+  --unk:#4A5160; --unk-bg:#EEEDEA; --unk-line:#D8D5CE;
   --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:10px;
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{font-family:"Geist",system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.5}
+body{font-family:var(--sans);color:var(--ink);background:var(--bg);font-size:15px;line-height:1.5}
 a{color:var(--accent)}
-.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-header.top{background:var(--paper);border-bottom:1px solid var(--rule)}
-header.top .wrap{display:flex;align-items:center;gap:12px;height:56px}
-.brand{display:flex;align-items:center;gap:8px;font-weight:600;letter-spacing:-.01em;text-decoration:none;color:var(--ink)}
-.brand svg{flex:none}
-.brand small{font-family:var(--mono);font-weight:400;color:var(--muted);font-size:12px}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Header */
+.top{background:var(--paper);border-bottom:1px solid var(--rule);position:sticky;top:0;z-index:5}
+.top .in{max-width:1280px;margin:0 auto;height:54px;display:flex;align-items:center;gap:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink);font-weight:600;white-space:nowrap}
+.brand .sub{font-weight:400;color:var(--muted)}
 .spacer{flex:1}
-.badge{font-family:var(--mono);font-size:11.5px;padding:3px 8px;border-radius:99px;border:1px solid var(--rule2);color:var(--ink2);background:var(--bg);white-space:nowrap}
-.badge.live{border-color:#BFD9C7;color:var(--clear);background:var(--clear-bg)}
-.badge.demo{border-color:#EED7AE;color:var(--accent);background:var(--flag-bg)}
+.badge{font-family:var(--mono);font-size:11.5px;padding:3px 9px;border-radius:99px;border:1px solid var(--rule2);color:var(--ink2);background:var(--wash);white-space:nowrap}
+.badge.live{border-color:var(--clear-line);color:var(--clear);background:var(--clear-bg)}
+.badge.demo{border-color:var(--flag-line);color:var(--accent);background:var(--flag-bg)}
+.top .rules{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
 
-h1{font-size:26px;letter-spacing:-.02em;margin:28px 0 4px}
-.lede{color:var(--ink2);margin:0 0 18px;max-width:640px}
+/* Shell */
+.shell{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;align-items:start;
+  padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.rail{display:grid;gap:14px;position:sticky;top:74px;max-height:calc(100vh - 90px);overflow:auto;padding-bottom:4px}
+.main{display:grid;gap:18px;min-width:0}
+.panel{background:var(--paper);border:1px solid var(--rule);border-radius:var(--r)}
+.panel>.hd{padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:8px}
+.panel>.hd h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin:0;color:var(--muted);font-weight:600}
+.panel>.bd{padding:14px 16px}
 
-.card{background:var(--paper);border:1px solid var(--rule);border-radius:var(--radius);padding:18px}
-.form-row{display:flex;gap:10px;flex-wrap:wrap}
-input[type=text],textarea{font:inherit;color:var(--ink);border:1px solid var(--rule2);border-radius:8px;padding:10px 12px;background:#fff;width:100%}
-input[type=text]:focus,textarea:focus{outline:2px solid var(--amber);outline-offset:0;border-color:var(--amber)}
-.grow{flex:1 1 320px}
-button{font:inherit;font-weight:600;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;padding:10px 16px;cursor:pointer}
-button.ghost{background:#fff;color:var(--ink);border-color:var(--rule2);font-weight:500}
-button:disabled{opacity:.5;cursor:wait}
-details.more{margin-top:12px}
-details.more summary{cursor:pointer;color:var(--ink2);font-size:14px}
-.opt{display:grid;gap:10px;margin-top:10px}
-label.small{font-size:13px;color:var(--ink2);display:block;margin-bottom:4px}
-.check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink2)}
-
-.msg{margin-top:14px;padding:10px 12px;border-radius:8px;background:var(--unk-bg);color:var(--ink2);font-size:14px}
+/* Rail: search and proposal */
+label.lb{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:4px}
+input[type=text]{font:inherit;color:var(--ink);border:1px solid var(--rule2);border-radius:8px;padding:9px 11px;background:#fff;width:100%}
+textarea{font:inherit;color:var(--ink);border:1px solid var(--rule2);border-radius:8px;padding:9px 11px;background:#fff;width:100%;resize:vertical}
+.field{display:grid;gap:4px}
+.stack{display:grid;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--rule2);border-radius:99px;padding:4px 10px;font-size:13px;background:#fff;color:var(--ink2);user-select:none}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.toggle{display:flex;gap:8px;align-items:center;font-size:13.5px;color:var(--ink2)}
+.btn{border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;padding:9px 14px;font-weight:600}
+.btn.ghost{background:#fff;color:var(--ink);border-color:var(--rule2);font-weight:500}
+.btn:disabled{opacity:.5;cursor:wait}
+.row2{display:flex;gap:8px}
+.row2>.grow{flex:1;min-width:0}
+.msg{padding:9px 12px;border-radius:8px;background:var(--unk-bg);color:var(--ink2);font-size:13.5px}
 .msg.err{background:var(--stop-bg);color:var(--stop)}
-.cands{margin-top:12px;display:grid;gap:8px}
-.cand{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:4px 12px;align-items:center;border:1px solid var(--rule);border-radius:8px;padding:10px 12px;background:#fff;cursor:pointer;text-align:left;color:var(--ink);font-weight:400;width:100%}
-.cand .txt{min-width:0}
-.cand .pills{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+
+/* Candidates */
+.cands{display:grid;gap:6px}
+.cand{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;text-align:left;border:1px solid var(--rule);border-radius:8px;padding:9px 11px;background:#fff;color:var(--ink)}
 .cand:hover{border-color:var(--amber)}
-.cand .num{font-family:var(--mono);font-size:13px;color:var(--ink2);min-width:84px}
-.cand .nm{font-weight:600}
-.cand .meta{font-size:13px;color:var(--muted)}
-.pill{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:99px;background:var(--unk-bg);color:var(--ink2)}
+.cand .nm{font-weight:600;font-size:14px}
+.cand .mt{font-size:12.5px;color:var(--muted);grid-column:1/-1}
+.pill{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:99px;background:var(--unk-bg);color:var(--ink2);height:fit-content;white-space:nowrap}
 .pill.active{background:var(--clear-bg);color:var(--clear)}
 .pill.closed{background:var(--stop-bg);color:var(--stop)}
 .pill.exact{background:var(--flag-bg);color:var(--accent)}
 
-.demo-list{margin-top:14px;border-top:1px dashed var(--rule2);padding-top:12px}
-.demo-list h3{font-size:13px;margin:0 0 8px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+/* Identity card */
+.idc .name{font-size:18px;font-weight:600;letter-spacing:-.01em;line-height:1.3;text-wrap:balance}
+.idc .num{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.idc dl{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 10px;margin:12px 0 0;font-size:13.5px}
+.idc dt{color:var(--muted)}
+.idc dd{margin:0;min-width:0}
+.idc .confirm{margin-top:12px;font-size:12.5px;color:var(--ink2);background:var(--wash);border:1px dashed var(--rule2);border-radius:8px;padding:8px 10px}
 
-.progress{margin-top:18px;font-family:var(--mono);font-size:13px;color:var(--ink2)}
-.progress div{padding:2px 0}
-.progress div::before{content:"·  ";color:var(--amber)}
+/* Decision */
+.choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.choices label{border:1px solid var(--rule2);border-radius:8px;padding:8px 6px;text-align:center;font-size:13.5px;background:#fff;cursor:pointer}
+.choices input{position:absolute;opacity:0;pointer-events:none}
+.choices label:has(input:checked){background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600}
+.choices label:has(input:focus-visible){outline:2px solid var(--amber)}
+.override{font-size:12.5px;color:var(--accent)}
+.recorded{font-size:12.5px;color:var(--clear);font-family:var(--mono)}
 
-/* Report */
-#report{margin:22px 0 60px}
-.route{border-radius:var(--radius);padding:18px 20px;border:1px solid;display:grid;gap:6px}
-.route.note{background:var(--clear-bg);border-color:#BFD9C7}
-.route.refer{background:var(--flag-bg);border-color:#EED7AE}
-.route.outside_appetite{background:var(--stop-bg);border-color:#EBC3C3}
-.route.compliance_hold{background:#2A1416;border-color:#2A1416;color:#fff}
-.route.compliance_hold .co,.route.compliance_hold a{color:#F3DADA}
-.route .label{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
-.route.note .label{color:var(--clear)} .route.refer .label{color:var(--accent)} .route.outside_appetite .label{color:var(--stop)} .route.compliance_hold .label{color:#F3B5B5}
-.route h2{margin:0;font-size:24px;letter-spacing:-.02em}
-.route .co{color:var(--ink2);font-size:14px}
-.route ul{margin:6px 0 0 18px;padding:0}
-.route li{margin:2px 0}
-.counts{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 6px}
-.count{font-family:var(--mono);font-size:12.5px;padding:4px 10px;border-radius:99px;border:1px solid var(--rule2);background:#fff}
+/* Verdict */
+.verdict{border-radius:var(--r);border:1px solid;padding:18px 20px;display:grid;gap:10px}
+.verdict.note{background:var(--clear-bg);border-color:var(--clear-line)}
+.verdict.refer{background:var(--flag-bg);border-color:var(--flag-line)}
+.verdict.outside_appetite{background:var(--stop-bg);border-color:var(--stop-line)}
+.verdict.compliance_hold{background:var(--hold-bg);border-color:var(--hold-bg);color:#fff}
+.verdict .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase}
+.verdict.note .eyebrow{color:var(--clear)} .verdict.refer .eyebrow{color:var(--accent)} .verdict.outside_appetite .eyebrow{color:var(--stop)} .verdict.compliance_hold .eyebrow{color:#F3B5B5}
+.verdict h1{margin:0;font-size:30px;letter-spacing:-.02em;line-height:1.1}
+.verdict ol{margin:0;padding-left:20px;display:grid;gap:4px}
+.verdict ol a{color:inherit;text-decoration:underline;text-decoration-color:rgba(0,0,0,.25);text-underline-offset:3px}
+.verdict.compliance_hold ol a{text-decoration-color:rgba(255,255,255,.4)}
+.verdict .none{font-size:14px}
 
-.checks{margin-top:10px;background:#fff;border:1px solid var(--rule);border-radius:var(--radius)}
-.row{display:grid;grid-template-columns:118px 1fr;gap:12px;padding:14px 16px;border-top:1px solid var(--rule)}
-.row:first-child{border-top:0}
-.row>div{min-width:0}
-.row.quiet{padding-block:9px}
-.row.quiet h3{display:inline;font-size:14px}
-.row.quiet .sum{display:inline;margin-left:6px;font-size:13.5px}
-.row.quiet .srcs{display:none}
-.st{font-family:var(--mono);font-size:11.5px;font-weight:500;padding:4px 8px;border-radius:6px;height:fit-content;text-align:center;white-space:nowrap}
+/* Coverage bar */
+.coverage{display:grid;gap:6px}
+.bar{display:flex;gap:3px;height:12px}
+.bar span{flex:1;border-radius:3px;background:var(--unk-bg);position:relative}
+.bar .clear{background:#5C9A70}
+.bar .info{background:#9DB8A6}
+.bar .flag{background:var(--amber)}
+.bar .flag.stop{background:#C24C4C}
+.bar .couldnt_check{background:repeating-linear-gradient(135deg,#B9B5AC 0 3px,#E4E1DA 3px 6px)}
+.bar .not_applicable{background:transparent;border:1px dashed var(--unk-line)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.verdict.compliance_hold .legend{color:#E9D6D6}
+
+/* Sections */
+.sec-h{display:flex;align-items:baseline;gap:10px;margin:2px 2px -6px}
+.sec-h h2{font-size:15px;margin:0;letter-spacing:-.01em}
+.sec-h .ct{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.cards{display:grid;gap:10px}
+.card{background:var(--paper);border:1px solid var(--rule);border-left:4px solid var(--rule2);border-radius:var(--r);padding:12px 16px;display:grid;gap:8px;scroll-margin-top:80px}
+.card.flag{border-left-color:var(--amber)}
+.card.flag.stop{border-left-color:#C24C4C}
+.card.flag.hold{border-left-color:var(--hold-bg)}
+.card.couldnt_check{border-left-color:#B9B5AC;background:linear-gradient(90deg,var(--wash),var(--paper) 40%)}
+.card.info{border-left-color:#9DB8A6}
+.card.target{box-shadow:0 0 0 3px var(--amber)}
+.card .ch{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card h3{margin:0;font-size:15px}
+.st{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:5px;white-space:nowrap}
 .st.clear{background:var(--clear-bg);color:var(--clear)}
 .st.info{background:#fff;color:var(--ink2);border:1px solid var(--rule2)}
 .st.flag{background:var(--flag-bg);color:var(--accent)}
 .st.flag.stop{background:var(--stop-bg);color:var(--stop)}
-.st.couldnt_check{background:repeating-linear-gradient(135deg,var(--unk-bg) 0 6px,#E4E2DD 6px 12px);color:var(--ink)}
-.st.not_applicable{background:#fff;color:var(--muted);border:1px dashed var(--rule2)}
-.row h3{margin:0;font-size:15px}
-.row .sum{color:var(--ink2);font-size:14px;margin-top:2px}
-.finds{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:5px}
-.finds li{font-size:14px;display:flex;gap:8px;align-items:baseline}
-.tag{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:4px;flex:none;text-transform:uppercase;letter-spacing:.03em}
+.st.couldnt_check{background:repeating-linear-gradient(135deg,var(--unk-bg) 0 6px,#E4E1DA 6px 12px);color:var(--ink)}
+.crit{font-family:var(--mono);font-size:10.5px;color:var(--muted);border:1px solid var(--rule2);padding:1px 6px;border-radius:4px}
+.why{font-size:13.5px;color:var(--ink2)}
+.finds{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.finds li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;font-size:14px;align-items:baseline}
+.tag{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
 .tag.note{background:var(--unk-bg);color:var(--ink2)}
 .tag.refer{background:var(--flag-bg);color:var(--accent)}
 .tag.outside_appetite{background:var(--stop-bg);color:var(--stop)}
-.tag.compliance_hold{background:#2A1416;color:#fff}
-.lines{display:flex;flex-wrap:wrap;gap:6px 14px}
-.lines label{font-size:14px;color:var(--ink2);display:flex;gap:6px;align-items:center}
-.two{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px}
-@media (max-width:640px){.two{grid-template-columns:1fr}}
-.access{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.srcs{margin-top:6px;font-size:12.5px;color:var(--muted)}
+.tag.compliance_hold{background:var(--hold-bg);color:#fff}
+.srcs{font-size:12px;color:var(--muted);display:flex;gap:4px 12px;flex-wrap:wrap}
 .srcs a{color:var(--muted)}
 
-h2.sec{font-size:17px;margin:26px 0 8px;letter-spacing:-.01em}
-.media{background:#fff;border:1px solid var(--rule);border-radius:var(--radius);overflow:hidden}
-.mi{padding:12px 16px;border-top:1px solid var(--rule);display:grid;gap:3px}
-.mi:first-child{border-top:0}
-.mi .t{font-weight:500}
-.mi .m{font-size:12.5px;color:var(--muted);font-family:var(--mono)}
-.mi .r{font-size:13.5px;color:var(--ink2)}
-.mi.excluded{opacity:.62}
-.about{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;background:var(--unk-bg)}
-.about.yes{background:var(--flag-bg);color:var(--accent)} .about.no{background:#fff;border:1px solid var(--rule2)}
+/* Quiet list */
+.quiet{background:var(--paper);border:1px solid var(--rule);border-radius:var(--r);display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.q{padding:10px 14px;border-top:1px solid var(--rule);display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;font-size:13.5px}
+.q:nth-child(-n+2){border-top:0}
+.q:nth-child(odd){border-right:1px solid var(--rule)}
+.q b{font-weight:600}
+.q .s{color:var(--ink2)}
+.tick{color:var(--clear);font-weight:700}
+.na{color:var(--muted)}
 
-.decision{display:grid;gap:12px}
-.choices{display:flex;gap:8px;flex-wrap:wrap}
-.choices label{border:1px solid var(--rule2);border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;gap:6px;align-items:center;background:#fff}
-.choices input:checked+span{font-weight:600}
-.override{font-size:13.5px;color:var(--accent)}
-.recorded{font-family:var(--mono);font-size:13px;color:var(--clear)}
-.foot{margin-top:24px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--rule);padding-top:12px;display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between}
-.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+/* News */
+.news{background:var(--paper);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.news h4{margin:0;padding:10px 16px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--wash);border-bottom:1px solid var(--rule)}
+.ni{padding:10px 16px;border-bottom:1px solid var(--rule);display:grid;gap:2px}
+.ni:last-child{border-bottom:0}
+.ni .t{font-weight:500}
+.ni .m{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.ni .r{font-size:13.5px;color:var(--ink2)}
+.ni.set-aside .t a{color:var(--ink2)}
+.sev{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:4px;margin-left:6px}
+.sev.high{background:var(--stop-bg);color:var(--stop)} .sev.medium{background:var(--flag-bg);color:var(--accent)}
 
-@media (max-width:640px){
-  h1{font-size:22px}
-  .row{grid-template-columns:96px minmax(0,1fr);gap:10px}
-  .cand{grid-template-columns:minmax(0,1fr) auto}
-  .cand .num{grid-column:1/-1}
-  header.top small{display:none}
+/* Progress */
+.prog ol{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.prog li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:14px}
+.prog .ic{width:16px;height:16px;border-radius:50%;border:2px solid var(--rule2)}
+.prog .start .ic{border-color:var(--amber);border-top-color:transparent;animation:spin .8s linear infinite}
+.prog .done .ic{background:var(--clear);border-color:var(--clear)}
+.prog .error .ic{background:#C24C4C;border-color:#C24C4C}
+.prog .skip .ic{border-style:dashed}
+.prog .dt{font-family:var(--mono);font-size:12px;color:var(--muted)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.prog .start .ic{animation:none}}
+
+/* Start state */
+.welcome h1{font-size:24px;letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance}
+.welcome p{margin:0;color:var(--ink2);max-width:62ch}
+.srcgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.srcgrid div{background:var(--wash);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--ink2)}
+.srcgrid b{display:block;color:var(--ink);font-size:13.5px}
+table.cases{width:100%;border-collapse:collapse;font-size:13.5px}
+table.cases th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;padding:8px 16px;border-bottom:1px solid var(--rule)}
+table.cases td{padding:9px 16px;border-bottom:1px solid var(--rule)}
+table.cases tr:last-child td{border-bottom:0}
+table.cases tr[data-id]{cursor:pointer}
+table.cases tr[data-id]:hover td{background:var(--wash)}
+.rt{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:99px;white-space:nowrap}
+.rt.note{background:var(--clear-bg);color:var(--clear)} .rt.refer{background:var(--flag-bg);color:var(--accent)}
+.rt.outside_appetite{background:var(--stop-bg);color:var(--stop)} .rt.compliance_hold{background:var(--hold-bg);color:#fff}
+.foot{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;border-top:1px solid var(--rule);padding-top:12px}
+.tablewrap{overflow-x:auto}
+
+@media (max-width:980px){
+  /* One column: confirm the company, read the verdict, then the proposal and decision. */
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .rail{display:contents}
+  #search-panel{order:1} #identity-panel{order:2} .main{order:3} #proposal-panel{order:4} #decision-panel{order:5}
+  .top .rules{display:none}
+  .quiet{grid-template-columns:minmax(0,1fr)}
+  .q:nth-child(odd){border-right:0}
+  .q:nth-child(2){border-top:1px solid var(--rule)}
+  .srcgrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:560px){
+  .brand .sub{display:none}
+  .verdict h1{font-size:25px}
 }
 @media print{
-  header.top,#search-card,.actions,.demo-list,#progress{display:none!important}
+  .top,#search-panel,#proposal-panel .actions,#decision-panel button{display:none!important}
+  .shell{display:block} .rail{position:static;max-height:none}
   body{background:#fff}
-  .card,.checks,.media{border-color:#ccc}
 }
 </style>
 </head>
 <body>
 <header class="top">
-  <div class="wrap">
-    <a class="brand" href="https://www.ai-toolstack.com/" aria-label="ai·toolstack">
+  <div class="in">
+    <a class="brand" href="https://www.ai-toolstack.com/" aria-label="ai·toolstack home">
       <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="#1A1D24"/><rect x="6" y="6" width="10" height="2.4" rx="1.2" fill="#E0A946"/><rect x="6" y="10" width="7" height="2.4" rx="1.2" fill="#fff"/><rect x="6" y="14" width="4" height="2.4" rx="1.2" fill="#fff"/></svg>
-      ai·toolstack <small>/ company pre-screen</small>
+      ai·toolstack <span class="sub">/ company pre-screen</span>
     </a>
     <span class="spacer"></span>
+    <span class="rules" id="rules-version"></span>
     <span id="data-badge" class="badge">…</span>
   </div>
 </header>
 
-<main class="wrap">
-  <h1>UK company pre-screen</h1>
-  <p class="lede">For a commercial underwriter before quoting: what the public record says about this company, what couldn't be checked, and a recommended route. You decide.</p>
-
-  <section class="card" id="search-card">
-    <form id="search-form" class="form-row" autocomplete="off">
-      <div class="grow">
-        <label class="small" for="q">Company name or Companies House number</label>
-        <input type="text" id="q" placeholder="e.g. 09446231 or Monzo Bank Limited" required>
-      </div>
-      <div style="align-self:flex-end"><button id="find-btn" type="submit">Find company</button></div>
-    </form>
-    <details class="more">
-      <summary>From the proposal (optional)</summary>
-      <div class="opt">
-        <div class="two">
-          <div>
-            <label class="small" for="trade">Declared trade</label>
-            <input type="text" id="trade" maxlength="300" placeholder="e.g. Commercial bakery with retail counter">
+<div class="shell">
+  <aside class="rail" id="rail">
+    <section class="panel" id="search-panel">
+      <div class="hd"><h2>Company</h2></div>
+      <div class="bd stack">
+        <form id="search-form" class="row2" autocomplete="off">
+          <div class="grow">
+            <label class="lb" for="q">Name or Companies House number</label>
+            <input type="text" id="q" placeholder="09446231 or Monzo Bank Limited" required>
           </div>
-          <div>
-            <label class="small" for="turnover">Declared turnover (£)</label>
-            <input type="text" id="turnover" inputmode="numeric" placeholder="e.g. 2400000">
-          </div>
+          <div style="align-self:flex-end"><button class="btn" id="find-btn" type="submit">Find</button></div>
+        </form>
+        <div id="access" class="row2" hidden>
+          <input class="grow" type="text" id="access-code" placeholder="Access code" autocomplete="off">
+          <button class="btn ghost" type="button" id="access-btn">Use code</button>
         </div>
-        <div>
-          <span class="small" style="display:block;font-size:13px;color:var(--ink2);margin-bottom:4px">Cover being quoted</span>
-          <div class="lines" id="lines">
-            <label><input type="checkbox" value="property"> Property</label>
-            <label><input type="checkbox" value="liability"> EL / PL</label>
-            <label><input type="checkbox" value="professional_indemnity"> PI</label>
-            <label><input type="checkbox" value="management_liability"> D&amp;O</label>
-            <label><input type="checkbox" value="financial_institutions"> Financial institutions</label>
-            <label><input type="checkbox" value="cyber"> Cyber</label>
-            <label><input type="checkbox" value="motor_fleet"> Motor fleet</label>
-          </div>
-        </div>
-        <label class="check"><input type="checkbox" id="fca"> This trade needs FCA authorisation</label>
+        <div id="search-msg"></div>
+        <div id="cands" class="cands"></div>
       </div>
-    </details>
-    <div id="access" class="access" hidden>
-      <input type="text" id="access-code" placeholder="Access code" style="max-width:260px" autocomplete="off">
-      <button type="button" id="access-btn">Use code</button>
-    </div>
-    <div id="search-msg"></div>
-    <div id="cands" class="cands"></div>
-    <div id="demo" class="demo-list" hidden>
-      <h3>Demo cases</h3>
-      <div id="demo-cases" class="cands"></div>
-    </div>
-  </section>
+    </section>
 
-  <div id="progress" class="progress" hidden></div>
-  <section id="report" hidden></section>
-</main>
+    <section class="panel" id="identity-panel" hidden></section>
+
+    <section class="panel" id="proposal-panel">
+      <div class="hd"><h2>From the proposal</h2></div>
+      <div class="bd stack">
+        <div class="field"><label class="lb" for="trade">Declared trade</label>
+          <input type="text" id="trade" maxlength="300" placeholder="e.g. Commercial bakery, retail counter"></div>
+        <div class="field"><label class="lb" for="turnover">Declared turnover (£)</label>
+          <input type="text" id="turnover" inputmode="numeric" placeholder="e.g. 2,400,000"></div>
+        <div class="field"><span class="lb">Cover being quoted</span>
+          <div class="chips" id="lines">
+            <button type="button" class="chip" data-v="property" aria-pressed="false">Property</button>
+            <button type="button" class="chip" data-v="liability" aria-pressed="false">EL / PL</button>
+            <button type="button" class="chip" data-v="professional_indemnity" aria-pressed="false">PI</button>
+            <button type="button" class="chip" data-v="management_liability" aria-pressed="false">D&amp;O</button>
+            <button type="button" class="chip" data-v="financial_institutions" aria-pressed="false">Financial inst.</button>
+            <button type="button" class="chip" data-v="cyber" aria-pressed="false">Cyber</button>
+            <button type="button" class="chip" data-v="motor_fleet" aria-pressed="false">Fleet</button>
+          </div></div>
+        <label class="toggle"><input type="checkbox" id="fca"> Trade needs FCA authorisation</label>
+        <div class="actions" id="rerun-row" hidden><button class="btn ghost" type="button" id="rerun-btn">Re-run with these details</button></div>
+      </div>
+    </section>
+
+    <section class="panel" id="decision-panel" hidden></section>
+  </aside>
+
+  <main class="main" id="main"></main>
+</div>
 
 <script>
-const $ = (s, el=document) => el.querySelector(s);
+const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const safeUrl = u => /^https?:\/\//i.test(String(u || "")) ? esc(u) : "#";
 const ROUTE = {note:"Note only", refer:"Refer", outside_appetite:"Outside appetite", compliance_hold:"Compliance hold"};
-const TAG = {note:"Note", refer:"Refer", outside_appetite:"Outside appetite", compliance_hold:"Compliance"};
-const ORDER = {flag:0, couldnt_check:1, info:2, clear:3, not_applicable:4};
+const ROUTE_LINE = {
+  note: "Nothing in what was checked changes the route.",
+  refer: "Needs a senior underwriter or a question to the broker before quoting.",
+  outside_appetite: "Decline unless a senior underwriter overrides with reasons.",
+  compliance_hold: "Possible sanctions match confirmed by date of birth. Don't bind or pay; compliance decides.",
+};
+const TAG = {note:"Note", refer:"Refer", outside_appetite:"Outside", compliance_hold:"Compliance"};
 const STATUS = {clear:"Clear", info:"Info", flag:"Flag", couldnt_check:"Couldn't check", not_applicable:"Not applicable"};
 const CLOSED = new Set(["dissolved","liquidation","administration","receivership","removed","closed","converted-closed","insolvency-proceedings","voluntary-arrangement"]);
-let CONFIG = null, CURRENT = null;
+let CONFIG = null, CURRENT = null, LAST_NUMBER = null;
 
-function accessCode() { try { return sessionStorage.getItem("prescreen-code") || ""; } catch (e) { return ""; } }
-async function api(path, opts={}) {
-  const r = await fetch(path, {...opts, headers:{"Content-Type":"application/json", "X-Access-Token": accessCode()}});
+/* ---------- API ---------- */
+function code() { try { return sessionStorage.getItem("prescreen-code") || ""; } catch (e) { return ""; } }
+async function api(path, opts = {}) {
+  const r = await fetch(path, {...opts, headers: {"Content-Type": "application/json", "X-Access-Token": code()}});
   const body = await r.json().catch(() => ({}));
   if (r.status === 401) { $("#access").hidden = false; throw new Error("Enter the access code to use this service."); }
-  if (!r.ok) {
-    const d = body.detail;
-    throw new Error(Array.isArray(d) ? d.map(x => x.msg).join("; ") : (d || `Request failed (${r.status})`));
-  }
+  if (!r.ok) { const d = body.detail; throw new Error(Array.isArray(d) ? d.map(x => x.msg).join("; ") : (d || `Request failed (${r.status})`)); }
   return body;
 }
-$("#access-btn").onclick = () => {
-  try { sessionStorage.setItem("prescreen-code", $("#access-code").value.trim()); } catch (e) {}
-  $("#access").hidden = true; init();
-};
+$("#access-btn").onclick = () => { try { sessionStorage.setItem("prescreen-code", $("#access-code").value.trim()); } catch (e) {} $("#access").hidden = true; init(); };
 
+/* ---------- Proposal ---------- */
+$("#lines").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true");
+  if (CURRENT) $("#rerun-row").hidden = false;
+});
+["trade", "turnover", "fca"].forEach(id => $("#" + id).addEventListener("input", () => { if (CURRENT) $("#rerun-row").hidden = false; }));
+function proposal() {
+  return {
+    declared_trade: $("#trade").value.trim(),
+    expects_fca_authorisation: $("#fca").checked,
+    cover_lines: [...document.querySelectorAll("#lines .chip[aria-pressed=true]")].map(b => b.dataset.v),
+    declared_turnover_gbp: (v => v ? Number(v) : null)($("#turnover").value.replace(/[^0-9]/g, "")),
+  };
+}
+function setProposal(p) {
+  $("#trade").value = p.declared_trade || "";
+  $("#turnover").value = p.declared_turnover_gbp ? Number(p.declared_turnover_gbp).toLocaleString("en-GB") : "";
+  $("#fca").checked = !!p.expects_fca_authorisation;
+  document.querySelectorAll("#lines .chip").forEach(b => b.setAttribute("aria-pressed", (p.cover_lines || []).includes(b.dataset.v) ? "true" : "false"));
+}
+$("#rerun-btn").onclick = () => { if (LAST_NUMBER) runScreen(LAST_NUMBER); };
+
+/* ---------- Start state ---------- */
 async function init() {
   try {
     CONFIG = await api("/api/prescreen/config");
     const b = $("#data-badge");
     b.textContent = CONFIG.data === "live" ? "Live data" : "Demo data";
     b.className = "badge " + CONFIG.data;
-    if (CONFIG.demo_cases.length) {
-      $("#demo").hidden = false;
-      $("#demo-cases").innerHTML = CONFIG.demo_cases.map(c => `
-        <button class="cand" type="button" data-num="${esc(c.company_number)}">
-          <span class="num">${esc(c.company_number)}</span>
-          <span class="txt"><span class="nm">${esc(c.label.split(" — ")[0])}</span><br>
-          <span class="meta">${esc(c.label.split(" — ")[1] || "")}</span></span>
-          <span class="pills"><span class="pill ${c.kind === "real" ? "active" : ""}">${c.kind === "real" ? "real profile" : "invented"}</span></span>
-        </button>`).join("");
-      $("#demo-cases").onclick = e => { const b = e.target.closest("[data-num]"); if (b) runScreen(b.dataset.num); };
-    }
-  } catch (e) { $("#data-badge").textContent = $("#access").hidden ? "API offline" : "Access code needed"; }
+    $("#rules-version").textContent = "rules " + CONFIG.rules_version;
+  } catch (e) { $("#data-badge").textContent = $("#access").hidden ? "API offline" : "Access code needed"; return; }
+  if (!CURRENT) showStart();
 }
 
+async function showStart() {
+  let recent = [];
+  try { recent = await api("/api/prescreen/recent"); } catch (e) {}
+  const demo = (CONFIG && CONFIG.demo_cases) || [];
+  $("#main").innerHTML = `
+    <section class="panel welcome"><div class="bd">
+      <h1>Is there anything on the public record that changes how you'd treat this risk?</h1>
+      <p>Find the company on the left. The pre-screen reads the public registers, recommends a route, and shows what it couldn't check. You decide.</p>
+      <div class="srcgrid">
+        <div><b>Companies House</b>Status, filings, charges, directors and their other companies, owners</div>
+        <div><b>Gazette and sanctions</b>Insolvency notices and the UK Sanctions List</div>
+        <div><b>FCA and news</b>Authorisation where the trade needs it; news read against this exact company</div>
+      </div>
+    </div></section>
+    ${recent.length ? `<section class="panel"><div class="hd"><h2>Recent cases</h2></div><div class="tablewrap"><table class="cases">
+      <thead><tr><th>Company</th><th>Number</th><th>Route</th><th>Decision</th><th>When</th></tr></thead><tbody>
+      ${recent.map(c => `<tr data-id="${esc(c.report_id)}"><td>${esc(c.company_name)}</td><td class="mono">${esc(c.company_number)}</td>
+        <td><span class="rt ${esc(c.route)}">${esc(ROUTE[c.route] || c.route)}</span></td><td>${esc(c.decision || "—")}</td>
+        <td class="mono">${esc(new Date(c.created_at).toLocaleString("en-GB", {day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit"}))}</td></tr>`).join("")}
+      </tbody></table></div></section>` : ""}
+    ${demo.length ? `<section class="panel"><div class="hd"><h2>Demo cases</h2><span class="spacer"></span><span class="badge demo">offline data</span></div>
+      <div class="bd cands">${demo.map(c => `<button class="cand" type="button" data-num="${esc(c.company_number)}">
+        <span class="nm">${esc(c.label.split(" — ")[0])}</span><span class="pill ${c.kind === "real" ? "active" : ""}">${c.kind === "real" ? "real profile" : "invented"}</span>
+        <span class="mt"><span class="mono">${esc(c.company_number)}</span> · ${esc(c.label.split(" — ")[1] || "")}</span></button>`).join("")}</div></section>` : ""}`;
+  $("#main").onclick = async e => {
+    const n = e.target.closest("[data-num]"); if (n) return runScreen(n.dataset.num);
+    const r = e.target.closest("tr[data-id]");
+    if (r) { try { const rep = await api("/api/prescreen/" + r.dataset.id); CURRENT = rep; LAST_NUMBER = rep.company_number; setProposal(rep.request || {}); render(rep); } catch (err) { flash(err.message); } }
+  };
+}
+function flash(text) { $("#search-msg").innerHTML = `<div class="msg err">${esc(text)}</div>`; }
+
+/* ---------- Find ---------- */
 $("#search-form").addEventListener("submit", async e => {
   e.preventDefault();
-  const q = $("#q").value.trim();
   $("#cands").innerHTML = ""; $("#search-msg").innerHTML = "";
   $("#find-btn").disabled = true;
   try {
-    const r = await api("/api/prescreen/search?q=" + encodeURIComponent(q));
-    if (r.resolved) {
-      $("#search-msg").innerHTML = r.message ? `<div class="msg">${esc(r.message)}</div>` : "";
-      await runScreen(r.company_number);
-    } else {
+    const r = await api("/api/prescreen/search?q=" + encodeURIComponent($("#q").value.trim()));
+    if (r.resolved) { if (r.message) $("#search-msg").innerHTML = `<div class="msg">${esc(r.message)}</div>`; await runScreen(r.company_number); }
+    else {
       $("#search-msg").innerHTML = `<div class="msg">${esc(r.message)}</div>`;
-      $("#cands").innerHTML = r.candidates.map(c => `
-        <button class="cand" type="button" data-num="${esc(c.company_number)}">
-          <span class="num">${esc(c.company_number)}</span>
-          <span class="txt"><span class="nm">${esc(c.name)}</span><br>
-          <span class="meta">${esc(c.address)}${c.date_of_creation ? " · inc. " + esc(c.date_of_creation) : ""}</span></span>
-          <span class="pills">${c.exact_name_match ? '<span class="pill exact">exact name</span>' : ""}
-          <span class="pill ${c.status === "active" ? "active" : CLOSED.has(c.status) ? "closed" : ""}">${esc(c.status || "?")}</span></span>
-        </button>`).join("");
+      $("#cands").innerHTML = r.candidates.map(c => `<button class="cand" type="button" data-num="${esc(c.company_number)}">
+        <span class="nm">${esc(c.name)}</span>
+        <span>${c.exact_name_match ? '<span class="pill exact">exact</span> ' : ""}<span class="pill ${c.status === "active" ? "active" : CLOSED.has(c.status) ? "closed" : ""}">${esc(c.status || "?")}</span></span>
+        <span class="mt"><span class="mono">${esc(c.company_number)}</span>${c.date_of_creation ? " · inc. " + esc(c.date_of_creation) : ""}${c.address ? " · " + esc(c.address) : ""}</span></button>`).join("");
     }
-  } catch (err) {
-    $("#search-msg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
-  } finally { $("#find-btn").disabled = false; }
+  } catch (err) { flash(err.message); } finally { $("#find-btn").disabled = false; }
 });
 $("#cands").onclick = e => { const b = e.target.closest("[data-num]"); if (b) runScreen(b.dataset.num); };
 
+/* ---------- Run with live progress ---------- */
 async function runScreen(number) {
-  const prog = $("#progress");
-  prog.hidden = false; $("#report").hidden = true;
-  const steps = ["Companies House: profile, filings, officers, owners, charges", "Directors: disqualifications and other companies",
-                 "UK Sanctions List: company, directors, owners", "FCA Register (if the trade is regulated)", "News and web: reading results"];
-  prog.innerHTML = ""; let i = 0;
-  const tick = setInterval(() => { if (i < steps.length) prog.insertAdjacentHTML("beforeend", `<div>${esc(steps[i++])}</div>`); }, 700);
+  LAST_NUMBER = number; $("#rerun-row").hidden = true;
+  const started = Date.now();
+  let stages = [];
+  const state = {};
+  const draw = () => {
+    $("#main").innerHTML = `<section class="panel prog"><div class="hd"><h2>Running pre-screen</h2><span class="spacer"></span>
+      <span class="mono" style="font-size:12px;color:var(--muted)" id="elapsed">${((Date.now() - started) / 1000).toFixed(0)}s</span></div>
+      <div class="bd"><ol>${stages.map(s => { const st = state[s.id] || {}; return `<li class="${st.state || "wait"}"><span class="ic"></span>
+        <span>${esc(s.label)}</span><span class="dt">${esc(st.state === "error" ? "couldn't reach" : st.state === "skip" ? (st.detail || "skipped") : (st.detail || ""))}</span></li>`; }).join("")}</ol></div></section>`;
+  };
+  const timer = setInterval(() => { const el = $("#elapsed"); if (el) el.textContent = ((Date.now() - started) / 1000).toFixed(0) + "s"; }, 500);
   try {
-    const report = await api("/api/prescreen", {method:"POST", body: JSON.stringify({
-      company_number: number, declared_trade: $("#trade").value.trim(), expects_fca_authorisation: $("#fca").checked,
-      cover_lines: [...document.querySelectorAll("#lines input:checked")].map(i => i.value),
-      declared_turnover_gbp: (v => v ? Number(v) : null)($("#turnover").value.replace(/[^0-9]/g, ""))})});
-    CURRENT = report;
-    render(report);
+    const r = await fetch("/api/prescreen/stream", {method: "POST", headers: {"Content-Type": "application/json", "X-Access-Token": code()},
+      body: JSON.stringify({company_number: number, ...proposal()})});
+    if (r.status === 401) { $("#access").hidden = false; throw new Error("Enter the access code to use this service."); }
+    if (!r.ok) { const b = await r.json().catch(() => ({})); const d = b.detail; throw new Error(Array.isArray(d) ? d.map(x => x.msg).join("; ") : (d || `Request failed (${r.status})`)); }
+    const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "", report = null;
+    while (true) {
+      const {value, done} = await reader.read(); if (done) break;
+      buf += dec.decode(value, {stream: true});
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 1); if (!line.trim()) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "stages") { stages = ev.stages; draw(); }
+        else if (ev.type === "progress") { state[ev.stage] = ev; draw(); }
+        else if (ev.type === "error") throw new Error(ev.detail);
+        else if (ev.type === "report") report = ev.report;
+      }
+    }
+    if (!report) throw new Error("The pre-screen stopped before it finished.");
+    CURRENT = report; render(report);
   } catch (err) {
-    $("#report").hidden = false;
-    $("#report").innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
-  } finally { clearInterval(tick); prog.hidden = true; }
+    $("#main").innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+  } finally { clearInterval(timer); }
 }
 
+/* ---------- Report ---------- */
 function srcLinks(sources) {
-  if (!sources || !sources.length) return "";
-  return `<div class="srcs">${sources.map(s => s.url ? `<a href="${safeUrl(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.label)}</a>` : esc(s.label)).join(" · ")}</div>`;
+  return (sources || []).length ? `<div class="srcs">${sources.map(s => s.url ? `<a href="${safeUrl(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.label)}</a>` : `<span>${esc(s.label)}</span>`).join("")}</div>` : "";
+}
+const stopOf = c => c.findings.some(f => f.route === "outside_appetite") ? " stop" : (c.findings.some(f => f.route === "compliance_hold") ? " stop hold" : "");
+function fmtDate(s) { if (!s) return ""; const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}); }
+function yearsSince(s) { const d = new Date(s); if (isNaN(d)) return ""; const y = Math.floor((Date.now() - d) / 31557600000); return y < 1 ? "under a year" : `${y} year${y === 1 ? "" : "s"}`; }
+
+function renderIdentity(r) {
+  const c = r.company || {};
+  const status = c.status || "";
+  const statusCls = status === "active" ? "active" : CLOSED.has(status) ? "closed" : "";
+  const sic = (c.sic || []).map(s => `<span class="mono">${esc(s.code)}</span>${s.label ? " " + esc(s.label) : ""}`).join("<br>");
+  const prev = (c.previous_names || []).map(p => `${esc(p.name)} <span class="mono">until ${esc(p.until)}</span>`).join("<br>");
+  const officers = (c.officers || []).slice(0, 4).map(o => esc(o.name)).join("<br>") + ((c.officer_count || 0) > 4 ? `<br><span style="color:var(--muted)">+${c.officer_count - 4} more</span>` : "");
+  $("#identity-panel").hidden = false;
+  $("#identity-panel").innerHTML = `<div class="hd"><h2>Is this the right company?</h2></div><div class="bd idc">
+    <div class="name">${esc(r.company_name)}</div>
+    <div class="num"><a class="mono" href="https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(r.company_number)}" target="_blank" rel="noopener noreferrer">${esc(r.company_number)}</a>
+      <span class="pill ${statusCls}">${esc(status.replace(/-/g, " "))}</span>${c.status_detail ? `<span class="pill closed">${esc(c.status_detail.replace(/-/g, " "))}</span>` : ""}</div>
+    <dl>
+      <dt>Incorporated</dt><dd>${esc(fmtDate(c.incorporated))}${c.incorporated ? ` <span style="color:var(--muted)">(${esc(yearsSince(c.incorporated))})</span>` : ""}</dd>
+      ${c.registered_office ? `<dt>Office</dt><dd>${esc(c.registered_office)}</dd>` : ""}
+      ${sic ? `<dt>SIC</dt><dd>${sic}</dd>` : ""}
+      ${c.last_accounts && c.last_accounts.type ? `<dt>Accounts</dt><dd>${esc(c.last_accounts.type.replace(/-/g, " "))}${c.last_accounts.made_up_to ? `, to ${esc(fmtDate(c.last_accounts.made_up_to))}` : ""}</dd>` : ""}
+      ${prev ? `<dt>Was called</dt><dd>${prev}</dd>` : ""}
+      ${officers ? `<dt>Directors</dt><dd>${officers}</dd>` : ""}
+      ${(c.owners || []).length ? `<dt>Owners</dt><dd>${c.owners.map(esc).join("<br>")}</dd>` : ""}
+    </dl>
+    <div class="confirm">Check the number and address against the proposal before relying on this report.</div>
+  </div>`;
 }
 
-function render(r) {
-  const counts = {clear:0, info:0, flag:0, couldnt_check:0, not_applicable:0};
-  r.checks.forEach(c => counts[c.status]++);
-  const chUrl = `https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(r.company_number)}`;
-  const reasons = r.route_reasons.length ? `<ul>${r.route_reasons.slice(0, 6).map(x => `<li>${esc(x)}</li>`).join("")}</ul>`
-    : `<div>No referral reasons in what was checked.${counts.couldnt_check ? ` ${counts.couldnt_check} check(s) couldn't run; they're listed below.` : ""}</div>`;
-  const demoNote = r.meta && r.meta.data === "demo" ? `<div class="msg">Demo data: ${esc(r.meta.case_label || "")}</div>` : "";
-
-  const rank = c => (c.findings.some(f => f.route === "outside_appetite" || f.route === "compliance_hold") ? -1 : 0) + ORDER[c.status];
-  const sorted = [...r.checks].sort((a, b) => rank(a) - rank(b));
-  const rows = sorted.map(c => {
-    const stop = c.findings.some(f => f.route === "outside_appetite" || f.route === "compliance_hold");
-    const finds = c.findings.length ? `<ul class="finds">${c.findings.map(f => `
-        <li><span class="tag ${f.route}">${esc(TAG[f.route])}</span><span>${esc(f.text)}${
-          f.sources && f.sources[0] && f.sources[0].url ? ` <a href="${safeUrl(f.sources[0].url)}" target="_blank" rel="noopener noreferrer">source</a>` : ""}</span></li>`).join("")}</ul>` : "";
-    const quiet = (c.status === "clear" || c.status === "not_applicable") && !c.findings.length;
-    return `<div class="row${quiet ? " quiet" : ""}">
-      <div><span class="st ${c.status}${stop ? " stop" : ""}">${STATUS[c.status]}</span></div>
-      <div><h3>${esc(c.title)}</h3><div class="sum">${esc(c.status === "flag" ? "" : c.summary)}</div>${finds}${srcLinks(c.sources)}</div>
-    </div>`;
-  }).join("");
-
-  const media = (r.media || []).map(m => `
-    <div class="mi ${m.about_this_company === "no" ? "excluded" : ""}">
-      <div class="t"><a href="${safeUrl(m.url)}" target="_blank" rel="noopener noreferrer">${esc(m.title)}</a></div>
-      <div class="m">${esc(m.source)} · ${esc((m.published || "").slice(0,10) || "undated")} ·
-        <span class="about ${m.about_this_company}">${m.about_this_company === "not_reviewed" ? "not reviewed" : "about this company: " + esc(m.about_this_company)}</span>
-        ${m.category && m.category !== "neutral" ? " · " + esc(m.category.replace(/_/g, " ")) + " · " + esc(m.severity) : ""}</div>
-      ${m.reason ? `<div class="r">${esc(m.reason)}</div>` : ""}
-    </div>`).join("");
-
-  $("#report").innerHTML = `
-    ${demoNote}
-    <div class="route ${r.route}">
-      <span class="label">Recommended route</span>
-      <h2>${ROUTE[r.route]}</h2>
-      <div class="co"><strong>${esc(r.company_name)}</strong> · <a href="${chUrl}" target="_blank" rel="noopener noreferrer">${esc(r.company_number)}</a></div>
-      ${reasons}
+function renderDecision(r) {
+  const map = {proceed: "note", refer: "refer", decline: "outside_appetite"};
+  const same = v => map[v] === r.route || (v === "decline" && r.route === "compliance_hold");
+  const last = (r.decisions || []).slice(-1)[0];
+  $("#decision-panel").hidden = false;
+  $("#decision-panel").innerHTML = `<div class="hd"><h2>Your decision</h2></div><form class="bd stack" id="decision-form">
+    <div class="choices">
+      <label><input type="radio" name="d" value="proceed" required>Proceed</label>
+      <label><input type="radio" name="d" value="refer">Refer</label>
+      <label><input type="radio" name="d" value="decline">Decline</label>
     </div>
-    <div class="counts">
-      <span class="count">${counts.flag} flagged</span><span class="count">${counts.clear} clear</span><span class="count">${counts.info} info</span>
-      <span class="count">${counts.couldnt_check} couldn't check</span><span class="count">${counts.not_applicable} not applicable</span>
-    </div>
-    <div class="checks">${rows}</div>
-    ${media ? `<h2 class="sec">News and web results</h2><div class="media">${media}</div>` : ""}
-    <h2 class="sec">Your decision</h2>
-    <form class="card decision" id="decision-form">
-      <div class="choices">
-        <label><input type="radio" name="d" value="proceed" required><span>Proceed to quote</span></label>
-        <label><input type="radio" name="d" value="refer"><span>Refer</span></label>
-        <label><input type="radio" name="d" value="decline"><span>Decline</span></label>
-      </div>
-      <div id="override" class="override" hidden></div>
-      <div><label class="small" for="reason">Reason (kept with the report)</label>
-        <textarea id="reason" rows="3" minlength="5" required placeholder="e.g. Charges are mainstream bank debt; broker confirmed loss payee."></textarea></div>
-      <div class="form-row"><div class="grow"><label class="small" for="uw">Your name</label><input type="text" id="uw" maxlength="120"></div>
-        <div style="align-self:flex-end"><button type="submit">Record decision</button></div></div>
-      <div id="recorded"></div>
-    </form>
-    <div class="actions"><button class="ghost" type="button" onclick="window.print()">Print / save as PDF</button>
-      <button class="ghost" type="button" onclick="window.scrollTo({top:0,behavior:'smooth'});document.getElementById('q').focus()">New pre-screen</button></div>
-    <div class="foot">
-      <span>Report ${esc(r.report_id)} · ${new Date(r.created_at).toLocaleString("en-GB")} · ${esc(r.elapsed_seconds)}s · ${r.llm_calls} model call(s)</span>
-      <span>Rules ${esc(r.rules_version)}: thresholds are drafts for an underwriter to confirm · recommendation only</span>
-    </div>`;
-  $("#report").hidden = false;
-  $("#report").scrollIntoView({behavior:"smooth", block:"start"});
-
-  const map = {proceed:"note", refer:"refer", decline:"outside_appetite"};
-  const sameAs = (v) => map[v] === r.route || (v === "decline" && r.route === "compliance_hold");
-  $("#decision-form").addEventListener("change", () => {
-    const v = ($("#decision-form").querySelector("input[name=d]:checked") || {}).value;
-    const differs = v && !sameAs(v);
+    <div class="override" id="override" hidden></div>
+    <div class="field"><label class="lb" for="reason">Reason, kept with the report</label>
+      <textarea id="reason" rows="3" minlength="5" required placeholder="e.g. Charges are mainstream bank debt; broker confirmed loss payee."></textarea></div>
+    <div class="row2"><input class="grow" type="text" id="uw" maxlength="120" placeholder="Your name"><button class="btn" type="submit">Record</button></div>
+    <div id="recorded">${last ? `<div class="recorded">Last recorded: ${esc(last.decision)}, ${esc(new Date(last.recorded_at).toLocaleString("en-GB"))}</div>` : ""}</div>
+  </form>`;
+  const form = $("#decision-form");
+  form.addEventListener("change", () => {
+    const v = (form.querySelector("input[name=d]:checked") || {}).value;
+    const differs = v && !same(v);
     $("#override").hidden = !differs;
-    $("#override").textContent = differs ? `This differs from the recommendation (${ROUTE[r.route]}). Say why in the reason.` : "";
+    $("#override").textContent = differs ? `Differs from the recommendation (${ROUTE[r.route]}). Say why.` : "";
   });
-  $("#decision-form").addEventListener("submit", async e => {
+  form.addEventListener("submit", async e => {
     e.preventDefault();
-    const v = $("#decision-form").querySelector("input[name=d]:checked").value;
+    const v = form.querySelector("input[name=d]:checked").value;
     try {
-      const d = await api(`/api/prescreen/${r.report_id}/decision`, {method:"POST", body: JSON.stringify({
-        decision: v, reason: $("#reason").value.trim(), underwriter: $("#uw").value.trim(), overrides_route: !sameAs(v)})});
-      $("#recorded").innerHTML = `<div class="recorded">Recorded ${esc(new Date(d.recorded_at).toLocaleString("en-GB"))}: ${esc(d.decision)}${d.overrides_route ? " (overrides recommendation)" : ""}.</div>`;
+      const d = await api(`/api/prescreen/${r.report_id}/decision`, {method: "POST", body: JSON.stringify({
+        decision: v, reason: $("#reason").value.trim(), underwriter: $("#uw").value.trim(), overrides_route: !same(v)})});
+      $("#recorded").innerHTML = `<div class="recorded">Recorded ${esc(new Date(d.recorded_at).toLocaleString("en-GB"))}: ${esc(d.decision)}${d.overrides_route ? " (overrides the recommendation)" : ""}</div>`;
     } catch (err) { $("#recorded").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
   });
 }
+
+function anchorFor(reason, checks) {
+  for (const c of checks) {
+    if (reason.startsWith(c.title + " couldn't")) return c.check_id;
+    if (c.findings.some(f => f.text === reason)) return c.check_id;
+  }
+  return null;
+}
+
+function card(c) {
+  const finds = c.findings.length ? `<ul class="finds">${c.findings.map(f => `<li><span class="tag ${f.route}">${esc(TAG[f.route])}</span>
+    <span>${esc(f.text)}${f.sources && f.sources[0] && f.sources[0].url ? ` <a href="${safeUrl(f.sources[0].url)}" target="_blank" rel="noopener noreferrer">source</a>` : ""}</span></li>`).join("")}</ul>` : "";
+  const why = c.status === "couldnt_check" ? `<div class="why">${esc(c.not_checked_reason ? "Why: " + c.not_checked_reason : c.summary)}</div>`
+    : (c.status === "info" ? `<div class="why">${esc(c.summary)}</div>` : "");
+  return `<article class="card ${c.status}${stopOf(c)}" id="c-${esc(c.check_id)}">
+    <div class="ch"><span class="st ${c.status}${stopOf(c)}">${STATUS[c.status]}</span><h3>${esc(c.title)}</h3>${c.critical && c.status === "couldnt_check" ? '<span class="crit">critical</span>' : ""}</div>
+    ${why}${finds}${srcLinks(c.sources)}</article>`;
+}
+
+const barRank = c => (stopOf(c) ? -1 : 0) + ({flag: 0, couldnt_check: 1, info: 2, clear: 3, not_applicable: 4}[c.status]);
+
+function render(r) {
+  renderIdentity(r); renderDecision(r); setProposal(r.request || {}); $("#rerun-row").hidden = true;
+  const checks = r.checks;
+  const counts = {clear: 0, info: 0, flag: 0, couldnt_check: 0, not_applicable: 0};
+  checks.forEach(c => counts[c.status]++);
+  const attention = checks.filter(c => c.status === "flag" || c.status === "couldnt_check")
+    .sort((a, b) => (stopOf(b) ? 1 : 0) - (stopOf(a) ? 1 : 0) || (a.status === "flag" ? -1 : 1) - (b.status === "flag" ? -1 : 1));
+  const info = checks.filter(c => c.status === "info");
+  const clear = checks.filter(c => c.status === "clear");
+  const na = checks.filter(c => c.status === "not_applicable");
+  const reasons = r.route_reasons.slice(0, 6);
+  const media = r.media || [];
+  const about = media.filter(m => m.about_this_company === "yes" || m.about_this_company === "unsure");
+  const aside = media.filter(m => m.about_this_company === "no");
+  const unread = media.filter(m => m.about_this_company === "not_reviewed");
+  const newsItem = (m, cls = "") => `<div class="ni ${cls}"><div class="t"><a href="${safeUrl(m.url)}" target="_blank" rel="noopener noreferrer">${esc(m.title)}</a>${
+      m.severity && m.severity !== "low" && cls !== "set-aside" ? `<span class="sev ${esc(m.severity)}">${esc(m.severity)}</span>` : ""}</div>
+    <div class="m">${esc(m.source)} · ${esc((m.published || "").slice(0, 10) || "undated")}${m.category && m.category !== "neutral" ? " · " + esc(m.category.replace(/_/g, " ")) : ""}${m.about_this_company === "unsure" ? " · may not be this company" : ""}</div>
+    ${m.reason ? `<div class="r">${esc(m.reason)}</div>` : ""}</div>`;
+  const demo = r.meta && r.meta.data === "demo";
+
+  $("#main").innerHTML = `
+    ${demo ? `<div class="msg">Demo data · ${esc(r.meta.case_label || "")}</div>` : ""}
+    <section class="verdict ${r.route}">
+      <span class="eyebrow">Recommended route</span>
+      <h1>${ROUTE[r.route]}</h1>
+      <div>${esc(ROUTE_LINE[r.route])}</div>
+      ${reasons.length ? `<ol>${reasons.map(x => { const id = anchorFor(x, checks); return `<li>${id ? `<a href="#c-${esc(id)}" data-jump="${esc(id)}">${esc(x)}</a>` : esc(x)}</li>`; }).join("")}</ol>`
+        : `<div class="none">${counts.couldnt_check ? `${counts.couldnt_check} check(s) couldn't run; they're listed below.` : ""}</div>`}
+      <div class="coverage" aria-label="Coverage: one segment per check">
+        <div class="bar">${[...checks].sort((a, b) => barRank(a) - barRank(b)).map(c => `<span class="${c.status}${stopOf(c)}" title="${esc(c.title)}: ${esc(STATUS[c.status])}"></span>`).join("")}</div>
+        <div class="legend">
+          <span><i style="background:var(--amber)"></i>${counts.flag} flagged</span>
+          <span><i style="background:repeating-linear-gradient(135deg,#B9B5AC 0 3px,#E4E1DA 3px 6px)"></i>${counts.couldnt_check} couldn't check</span>
+          <span><i style="background:#9DB8A6"></i>${counts.info} info</span>
+          <span><i style="background:#5C9A70"></i>${counts.clear} clear</span>
+          ${counts.not_applicable ? `<span><i style="border:1px dashed var(--unk-line)"></i>${counts.not_applicable} not applicable</span>` : ""}
+        </div>
+      </div>
+    </section>
+
+    ${attention.length ? `<div class="sec-h"><h2>Needs your attention</h2><span class="ct">${attention.length}</span></div><div class="cards">${attention.map(card).join("")}</div>` : ""}
+    ${info.length ? `<div class="sec-h"><h2>Worth reading</h2><span class="ct">${info.length}</span></div><div class="cards">${info.map(card).join("")}</div>` : ""}
+    ${clear.length || na.length ? `<div class="sec-h"><h2>Checked, nothing found</h2><span class="ct">${clear.length}</span></div>
+      <div class="quiet">${clear.map(c => `<div class="q" id="c-${esc(c.check_id)}"><span class="tick">✓</span><span><b>${esc(c.title)}</b><br><span class="s">${esc(c.summary)}</span></span></div>`).join("")}
+      ${na.map(c => `<div class="q na" id="c-${esc(c.check_id)}"><span>–</span><span><b>${esc(c.title)}</b><br><span class="s">${esc(c.summary)}</span></span></div>`).join("")}</div>` : ""}
+
+    ${media.length ? `<div class="sec-h"><h2>News and web</h2><span class="ct">${media.length}</span></div><div class="news">
+      ${about.length ? `<h4>About this company</h4>${about.map(m => newsItem(m)).join("")}` : ""}
+      ${unread.length ? `<h4>Not reviewed</h4>${unread.map(m => newsItem(m)).join("")}` : ""}
+      ${aside.length ? `<h4>Set aside: about a different company</h4>${aside.map(m => newsItem(m, "set-aside")).join("")}` : ""}
+    </div>` : ""}
+
+    <div class="foot"><span>Report <span class="mono">${esc(r.report_id)}</span> · ${esc(new Date(r.created_at).toLocaleString("en-GB"))} · ${esc(r.elapsed_seconds)}s · ${r.llm_calls} model call(s)</span>
+      <span>Rules ${esc(r.rules_version)}: draft thresholds, a recommendation only</span></div>`;
+
+  $("#main").onclick = e => {
+    const a = e.target.closest("[data-jump]"); if (!a) return;
+    e.preventDefault();
+    const el = document.getElementById("c-" + a.dataset.jump);
+    if (el) { el.scrollIntoView({behavior: "smooth", block: "center"}); el.classList.add("target"); setTimeout(() => el.classList.remove("target"), 1600); }
+  };
+  window.scrollTo({top: 0, behavior: "smooth"});
+}
+
 init();
 </script>
 </body>

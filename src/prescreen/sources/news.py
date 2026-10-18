@@ -51,7 +51,7 @@ class NewsSearch:
         if self.fixtures is not None:
             if isinstance(self.fixtures, SourceError):
                 raise self.fixtures
-            self.provider_used = "fixtures"
+            self.provider_used = "demo news results"
             return list(self.fixtures)[:limit]
 
         name = short_name(registered_name)

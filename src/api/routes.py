@@ -69,6 +69,13 @@ async def serve_prescreen() -> HTMLResponse:
     return HTMLResponse("<h1>frontend/prescreen.html not found</h1>", status_code=404)
 
 
+@router.get("/v1", response_class=HTMLResponse, tags=["meta"])
+async def serve_prescreen_v1() -> HTMLResponse:
+    """The first pre-screen layout (single column), kept for comparison."""
+    path = _PRESCREEN_HTML.with_name("prescreen-v1.html")
+    return HTMLResponse(path.read_text(encoding="utf-8")) if path.exists() else HTMLResponse("not found", 404)
+
+
 @router.get("/legacy", response_class=HTMLResponse, tags=["meta"])
 async def serve_frontend() -> HTMLResponse:
     """The original agentic research UI, kept for comparison."""
