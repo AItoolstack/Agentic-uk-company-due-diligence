@@ -219,6 +219,34 @@ def _fix_args(tool: str, args: dict[str, Any], report_id: str) -> dict[str, Any]
     return args
 
 
+# Keys a final answer may arrive under when the model skips the {"final": ...} wrapper.
+FINAL_KEYS = {"director_history": ("directors",), "news": ("items",), "broker_email": ("subject", "body")}
+
+
+def read_turn(spec_name: str, reply: dict[str, Any]) -> tuple[str, Any]:
+    """("final", dict) | ("call", dict) | ("bad", shape). Models drift from the exact format: a final as a list or
+    a JSON string, the answer's own keys at the top level, or {"tool": ..., "args": ...} without "call"."""
+    final = reply.get("final")
+    if isinstance(final, str):
+        try:
+            final = json.loads(final)
+        except ValueError:
+            pass
+    if isinstance(final, list):
+        key = FINAL_KEYS.get(spec_name, ("items",))[0]
+        final = {key: final}
+    if isinstance(final, dict):
+        return "final", final
+    call = reply.get("call")
+    if isinstance(call, dict) and call.get("tool"):
+        return "call", call
+    if isinstance(reply.get("tool"), str):
+        return "call", {"tool": reply["tool"], "args": reply.get("args") or reply.get("arguments") or {}}
+    if any(k in reply for k in FINAL_KEYS.get(spec_name, ())):
+        return "final", reply
+    return "bad", {"keys": sorted(reply)[:8], "preview": json.dumps(reply, default=str)[:200]}
+
+
 async def run_specialist(spec: Spec, ctx: Ctx, focus: str = "") -> dict[str, Any]:
     """Run one specialist to a checked result. Never raises: failures are part of the result."""
     trace = ctx.toolbox.trace
@@ -240,13 +268,18 @@ async def run_specialist(spec: Spec, ctx: Ctx, focus: str = "") -> dict[str, Any
             if step == spec.max_steps:
                 user += "\n\nNo tool calls left. Give your final answer now."
             reply = await ctx.model.json(spec.name, system, user, purpose=f"step {step + 1}")
-            if isinstance(reply.get("final"), dict):
-                final = reply["final"]
+            kind, body = read_turn(spec.name, reply)
+            if kind == "final":
+                final = body
                 break
-            call = reply.get("call") if isinstance(reply.get("call"), dict) else None
-            if call is None or step == spec.max_steps:
-                transcript.append("SYSTEM: Reply with {\"final\": ...} now.")
+            if kind == "bad" or step == spec.max_steps:
+                trace.add("note", "unusable turn" if kind == "bad" else "call after the last step", spec.name, 0,
+                          ok=False, error=(f"reply had keys {body['keys']}: {body['preview']}" if kind == "bad"
+                                           else "asked for a tool with no calls left"))
+                transcript.append("SYSTEM: That reply wasn't usable. Reply with exactly {\"final\": "
+                                  + spec.final_format + "} now, using what you've already found.")
                 continue
+            call = body
             tool, args = str(call.get("tool", "")), call.get("args") or {}
             result["steps"] += 1
             try:
@@ -292,7 +325,8 @@ async def run_specialist(spec: Spec, ctx: Ctx, focus: str = "") -> dict[str, Any
         except ModelError as err:
             result.update(status="error", error=f"model: {err}")
             return result
-        final = reply.get("final") if isinstance(reply.get("final"), dict) else final
+        kind, body = read_turn(spec.name, reply)
+        final = body if kind == "final" else final
         text = spec.render(final)
     result.update(status="blocked", text="", data=None, guardrail=verdict,
                   withheld_reason="; ".join(sorted({v["detail"] for v in verdict["violations"]}))[:400])

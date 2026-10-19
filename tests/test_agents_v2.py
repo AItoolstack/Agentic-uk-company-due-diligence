@@ -411,3 +411,40 @@ def test_api_agent_review_runs_over_http_mcp_on_the_space(monkeypatch):
     assert prescreen_routes._agent_mcp_url() == "http://127.0.0.1:7860/mcp"
     monkeypatch.setenv("AGENT_MCP_URL", "http://example/mcp")
     assert prescreen_routes._agent_mcp_url() == "http://example/mcp"
+
+
+# ---------------------------------------------------------------------------
+# Format drift (found on the first live run: Monzo, director_history never gave a usable final)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("reply,kind", [
+    ({"final": {"directors": []}}, "final"),
+    ({"final": [{"name": "A", "story": "x"}]}, "final"),            # final as a list
+    ({"final": '{"directors": []}'}, "final"),                       # final as a JSON string
+    ({"directors": [{"name": "A", "story": "x"}]}, "final"),         # no wrapper
+    ({"call": {"tool": "company_record", "args": {}}}, "call"),
+    ({"tool": "company_record", "args": {"company_number": "1"}}, "call"),  # no "call" wrapper
+    ({"answer": "something"}, "bad"),
+])
+def test_read_turn_accepts_common_drift(reply, kind):
+    from src.agents_v2.specialists import read_turn
+    assert read_turn("director_history", reply)[0] == kind
+
+
+def test_unusable_turns_are_traced_with_their_shape():
+    s = prescreen("ZZ000001", declared_trade="Bakery")
+    turns = {"n": 0}
+
+    def drifting(agent, system, user):
+        if agent == "director_history":
+            turns["n"] += 1
+            if turns["n"] == 1:
+                return j({"answer": "I looked and it's fine"})
+            return j({"directors": [{"name": "Jordan Alex Example", "story":
+                      "Was a director of NORTHERN BAKES LIMITED (ZZ900001), now in liquidation."}]})
+        return polite(agent, system, user)
+    out = run(report_id=s["report_id"], scripted=drifting)
+    d = next(x for x in out["review"]["sections"] if x["agent"] == "director_history")
+    assert d["status"] == "ok"
+    notes = [sp for sp in out["trace"]["spans"] if sp["kind"] == "note"]
+    assert notes and "answer" in notes[0]["error"]

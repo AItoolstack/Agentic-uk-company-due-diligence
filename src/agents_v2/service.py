@@ -53,7 +53,8 @@ def config() -> dict[str, Any]:
     provider = os.environ.get("AGENT_PROVIDER", "openai")
     return {"model": default_model(), "provider": provider, "available": bool(provider_key(provider)),
             "judge_model": os.environ.get("AGENT_GUARDRAIL_MODEL", "") or default_model(),
-            "judge": judge_enabled(), "transport": "http" if os.environ.get("AGENT_MCP_URL") else "in-process",
+            "judge": judge_enabled(),
+            "transport": "http" if os.environ.get("AGENT_MCP_URL") or os.environ.get("SPACE_HOST") else "in-process",
             "runs_per_hour": int(os.environ.get("AGENT_RUNS_PER_HOUR", "20"))}
 
 
