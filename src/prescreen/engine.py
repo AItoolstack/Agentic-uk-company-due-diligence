@@ -236,14 +236,15 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
     async def fca_lookup() -> tuple[Any, Any]:
         if not fca_needed:
             return None, None
-        firms = await _safe(services.fca.search_firms(data.name))
-        discipline = None
         target = C.normalise_name(data.name)
+        firms = await _safe(services.fca.search_firms(data.name, want=lambda n: C.normalise_name(n) == target))
+        discipline = None
         # The Register's search is word-based; "REVOLUT LTD" can miss "Revolut Ltd" (live), so retry
         # once with the bare name before calling the firm not found.
         if isinstance(firms, list) and not any(C.normalise_name(f["name"]) == target for f in firms) \
                 and target and target != data.name.upper().strip():
-            again = await _safe(services.fca.search_firms(target.title()))
+            again = await _safe(services.fca.search_firms(target.title(),
+                                                          want=lambda n: C.normalise_name(n) == target))
             if isinstance(again, list):
                 firms = firms + again
         if isinstance(firms, list):

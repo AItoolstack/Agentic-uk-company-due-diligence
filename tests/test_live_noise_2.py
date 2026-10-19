@@ -77,3 +77,38 @@ def test_fca_search_retries_with_the_bare_name_and_lists_what_it_saw():
     nf = next(f for f in _check(_run(MONZO, services=s, cover_lines=["management_liability"]), "fca").findings
               if f.rule_id == "fca_not_found")
     assert nf.detail["register_names"] == ["Monzo Travel Ltd (FRN 1, Authorised)"]
+
+
+def test_fca_search_follows_the_registers_next_page_until_the_name_matches():
+    import asyncio
+
+    import httpx
+    base = "https://register.fca.org.uk/services/V0.1"
+    pages = {
+        1: {"Data": [{"Name": "Revolut Trading Ltd", "Reference Number": "832790", "Status": "No longer authorised"}],
+            "ResultInfo": {"page": "1", "Next": f"{base}/Search?q=REVOLUT+LTD&type=firm&pgnp=2"}},
+        2: {"Data": [{"Name": "Revolut Ltd", "Reference Number": "900562", "Status": "Authorised"}],
+            "ResultInfo": {"page": "2", "Next": f"{base}/Search?q=REVOLUT+LTD&type=firm&pgnp=3"}},
+        3: {"Data": [{"Name": "never read", "Reference Number": "3", "Status": ""}], "ResultInfo": {}},
+    }
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page = int(request.url.params.get("pgnp", "1"))
+        seen.append(page)
+        return httpx.Response(200, json=pages[page])
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            fca = FCARegister(client, "key", "a@b.c", base)
+            target = normalise_name("REVOLUT LTD")
+            return fca, await fca.search_firms("REVOLUT LTD", want=lambda n: normalise_name(n) == target)
+
+    fca, firms = asyncio.run(go())
+    assert [f["frn"] for f in firms] == ["832790", "900562"]
+    assert seen == [1, 2] and fca.last_result_info["pages_read"] == 2
+
+
+def test_fca_search_never_follows_a_link_off_the_register():
+    assert FCARegister._next_url({"Next": "https://evil.example/Search?q=x"}) == ""
+    assert FCARegister._next_url({"Next": "https://register.fca.org.uk/services/V0.1/Search?q=x&pgnp=2"})

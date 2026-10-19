@@ -15,7 +15,7 @@ Disciplinary history items: 'TypeofAction', 'EnforcementType', 'ActionEffectiveF
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
@@ -33,6 +33,7 @@ class FCARegister:
         self.email = email
         self.base_url = base_url.rstrip("/")
         self.fixtures = fixtures
+        self.last_result_info: dict[str, Any] = {}
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         if self.fixtures is not None:
@@ -49,13 +50,45 @@ class FCARegister:
         }
         return await get_json(self.client, SOURCE, f"{self.base_url}{path}", params=params, headers=headers)
 
-    async def search_firms(self, name: str) -> list[dict[str, str]]:
+    MAX_PAGES = 5
+
+    async def search_firms(self, name: str, want: Callable[[str], bool] | None = None) -> list[dict[str, str]]:
+        """The Register's search is fuzzy and paged ("REVOLUT LTD" puts Revolut Ltd past page 1, live).
+        Follow ResultInfo's next link up to MAX_PAGES, stopping early once a name matches `want`."""
         raw = await self._get("/Search", {"q": name, "type": "firm"})
         if raw is NOT_FOUND or not isinstance(raw, dict):
             return []
+        data = self._rows(raw)
+        self.last_result_info = raw.get("ResultInfo") or {}
+        pages = 1
+        while pages < self.MAX_PAGES and self.fixtures is None:
+            nxt = self._next_url(raw.get("ResultInfo"))
+            if not nxt or (want and any(want(o["name"]) for o in self._parse(data))):
+                break
+            raw = await get_json(self.client, SOURCE, nxt, headers={
+                "X-Auth-Email": self.email, "X-Auth-Key": self.api_key, "Accept": "application/json"})
+            if raw is NOT_FOUND or not isinstance(raw, dict):
+                break
+            data += self._rows(raw)
+            pages += 1
+        self.last_result_info = {**self.last_result_info, "pages_read": pages}
+        return self._parse(data)
+
+    @staticmethod
+    def _rows(raw: dict[str, Any]) -> list[dict[str, Any]]:
         data = raw.get("Data") or []
-        if isinstance(data, dict):
-            data = [data]
+        return [data] if isinstance(data, dict) else list(data)
+
+    @staticmethod
+    def _next_url(info: Any) -> str:
+        if not isinstance(info, dict):
+            return ""
+        nxt = info.get("Next") or info.get("next") or ""
+        # Only ever follow a link back to the Register itself.
+        return nxt if isinstance(nxt, str) and nxt.startswith("https://register.fca.org.uk/") else ""
+
+    @staticmethod
+    def _parse(data: list[dict[str, Any]]) -> list[dict[str, str]]:
         out = []
         for item in data:
             frn = str(item.get("Reference Number") or item.get("FRN") or "").strip()
