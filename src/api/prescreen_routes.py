@@ -210,6 +210,46 @@ async def changes_seen(company_number: str) -> dict:
     return {"ok": True}
 
 
+# ---------------------------------------------------------------------------
+# Agent review (src/agents_v2): specialist agents over the MCP server. They explain; the route stays the rules'.
+# ---------------------------------------------------------------------------
+
+@router.get("/agents/config")
+async def agents_config() -> dict:
+    from src.agents_v2.service import config as agent_config
+    return agent_config()
+
+
+@router.post("/{report_id}/agent-review")
+async def agent_review(report_id: str) -> dict:
+    """Run the agent layer on a saved report. Takes 20-90 seconds. Returns the review and its trace."""
+    from src.agents_v2.model import default_model, provider_key
+    from src.agents_v2.service import AgentLimit, agent_limit, run_agent_review
+    if await load_report(report_id) is None:
+        raise HTTPException(404, "Report not found.")
+    if not provider_key(os.environ.get("AGENT_PROVIDER", "openai")):
+        raise HTTPException(503, f"The agent model ({default_model()}) has no API key on this server.")
+    try:
+        agent_limit()
+    except AgentLimit as err:
+        raise HTTPException(429, str(err)) from err
+    return await run_agent_review(report_id=report_id, mcp_url=_agent_mcp_url())
+
+
+@router.get("/{report_id}/agent-runs")
+async def agent_runs(report_id: str, limit: int = 5) -> list[dict]:
+    return await get_store().list_agent_runs(report_id, limit=max(1, min(limit, 20)))
+
+
+def _agent_mcp_url() -> str:
+    """On the Space the agents reach the pre-screen over real HTTP MCP, through the same /mcp endpoint an outside
+    client uses (and the same access token). Elsewhere, in-process unless AGENT_MCP_URL is set."""
+    url = os.environ.get("AGENT_MCP_URL", "")
+    if not url and os.environ.get("SPACE_HOST"):
+        url = f"http://127.0.0.1:{os.environ.get('PORT', '7860')}/mcp"
+    return url
+
+
 @router.get("/{report_id}")
 async def get_report(report_id: str) -> dict:
     payload = await load_report(report_id)

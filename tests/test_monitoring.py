@@ -182,3 +182,23 @@ def test_store_fallback_doesnt_hide_ordinary_bugs(tmp_path):
     except KeyError:
         pass
     assert store.kind == "postgres"
+
+
+@pytest.mark.parametrize("which", ["files", "postgres"])
+def test_agent_runs_round_trip(tmp_path, which):
+    stores = {s.kind: s for s in _stores(tmp_path)}
+    if which not in stores:
+        pytest.skip("no TEST_PG_DSN")
+    store = stores[which]
+
+    async def go():
+        r = _report(number=f"ZZ{uuid.uuid4().int % 10**6:06d}")
+        await store.save_report(r)
+        for i, when in enumerate(("2026-10-19T08:00:00+00:00", "2026-10-19T09:00:00+00:00")):
+            await store.save_agent_run({"run_id": uuid.uuid4().hex[:16], "report_id": r["report_id"], "created_at": when,
+                                        "model": "gpt-6-luna", "status": "ok", "n": i,
+                                        "trace": {"totals": {"cost_usd": 0.0012, "wall_ms": 12000}}})
+        runs = await store.list_agent_runs(r["report_id"])
+        assert [x["n"] for x in runs] == [1, 0], "newest first"
+        assert await store.list_agent_runs("../etc") == []
+    asyncio.run(go())

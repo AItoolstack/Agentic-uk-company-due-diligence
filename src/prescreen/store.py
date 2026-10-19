@@ -43,6 +43,8 @@ class Store(Protocol):
     async def list_changes(self, limit: int = 30, number: str | None = None) -> list[dict[str, Any]]: ...
     async def mark_seen(self, number: str) -> None: ...
     async def purge(self) -> int: ...
+    async def save_agent_run(self, run: dict[str, Any]) -> None: ...
+    async def list_agent_runs(self, report_id: str, limit: int = 5) -> list[dict[str, Any]]: ...
 
 
 def _summary(payload: dict[str, Any], decisions: list[dict[str, Any]]) -> dict[str, Any]:
@@ -171,6 +173,18 @@ class FileStore:
     async def purge(self) -> int:
         return 0  # local files: nothing to enforce
 
+    async def save_agent_run(self, run: dict[str, Any]) -> None:
+        self._write(self.base / "agent_runs" / run["report_id"] / f"{run['run_id']}.json", run)
+
+    async def list_agent_runs(self, report_id: str, limit: int = 5) -> list[dict[str, Any]]:
+        if not REPORT_ID.fullmatch(report_id or ""):
+            return []
+        folder = self.base / "agent_runs" / report_id
+        if not folder.exists():
+            return []
+        runs = [self._read(f, None) for f in folder.glob("*.json")]
+        return sorted([r for r in runs if r], key=lambda r: r.get("created_at", ""), reverse=True)[:limit]
+
 
 # ---------------------------------------------------------------------------
 # Postgres (Supabase)
@@ -293,6 +307,21 @@ class PgStore:
     async def purge(self) -> int:
         row = await self._exec("select purge_expired_reports() as n", (), "one")
         return int(row["n"]) if row else 0
+
+    async def save_agent_run(self, run: dict[str, Any]) -> None:
+        t = (run.get("trace") or {}).get("totals") or {}
+        await self._exec(
+            "insert into agent_runs (id, report_id, created_at, model, status, cost_usd, wall_ms, payload) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s) on conflict (id) do nothing",
+            (run["run_id"], run["report_id"], run["created_at"], run.get("model", ""), run.get("status", ""),
+             t.get("cost_usd", 0), t.get("wall_ms", 0), self._j(run)))
+
+    async def list_agent_runs(self, report_id: str, limit: int = 5) -> list[dict[str, Any]]:
+        if not REPORT_ID.fullmatch(report_id or ""):
+            return []
+        rows = await self._exec("select payload from agent_runs where report_id = %s order by created_at desc "
+                                "limit %s", (report_id, limit), "all")
+        return [r["payload"] for r in rows]
 
     @staticmethod
     def _iso(row: dict[str, Any]) -> dict[str, Any]:

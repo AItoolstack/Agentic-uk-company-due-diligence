@@ -262,6 +262,28 @@ details.rest>.groups{margin-top:12px}
 .gsec>header .aside{font-size:12.5px}
 .grow{display:grid;grid-template-columns:18px minmax(0,1fr);gap:9px;padding:10px 18px;border-top:1px solid var(--rule);font-size:14px;scroll-margin-top:90px}
 .panel>header+.grow{border-top:0}
+/* Agent review */
+.agents .intro{font-size:13.5px;color:var(--muted);margin:0 0 12px;max-width:68ch}
+.agents .plan{font-size:13.5px;margin:0 0 4px}
+.agents .plan .not{color:var(--muted)}
+.asec{border-top:1px solid var(--rule);padding:14px 18px}
+.asec h3{font-size:14px;margin:0 0 4px;font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.asec .by{font-size:12px;color:var(--muted);font-weight:400}
+.asec .txt{white-space:pre-wrap;font-size:14px;line-height:1.55;margin:6px 0 0;max-width:72ch}
+.asec .txt.email{font-family:var(--mono);font-size:13px;background:var(--wash);border:1px solid var(--rule);border-radius:8px;padding:12px}
+.chip{font-size:11.5px;border-radius:999px;padding:2px 8px;border:1px solid var(--rule);color:var(--muted);font-weight:500}
+.chip.ok{color:var(--live);background:var(--live-bg);border-color:transparent}
+.chip.blocked{color:var(--out);background:var(--out-bg);border-color:var(--out-line)}
+.chip.error{color:var(--refer);background:var(--refer-bg);border-color:var(--refer-line)}
+.asec .withheld{font-size:13.5px;color:var(--out);margin:6px 0 0}
+.tracebar{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--muted);padding:12px 18px;border-top:1px solid var(--rule);font-family:var(--mono)}
+.tracebar b{color:var(--ink);font-weight:500}
+.spans{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)}
+.spans td,.spans th{padding:4px 8px;border-top:1px solid var(--rule);text-align:left;white-space:nowrap}
+.spans th{font-weight:500;color:var(--muted)}
+.spans tr.bad td{color:var(--out)}
+.agents details.tr{padding:0 18px 14px}
+.agents details.tr summary{cursor:pointer;font-size:13px;color:var(--accent);padding:4px 0}
 .grow b{font-weight:600}
 .grow .s{color:var(--ink2)}
 .grow .up{font-size:13px;margin-left:6px}
@@ -921,6 +943,9 @@ ${pvrGiven.length ? `<section class="panel" id="pvr" style="scroll-margin-top:90
           ${aside.length ? `<h4>Before this company took its name: probably a different business, but worth a look</h4>${aside.map(m => newsItem(m, "set-aside")).join("")}` : ""}
         </section>` : ""}
 
+        <section class="panel agents" id="agent-review"><header><h2>Agent review</h2><span class="aside">specialist agents over the MCP server: they explain, the rules decide</span></header>
+          <div id="agent-out"><div class="body"><span class="aside">Loading…</span></div></div></section>
+
         <div class="foot"><span>Report <span class="mono">${esc(r.report_id)}</span>, ${esc(new Date(r.created_at).toLocaleString("en-GB"))}, ${esc(r.elapsed_seconds)}s, ${r.llm_calls} model call${r.llm_calls === 1 ? "" : "s"}</span>
           <span>Rules ${esc(r.rules_version)}: draft thresholds. A recommendation only.</span></div>
       </div>
@@ -930,7 +955,63 @@ ${pvrGiven.length ? `<section class="panel" id="pvr" style="scroll-margin-top:90
   $("#prop-rail").appendChild(PROP);
   placeRail();
   wireReport(r, qs);
+  loadAgentRuns(r);
   window.scrollTo({top: 0});
+}
+
+// ---------------------------------------------------------------------------
+// Agent review
+// ---------------------------------------------------------------------------
+const AGENT_INTRO = `<p class="intro">Agents read this case through the same MCP tools an outside client would use. They can't change the route or record a decision, and a guardrail checks everything they write before it shows here.</p>`;
+const AGENT_NAME = {director_history: "Directors' other companies", news: "News", broker_email: "Email to the broker"};
+async function loadAgentRuns(r) {
+  const out = $("#agent-out"); if (!out) return;
+  let runs = [], cfg = {};
+  try { [runs, cfg] = await Promise.all([api(`/api/prescreen/${r.report_id}/agent-runs?limit=1`), api("/api/prescreen/agents/config")]); } catch (e) {}
+  out.innerHTML = runs.length ? renderAgentRun(runs[0], cfg) : `<div class="body">${AGENT_INTRO}${agentButton(cfg)}</div>`;
+  wireAgentButton(r, cfg);
+}
+function agentButton(cfg, again) {
+  if (cfg && cfg.available === false) return `<p class="aside">Agents aren't set up on this server (no key for ${esc(cfg.model || "the model")}).</p>`;
+  return `<div class="acts" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn ${again ? "quiet small" : ""}" id="agent-run">${again ? "Run again" : "Run agent review"}</button>
+    <span class="aside" id="agent-msg">${again ? "" : `${esc(cfg.model || "")}, usually 20–60 seconds and under a cent`}</span></div>`;
+}
+function wireAgentButton(r, cfg) {
+  const b = $("#agent-run"); if (!b) return;
+  b.onclick = async () => {
+    b.disabled = true; const m = $("#agent-msg"); if (m) m.textContent = "Agents are working. This takes 20–60 seconds…";
+    try { const run = await api(`/api/prescreen/${r.report_id}/agent-review`, {method: "POST"}); $("#agent-out").innerHTML = renderAgentRun(run, cfg); wireAgentButton(r, cfg); }
+    catch (e) { b.disabled = false; if (m) m.textContent = e.message; }
+  };
+  document.querySelectorAll(".copy-email").forEach(btn => btn.onclick = () => copyText(btn, btn.dataset.text));
+}
+function renderAgentRun(run, cfg) {
+  const v = run.review || {}, plan = v.plan || {}, t = (run.trace || {}).totals || {};
+  if (v.stopped) return `<div class="body"><p class="msg err">${esc(v.stopped)}</p>${agentButton(cfg, true)}</div>`;
+  const ran = (plan.run || []).map(n => AGENT_NAME[n] || n);
+  const notRun = Object.entries(plan.not_run || {}).concat(Object.entries(plan.dropped || {}));
+  const secs = (v.sections || []).map(x => {
+    const g = x.guardrail || {};
+    const chip = x.status === "ok" ? `<span class="chip ok">${icon("tick")} checked: ${esc(g.checked_by || "rules")}</span>`
+      : x.status === "blocked" ? `<span class="chip blocked">withheld by the guardrail</span>` : `<span class="chip error">didn't finish</span>`;
+    const email = x.agent === "broker_email";
+    return `<div class="asec"><h3>${esc(AGENT_NAME[x.agent] || x.title)} ${chip}${x.revisions ? `<span class="by">rewritten ${x.revisions}× after the guardrail blocked a draft</span>` : ""}</h3>
+      <div class="by">${esc(x.agent)} agent, ${x.steps} tool call${x.steps === 1 ? "" : "s"}${email ? ", for the broker: read before sending" : ", internal"}</div>
+      ${x.status === "ok" ? `<div class="txt ${email ? "email" : ""}">${esc(x.text)}</div>${email ? `<button class="btn quiet small copy-email" style="margin-top:8px" data-text="${esc(x.text)}">Copy email</button>` : ""}`
+        : x.status === "blocked" ? `<p class="withheld">Not shown: ${esc(x.withheld_reason || "")}</p>` : `<p class="withheld">${esc(x.error || "")}</p>`}</div>`;
+  }).join("");
+  const spans = (run.trace || {}).spans || [];
+  return `<div class="body">${AGENT_INTRO}<p class="plan">${ran.length ? `Ran: ${esc(ran.join(", "))}.` : "No specialist had anything to work on."} <span class="aside">Planned by ${esc(plan.planned_by || "rules")}.</span></p>
+    ${notRun.length ? `<p class="plan not">${notRun.map(([n, why]) => `${esc(AGENT_NAME[n] || n)}: ${esc(why)}`).join("<br>")}</p>` : ""}
+    <p class="plan not">Route unchanged: ${esc(ROUTE[v.route] || v.route)}. ${(v.couldnt_check || []).length} check${(v.couldnt_check || []).length === 1 ? "" : "s"} couldn't run and stay unchecked.</p>
+    </div>${secs}
+    <div class="tracebar"><span><b>${t.model_calls}</b> model calls</span><span><b>${t.tool_calls}</b> MCP tool calls</span><span><b>${(t.input_tokens || 0).toLocaleString("en-GB")}</b> in / <b>${(t.output_tokens || 0).toLocaleString("en-GB")}</b> out tokens</span>
+      <span><b>$${(t.cost_usd || 0).toFixed(4)}</b></span><span><b>${((t.wall_ms || 0) / 1000).toFixed(1)}s</b></span><span>${esc(run.model)} · MCP ${esc(run.transport)}</span><span>${esc(new Date(run.created_at).toLocaleString("en-GB"))}</span></div>
+    <details class="tr"><summary>Trace: every call, in order</summary><div class="tablewrap"><table class="spans"><thead><tr><th>#</th><th>agent</th><th>kind</th><th>call</th><th>ms</th><th>tokens in/out</th><th>$</th><th></th></tr></thead><tbody>
+    ${spans.map(sp => `<tr class="${sp.ok === false || sp.passed === false ? "bad" : ""}"><td>${sp.seq}</td><td>${esc(sp.agent)}</td><td>${esc(sp.kind)}</td><td>${esc(sp.name)}</td><td>${sp.ms}</td>
+      <td>${sp.kind === "model" ? `${sp.input_tokens || 0}/${sp.output_tokens || 0}` : sp.bytes ? `${sp.bytes} B` : ""}</td><td>${sp.cost_usd ? sp.cost_usd.toFixed(5) : ""}</td>
+      <td>${esc(sp.refused ? "refused: not on allowlist" : sp.error ? sp.error : sp.kind === "guardrail" ? (sp.passed ? "passed" : "blocked: " + (sp.violations || []).join(", ")) : "")}</td></tr>`).join("")}
+    </tbody></table></div></details><div class="body" style="padding-top:0">${agentButton(cfg, true)}</div>`;
 }
 
 // On narrow screens the rail goes straight after the verdict, so the decision isn't 8,000px down.
