@@ -259,3 +259,69 @@ over HTTP (connect, find_company 0.2 s, prescreen_company 0.06 s on demo data), 
 broker_questions section 1.8 KB. Live numbers follow.
 
 **Tests:** 33 new (agents) + 2 (agent-run storage, files and Postgres). Suite 214.
+
+## Step 2, live: nine real companies through the agents (19 Oct, 20:50–21:30)
+
+On the Space, `gpt-6-luna` for every agent and the judge, agents reaching the pre-screen over HTTP MCP
+(`127.0.0.1:7860/mcp`, same access token as any client). Saved live reports, run one after another.
+
+**First run broke, and the trace couldn't say why.** Monzo's director-history agent made four good tool calls
+(two `company_record`, two `gazette_notices`), then three model calls with no usable answer, then gave up
+("the agent didn't give a final answer"). The loop only accepted `{"final": {...}}`, and an unusable turn
+left no trace of what the model *had* said. Fix: accept the common drift (final as a list or a JSON string,
+the answer's own keys with no wrapper, a tool call with no `call` wrapper), and record any other reply as a
+trace note with its keys and a preview. Tested with a scripted drifting agent. Re-run: Monzo finished.
+Lesson: **a trace that records only successes can't explain a failure.** Log the shape of what you rejected.
+
+**The batch (after the fix):**
+
+| Company | Route (rules) | Agents run | Model / MCP calls | Tokens in / out | Cost | Time | Guardrail |
+|---|---|---|---|---|---|---|---|
+| Monzo | refer | directors, email | 11 / 6 | 27.4k / 1.7k | $0.0036 | 27.8 s | 1 rewrite (judge) |
+| Wilko | refer | email | 3 / 2 | 3.0k / 0.2k | $0.0004 | 7.4 s | – |
+| Thames Water | refer | directors, news, email | 16 / 9 | 56.9k / 3.3k | $0.0074 | 49.5 s | 1 rewrite (judge) |
+| Carillion | outside appetite | news, email | 8 / 3 | 17.0k / 1.9k | $0.0027 | 26.5 s | 1 rewrite (judge) |
+| BrewDog | outside appetite | news, email | 6 / 3 | 11.1k / 1.1k | $0.0017 | 16.8 s | – |
+| Tesco | refer | directors, email | 7 / 4 | 9.2k / 0.8k | $0.0013 | 14.9 s | – |
+| Revolut | refer | news, email | 6 / 3 | 8.2k / 0.7k | $0.0012 | 15.8 s | – |
+| Greggs | note | email | 3 / 2 | 1.8k / 0.2k | $0.0003 | 6.8 s | – |
+| Linklaters | refer | email | 5 / 2 | 5.4k / 0.5k | $0.0008 | 14.1 s | 1 rewrite (judge) |
+| **9 runs** | **unchanged in 9/9** | 16 sections | **65 / 34** | 140k / 10.5k | **$0.019** | median 15.8 s, max 49.5 s | 4 rewrites, 0 withheld |
+
+Per agent: director history 17 calls ($0.0073), judge 20 calls ($0.0058, **30% of spend**), news 9 ($0.0033),
+email 10 ($0.0016), supervisor 9 ($0.0013). Median MCP call over HTTP: 1.5 s (live sources behind it).
+No cached tokens, no rejected parameters; every call served by `gpt-6-luna`. The supervisor dropped nothing:
+with eligibility already in code, every eligible specialist was worth running.
+
+**What the guardrail caught (all four by the model judge; the code rules fired zero times live):**
+1. *Monzo, directors.* Draft: "the record does not show whether she was still in post near the administration
+   notice". The record did: Burbidge left SYMBIOCO in May 2022; the notice was Dec 2025. Rewrite: "she was not in
+   post". The judge made the text *more* accurate, not just safer.
+2. *Thames Water, directors.* "two holding companies", inferred from the names (HAYA HOLDCO). Not in the record. Removed.
+3. *Carillion, news.* "a former Carillion chief executive was fined"; the result only said "ex-boss". Narrowed.
+4. *Linklaters, email.* "the board" for an LLP. LLPs have members, not a board. Removed.
+
+Honest reading: the code rules guard known failure modes (they pass 20+ scripted attacks in tests); on real
+output the risk was subtler, and the judge found it. Rules are cheap insurance; the judge is where the
+quality came from, at 30% of the cost.
+
+**Things the agents exposed in the core, logged for a human decision (no rule changed):**
+- *Director-link rule over-counts.* For a linked company in a *current* insolvency status, the event date is
+  unknown, so any director in post in the 5-year window counts. Burbidge left SYMBIOCO 3.5 years before its
+  administration notice and still counted towards Monzo's refer. The agent's narrative made that visible.
+- *LLP wording.* Broker questions say "directors" for an LLP (Linklaters); should be "members".
+- *Step budget.* Thames Water's director agent spent its 6 calls on De Brunner's four companies; the other two
+  directors' companies weren't looked up. It said so plainly ("No company record … was provided"), which is
+  the right failure, but a budget per director (or parallel lookups) would close it.
+
+**Not tested live:** a compliance hold. None of the live companies is on one, so the "broker email never
+starts" path is proven on demo data only (0 model calls, 0 cost).
+
+**The comparison so far** (old graph numbers from 01):
+| | Old LangGraph agent graph | Rules + 1 call (pre-screen) | Pre-screen + agent layer |
+|---|---|---|---|
+| Model calls | 8–11, deciding the outcome | 1 (news read) | 1 + 3–16, explaining only |
+| Who sets the route | the agents | written rules | written rules (unchanged 9/9) |
+| "Couldn't check" | became "clean" | shown, never clear | shown; agents blocked from calling it clear |
+| Cost per case | – | ~$0 (Groq free tier) | $0.0003–$0.0074 extra |
+| Extra time | – | 10–60 s | 7–50 s |
