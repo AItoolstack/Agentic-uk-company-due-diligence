@@ -228,7 +228,8 @@ async def eval_legacy(body: dict) -> dict:
     except AgentLimit as err:
         raise HTTPException(429, str(err)) from err
     return await run_legacy(query, provider=str(body.get("provider") or ""), model=str(body.get("model") or ""),
-                            fast_model=str(body.get("fast_model") or ""))
+                            fast_model=str(body.get("fast_model") or ""),
+                            structured_method=str(body.get("structured_method") or ""))
 
 
 @router.get("/agents/config")

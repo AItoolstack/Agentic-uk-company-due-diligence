@@ -65,7 +65,11 @@ _METER: ContextVar[CallMeter | None] = ContextVar("legacy_call_meter", default=N
 register_configure_hook(_METER, inheritable=True)
 
 
-async def run_legacy(query: str, provider: str = "", model: str = "", fast_model: str = "") -> dict[str, Any]:
+async def run_legacy(query: str, provider: str = "", model: str = "", fast_model: str = "",
+                     structured_method: str = "") -> dict[str, Any]:
+    """structured_method="function_calling" gives the old graph its best shot on OpenAI: two of its schemas
+    (SourceSelectionOutput, EvidenceCritiqueOutput) are rejected by OpenAI's strict json_schema mode, which is
+    a porting problem, not an architecture one. Found on the first eval run (Greggs, 19 Oct)."""
     from src import llm as llm_module
     from src.api.routes import get_research_graph
     from src.config import settings
@@ -75,6 +79,7 @@ async def run_legacy(query: str, provider: str = "", model: str = "", fast_model
         saved = (settings.chat_model_provider, settings.chat_model, settings.chat_model_fast,
                  settings.openai_temperature)
         meter = CallMeter()
+        patched = None
         token = _METER.set(meter)
         try:
             if provider or model:
@@ -84,6 +89,13 @@ async def run_legacy(query: str, provider: str = "", model: str = "", fast_model
                 if settings.chat_model_provider == "openai":
                     settings.openai_temperature = None  # newer OpenAI models reject temperature
             llm_module.get_llm.cache_clear()
+            if structured_method:
+                from langchain_openai import ChatOpenAI
+                patched = ChatOpenAI.with_structured_output
+
+                def with_method(self, schema=None, *, method=None, **kw):  # noqa: ANN001
+                    return patched(self, schema, method=method or structured_method, **kw)
+                ChatOpenAI.with_structured_output = with_method
             t0 = time.perf_counter()
             error = ""
             state: dict[str, Any] = {}
@@ -93,6 +105,9 @@ async def run_legacy(query: str, provider: str = "", model: str = "", fast_model
                 error = f"{type(err).__name__}: {str(err)[:400]}"
             elapsed = time.perf_counter() - t0
         finally:
+            if structured_method and patched is not None:
+                from langchain_openai import ChatOpenAI
+                ChatOpenAI.with_structured_output = patched
             _METER.reset(token)
             (settings.chat_model_provider, settings.chat_model, settings.chat_model_fast,
              settings.openai_temperature) = saved
@@ -103,7 +118,7 @@ async def run_legacy(query: str, provider: str = "", model: str = "", fast_model
     return {
         "query": query,
         "model": {"provider": provider or saved[0], "quality": model or saved[1],
-                  "fast": fast_model or model or saved[2]},
+                  "fast": fast_model or model or saved[2], "structured_method": structured_method or "default"},
         "elapsed_seconds": round(elapsed, 2),
         "crash": error,
         "brief": brief.model_dump(mode="json") if brief is not None else None,
