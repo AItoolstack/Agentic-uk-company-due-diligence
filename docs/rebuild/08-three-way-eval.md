@@ -28,7 +28,7 @@ the correction is recorded in the file. **Scores** with quoted evidence: `eval/s
 |---|---|---|---|
 | Right company number | 9/9 | 9/9 | 9/9 |
 | Status correct | 9/9 | 9/9 | 9/9 |
-| Key facts found (9 in all) | **3 of 9** (4 half-found) | **9 of 9** | 9 of 9 (from P) |
+| Key facts found (9 in all) | **3 of 9** (1 found + 4 half-found) | **9 of 9** | 9 of 9 (from P) |
 | Outcome in the expected band | 8/9 (Tesco: refer on 2018 notices) | 9/9 | 9/9, route unchanged 9/9 |
 | Wrong statements | **6** | 1 | 0 added; caught P's 1 |
 | A check that didn't run, presented as clear | 2 (+ sanctions never ran, 9/9) | 0 | 0 |
