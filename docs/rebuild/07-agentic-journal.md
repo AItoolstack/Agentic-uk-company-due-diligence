@@ -174,3 +174,31 @@ the Supabase MCP connector) named the cause each time in one query.
 Note the pattern: the coverage invariant did its job. Sanctions failing showed as "couldn't check",
 never as "clear". The cost was a Refer on every case — noisy, but safe. That's the trade-off the design
 chose on purpose, and the live run is the evidence for it.
+
+## Second live batch: from "wrong" to "noisy" (19 Oct, 00:30–01:30)
+
+Ten real companies on rules draft-2026-10-19a. Nothing was *wrong* any more; the theme was the
+**same fact said twice**, or a question that no longer mattered. Each fix has a test in
+`tests/test_live_noise.py` / `test_live_noise_2.py`, and none changes a route.
+
+| Company | Noise | Fix (rules 19b / 19c) |
+|---|---|---|
+| Thames Water | Three director lines, one each, as three reasons | One reason: "3 directors … (6 in all): De Brunner (4), …" |
+| Monzo | FCA fine as a reason, then news of the same fine as a second reason; 7 broker questions | News of an FCA action already found is a note; questions capped at 5, notes only fill spare places |
+| Carillion | "Why are accounts overdue?" for a company in liquidation since 2018 | Ended company keeps only the questions that still matter |
+| Wilko | "Dormant but trading" and "trade doesn't match SIC" as two reasons | One reason, one question |
+| BrewDog | One administration = case on record + two Gazette notices, one named "Gazette: BREWDOG PLC" | Gazette notices back up an insolvency on record instead of adding reasons; a notice is never named after the company |
+| Tesco | 2017 accounting fine as a Refer in 2026; a shoplifter in a Tesco store as adverse news | Serious news older than 5 years is a note (`media_old`); prompt: a victim or bystander isn't adverse |
+| Greggs | Summary "nothing adverse" above a job-cuts finding | Summary built from the findings |
+| Revolut | "Not on the FCA Register" for an EMI that is | See below |
+
+**Revolut, a debugging story worth its own post.** The check said no Register firm had the exact name.
+The engine can't tell you why; the MCP server can. Calling `fca_firm_search` on the live endpoint from
+the browser showed 15 fuzzy matches (Revolution Scooters, Skinny Revolution…) and no Revolut Ltd.
+Second call, with paging info exposed in the tool's output: `total_count: 87`, `per_page: 20`, and a
+`Next` link. Fix: follow `Next` (Register host only). Third call: found "Revolut Ltd" on page 2,
+but FRN 975775, an *appointed representative*. Stopping at the first exact name would have turned
+"not found" into "not authorised", which is worse. Final fix: keep paging until an *authorised* record
+with that exact name turns up (page 4: FRN 900562, Registered), and prefer it.
+Lessons: (1) the MCP tools double as a live debugging console for the agent that built them;
+(2) "exact name match" is not identity; a name can belong to several Register records.

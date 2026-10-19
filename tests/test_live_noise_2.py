@@ -121,3 +121,13 @@ def test_authorised_record_wins_when_several_share_the_name():
     firms = [{"name": "Revolut Ltd", "frn": "975775", "status": "Appointed representative"},
              {"name": "Revolut Ltd", "frn": "900562", "status": "Authorised"}]
     assert best_fca_match(firms, "REVOLUT LTD")["frn"] == "900562"
+
+
+def test_collapse_news_is_not_a_reason_once_the_company_is_shown_as_insolvent():
+    insolvent = _c("status", _f("company_insolvent", Route.OUTSIDE_APPETITE, "Company is in liquidation."))
+    collapse = _c("media", _f("media_high", Route.REFER, "collapse news", categories=["insolvency_or_distress"]))
+    fraud = _c("media", _f("media_high", Route.REFER, "fraud news",
+                           categories=["fraud_or_financial_crime", "insolvency_or_distress"]))
+    assert decide([insolvent, collapse]) == (Route.OUTSIDE_APPETITE, ["Company is in liquidation."])
+    assert "fraud news" in decide([insolvent, fraud])[1]
+    assert decide([collapse])[1] == ["collapse news"]

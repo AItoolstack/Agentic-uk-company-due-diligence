@@ -317,6 +317,7 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
             if c.check_id == "media" and c.status == CheckStatus.FLAG and not any(
                     f.route != Route.NOTE for f in c.findings):
                 c.status = CheckStatus.INFO
+                c.summary = " ".join(f.text for f in c.findings)
 
     for c in results:
         c.group = casefile.group_of(c.check_id)

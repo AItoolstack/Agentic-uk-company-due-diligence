@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from src.prescreen.models import CheckResult, CheckStatus, Route
 
-RULES_VERSION = "draft-2026-10-19c"
+RULES_VERSION = "draft-2026-10-19d"
 
 THRESHOLDS = {
     # Company age
@@ -76,6 +76,11 @@ def decide(checks: list[CheckResult]) -> tuple[Route, list[str]]:
                 continue
             # Same fact twice (Wilko, live): "dormant but trading" already says the SIC doesn't fit.
             if f.rule_id == "trade_mismatch" and "dormant_but_trading" in all_ids:
+                continue
+            # News of the collapse of a company already shown as closed or insolvent is the same fact
+            # (Carillion, BrewDog, live). Other serious news (fraud, a fine) still counts.
+            if ended and f.rule_id == "media_high" and \
+                    set(f.detail.get("categories") or ["?"]) <= {"insolvency_or_distress"}:
                 continue
             # Gazette notices are evidence for an insolvency already on record, not new reasons (BrewDog, live).
             if f.rule_id == "gazette_insolvency_notice" and all_ids & {"insolvency_history", "company_insolvent"}:
