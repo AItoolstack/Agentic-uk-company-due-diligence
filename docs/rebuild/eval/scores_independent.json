@@ -1,0 +1,692 @@
+{
+ "_about": "Independent blind rescore, 19 Oct 2026, by a separate Claude evaluator subagent (Opus 5.5) that did not build the system. Method: read ground_truth.json and the scores.json '_about' rubric only, then scored from raw Supabase payloads (eval_runs.payload.brief for G; reports.payload checks/route/media for P; agent_runs.payload.review sections/guardrail for A) via read-only SELECTs. scores.json, 08-three-way-eval.md and 07-agentic-journal.md were not opened before this file was written. Conventions: hedged accurate statements are not wrong; hedged inaccurate statements are wrong; risk-matrix judgements are not counted as factual statements; G band follows the rubric (critical=decline, high/medium + referral triggers=refer, low=note). Facts outside the payloads (e.g. the Revolut €3.5m fine being Revolut Bank UAB / Bank of Lithuania, SIC 62090 meaning) come from my own knowledge and are flagged as such.",
+ "totals": {
+  "G": {
+   "identity": 9,
+   "status": 9,
+   "key_facts": "2.0/9",
+   "band": 8,
+   "wrong": 4,
+   "gap_as_clear": 0,
+   "defaulted": 0
+  },
+  "P": {
+   "identity": 9,
+   "status": 9,
+   "key_facts": "9/9",
+   "band": 9,
+   "wrong": 2,
+   "gap_as_clear": 1,
+   "defaulted": 0
+  },
+  "A": {
+   "route_kept": 9,
+   "identity": 9,
+   "status": 9,
+   "key_facts": "9/9",
+   "band": 9,
+   "wrong_total": 3,
+   "wrong_added_by_agents": 1,
+   "minor_wrong_added": 2,
+   "gap_as_clear": 1,
+   "caught_p_errors": "0 full, 1 partial (Revolut €3.5m entity)"
+  }
+ },
+ "companies": [
+  {
+   "name": "Monzo Bank Limited",
+   "number": "09446231",
+   "G": {
+    "run_id": "122ce21cb915c5a3",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0.5,
+    "key_facts_of": 2,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "Regulatory: 'FCA status is “unknown”, no FRN is recorded' -> FCA-authorised fact missed (0).",
+     "Fine: '£21,091,300 for inadequate financial-crime controls' - amount, no date -> 0.5.",
+     "overall_risk_level high + referral triggers -> refer.",
+     "PSC 'internally inconsistent' (Total 1 / Corporate 3) is a feed artefact; stated as about the feed, not counted wrong but drives governance_risk 'high'."
+    ]
+   },
+   "P": {
+    "run_id": "9f9dbe9d3eb74d87",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 2,
+    "key_facts_of": 2,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'MONZO BANK LIMITED, FRN 730427: Authorised.'",
+     "'FCA action in the last 5 years: fine, 07 Jul 2025'; media finding: 'FCA fines Monzo £21m'",
+     "route refer"
+    ]
+   },
+   "A": {
+    "run_id": "e7d660f727aa0d9a",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 0,
+    "minor_wrong_added": 0,
+    "caught_p_error": 0,
+    "gap_as_clear_inherited_from_P": 0,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "Route refer = P.",
+     "Guardrail blocked own plural error: 'evidence identifies only one insolvent company'.",
+     "director_history: 'records provided do not give his resignation date' - mild challenge to P's 'in post when it began', not a demonstrated P error."
+    ]
+   }
+  },
+  {
+   "name": "Wilko Limited",
+   "number": "09563205",
+   "G": {
+    "run_id": "7a49c19aeef02b02",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 1,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "No mention of SIC 99999 / micro-entity -> 0.",
+     "Wrong: 'The stated latest date [2026-09-24] is later than the current assessment date' - false (run date 2026-10-19).",
+     "Trap: hedged ('does not establish that this is the same legal entity'), so not counted wrong, but refer and financial_risk 'high' rest on the other entity's collapse: band right for the wrong reason."
+    ]
+   },
+   "P": {
+    "run_id": "1dba30b263f548cf",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 1,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'Filed as dormant (or SIC 99999), but the proposal describes a trading business.'",
+     "'last accounts were micro-entity (turnover limit £1,000,000)'",
+     "Trap avoided: 'Renamed from THE RANGE FINANCE LIMITED on 06 Nov 2023. News ... before that date is about a different company.'"
+    ]
+   },
+   "A": {
+    "run_id": "56c9cce00dc08acf",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 1,
+    "minor_wrong_added": 0,
+    "caught_p_error": 0,
+    "gap_as_clear_inherited_from_P": 0,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "Wrong added: broker email 'WILKO LIMITED files as dormant' - drops P's '(or SIC 99999)' hedge; ground truth explicitly corrected this (accounts are micro-entity). Sent to an external audience; guardrail passed it."
+    ]
+   }
+  },
+  {
+   "name": "Thames Water Utilities Limited",
+   "number": "02366661",
+   "G": {
+    "run_id": "a462eadb5748b1b0",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0.5,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'notice of a decision to impose a financial penalty; the specific outcome and amounts are not supplied' - Ofwat penalty without amount or date. Gave 0.5; arguably 0 since both date and amount are missing and it is only a proposed decision.",
+     "high + referral triggers -> refer."
+    ]
+   },
+   "P": {
+    "run_id": "5e86bd42914d4ee6",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 1,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'latest 2025-06-19: Thames Water hit with record £123 million fine by Ofwat'",
+     "route refer (director link + regulatory news). Media mislabels debt restructuring as 'operational_incident' - a label, not counted."
+    ]
+   },
+   "A": {
+    "run_id": "766d23790cc31032",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 0,
+    "minor_wrong_added": 0,
+    "caught_p_error": 0,
+    "gap_as_clear_inherited_from_P": 0,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "news: 'Ofwat reported that it fined Thames Water nearly £123m following two investigations.'",
+     "Guardrail blocked own date error ('about seven weeks before the notice, not one month')."
+    ]
+   }
+  },
+  {
+   "name": "Carillion PLC",
+   "number": "03782379",
+   "G": {
+    "run_id": "cf64ee5f09fe164d",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0.5,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'in liquidation ... does not specify the liquidation date' -> 0.5.",
+     "critical -> decline.",
+     "'No overdue accounts or confirmation statements are specifically reported' (P: accounts overdue 3033 days) - hedged ('does not establish whether ... overdue'), not counted as gap_as_clear.",
+     "Phoenix 1.00 / fraud_risk 'high' from Cochrane '32 of 50 dissolved/failed' conflates solvent dissolutions with failures (P counts 0 insolvent links); hedged, not counted."
+    ]
+   },
+   "P": {
+    "run_id": "bdc92629b8534da5",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 1,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'compulsory liquidation (petitioned on 2018-01-15, wound up on 2018-01-15)'",
+     "outside_appetite -> decline.",
+     "Weakness: counts KPMG's 2023 audit fine and 'Philip Green was a Number 10 adviser' as adverse regulatory news 'about this company' - category noise, not counted."
+    ]
+   },
+   "A": {
+    "run_id": "01e83cb9d9b0f45c",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 0,
+    "minor_wrong_added": 0,
+    "caught_p_error": 0,
+    "gap_as_clear_inherited_from_P": 0,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "news: 'KPMG was fined £21m for poor auditing of Carillion' - accurate; did not flag P's mis-categorised items."
+    ]
+   }
+  },
+  {
+   "name": "BrewDog PLC",
+   "number": "SC311560",
+   "G": {
+    "run_id": "3df47db73e0a8e0e",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0.5,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'BREWDOG PLC (SC311560) is reported as in administration' - no date -> 0.5.",
+     "'No overdue filing or accounts status is identified in the evidence' (P: accounts overdue 111 days) - phrased as absence in evidence; borderline gap, not counted.",
+     "Phoenix 1.00 from 'BOER, Giny: 1/1 companies ... BREWDOG PLC' - circular (the subject company itself); feeds fraud_risk 'high'."
+    ]
+   },
+   "P": {
+    "run_id": "dfe4a52aa5ac4ecf",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 1,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'in administration (administration started on 2026-03-02)'",
+     "outside_appetite"
+    ]
+   },
+   "A": {
+    "run_id": "5417aa4501d9d4c3",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 0,
+    "minor_wrong_added": 0,
+    "caught_p_error": 0,
+    "gap_as_clear_inherited_from_P": 0,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "news: 'administration started on 2026-03-02' - consistent."
+    ]
+   }
+  },
+  {
+   "name": "Tesco PLC",
+   "number": "00445790",
+   "G": {
+    "run_id": "8156a7e0e5afecb9",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0,
+    "key_facts_of": 0,
+    "band": 0,
+    "wrong": 1,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "overall_risk_level 'medium' + referral triggers -> refer; expected note -> 0.",
+     "Trap fallen into: 'High-severity market-abuse/investor-compensation and 2018 final-notice news signals require confirmation' -> regulatory_risk 'high'. Hedged, so counted as band miss, not a wrong statement.",
+     "Wrong: '16 September 2026, which is future-dated relative to the current date' - false."
+    ]
+   },
+   "P": {
+    "run_id": "247830b2d7b64530",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0,
+    "key_facts_of": 0,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "route note; '2 adverse news items ... latest 2020-06-08' shown as info and not routed.",
+     "Minor: unlike Carillion, does not label these items as older than 5 years."
+    ]
+   },
+   "A": {
+    "run_id": "e4ca56e23dc9fc19",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 0,
+    "minor_wrong_added": 1,
+    "caught_p_error": 0,
+    "gap_as_clear_inherited_from_P": 0,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "Minor: email 'why directors left in the last year?' - one director left (GARNIER). The same plural error was blocked as unsupported_claim on Monzo; here the guardrail passed it.",
+     "Asks 'Has the adverse news ... been resolved?' on 2017/2020 items: on a note-route case it presents old items as an open matter."
+    ]
+   }
+  },
+  {
+   "name": "Revolut Ltd",
+   "number": "08804411",
+   "G": {
+    "run_id": "300c7bd03498c4c4",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0,
+    "key_facts_of": 2,
+    "band": 1,
+    "wrong": 1,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'FCA status is recorded as unknown; no FRN is supplied' -> FRN 900562 missed (0). Trap: did not say 'not on register' ('does not establish that the company is unauthorised').",
+     "CS overdue missed: 'no overdue filing ... is supplied' -> 0.",
+     "Wrong: '12 October 2026, which appears future-dated' - false (hedged but inaccurate).",
+     "medium + referral triggers -> refer (reasons: licence delay, PSC counts, lawsuits - not the GT reasons)."
+    ]
+   },
+   "P": {
+    "run_id": "4c0b2741339b4fbf",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 2,
+    "key_facts_of": 2,
+    "band": 1,
+    "wrong": 2,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "'Revolut Ltd, FRN 900562: Registered.'",
+     "'Confirmation statement is overdue (was due 13 Sep 2026).'",
+     "Wrong 1: route reason '1 serious adverse news item about this company ... Revolut Fined €3.5 Million for AML Failures' - that fine was imposed on Revolut Bank UAB by the Bank of Lithuania, a different entity, marked about_this_company 'yes'.",
+     "Wrong 2: trade check 'matches SIC code 62090, which covers electronic money services' - 62090 is 'Other information technology service activities'."
+    ]
+   },
+   "A": {
+    "run_id": "19d3ac1e7ba4107a",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 0,
+    "minor_wrong_added": 1,
+    "caught_p_error": "partial",
+    "gap_as_clear_inherited_from_P": 0,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "Partial catch: news agent 'does not identify the regulator ... say which Revolut entity was affected'. It did not say it is a different entity, and the route reason stands.",
+     "Did not catch the SIC 62090 claim.",
+     "Minor: 'who are the directors who joined in the last year' - one joined (JAJODIA)."
+    ]
+   }
+  },
+  {
+   "name": "Greggs PLC",
+   "number": "00502851",
+   "G": {
+    "run_id": "17d851e1a3dd77d5",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0,
+    "key_facts_of": 0,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "overall_risk_level 'low' -> note.",
+     "Whistleblower item hedged: 'do not establish the allegation’s accuracy'."
+    ]
+   },
+   "P": {
+    "run_id": "95e19931c47f4578",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0,
+    "key_facts_of": 0,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "route note; 740-job-cut news as info."
+    ]
+   },
+   "A": {
+    "run_id": "10f4360c20c44d60",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 0,
+    "minor_wrong_added": 0,
+    "caught_p_error": 0,
+    "gap_as_clear_inherited_from_P": 0,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "email plurals correct (2 appointed, 2 resigned)."
+    ]
+   }
+  },
+  {
+   "name": "Linklaters LLP",
+   "number": "OC326345",
+   "G": {
+    "run_id": "173fbaeed55dcac3",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 0,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 1,
+    "gap_as_clear": 0,
+    "defaulted": 0,
+    "evidence": [
+     "Wrong: 'The source reports 35 active LLP designated members/members and no resigned officers' - about 336 members and several resignations in the last 12 months. Partly hedged ('does not ... rule out changes outside the snapshot'), but the count is wrong.",
+     "Says 'only 5 officers were checked' - not the GT fact (about 336 members, not all checkable) -> 0.",
+     "Refer driven by 'phoenix score 0.78' from '1 of 17 dissolved' - right band, wrong reason."
+    ]
+   },
+   "P": {
+    "run_id": "dc085b64d370411c",
+    "identity": 1,
+    "status": 1,
+    "key_facts": 1,
+    "key_facts_of": 1,
+    "band": 1,
+    "wrong": 0,
+    "gap_as_clear": 1,
+    "defaulted": 0,
+    "evidence": [
+     "'Only the first 15 of 336 members were checked.'; couldnt_check -> refer.",
+     "gap_as_clear 1: FCA check 'not_applicable: Not a regulated trade by SIC code' while company.sic = [] (the trade check itself says 'SIC codes not provided'). A no-data result presented as a positive conclusion. Borderline (a law firm usually needs no FCA authorisation), but the stated basis does not exist.",
+     "Also missed the Law360 tribunal claim G found ('nothing adverse about this company'); a search difference, not counted."
+    ]
+   },
+   "A": {
+    "run_id": "2f0286a862da3da2",
+    "route_kept": 1,
+    "identity": "as P",
+    "status": "as P",
+    "key_facts": "as P",
+    "band": "as P",
+    "wrong_added_by_agents": 0,
+    "minor_wrong_added": 0,
+    "caught_p_error": 0,
+    "gap_as_clear_inherited_from_P": 1,
+    "gap_as_clear_added": 0,
+    "evidence": [
+     "couldnt_check carried: 'Not checked. This is not a clear result. A critical check'.",
+     "Did not question the FCA not_applicable on empty SIC."
+    ]
+   }
+  }
+ ],
+ "gt_notes": [
+  "Thames Water key fact: G names an Ofwat penalty decision with no amount or date; rubric 0.5 assumes one of the two is present. Scored 0.5, could be 0.",
+  "Revolut key fact: GT says 'FCA-authorised (EMI)' but its own verification says 'Registered (EMI)'. P says 'Registered'. Scored 1.",
+  "Wilko: the GT 'traps' line does not say how a hedged attribution counts. G hedged throughout but routed on it; I count it as a band-right-for-wrong-reason, not a wrong statement.",
+  "Band for G is generous by construction: any medium/high with a referral list = refer, so G reaches 8/9 while getting the reasons wrong on Wilko and Linklaters."
+ ],
+ "comparison": {
+  "_note": "Written after reading scores.json and 08-three-way-eval.md. Blind values above are unchanged; revisions are listed here.",
+  "revised_mine_after_comparison": {
+   "G.gap_as_clear": "0 -> 1 (Linklaters; builder right)"
+  },
+  "totals_side_by_side": {
+   "G": {
+    "key_facts": [
+     "2.0/9",
+     "3/9"
+    ],
+    "band": [
+     "8/9",
+     "8/9"
+    ],
+    "wrong": [
+     "4",
+     "6"
+    ],
+    "gap_as_clear": [
+     "1 (revised)",
+     "2"
+    ]
+   },
+   "P": {
+    "key_facts": [
+     "9/9",
+     "9/9"
+    ],
+    "band": [
+     "9/9",
+     "9/9"
+    ],
+    "wrong": [
+     "2",
+     "1"
+    ],
+    "gap_as_clear": [
+     "1",
+     "0"
+    ]
+   },
+   "A": {
+    "route_kept": [
+     "9/9",
+     "9/9"
+    ],
+    "wrong_added": [
+     "1 (+2 minor)",
+     "0"
+    ],
+    "caught_P_error": [
+     "partial, and propagated in the broker email",
+     "1"
+    ]
+   }
+  },
+  "disagreements": [
+   {
+    "item": "Monzo G key_facts",
+    "mine": 0.5,
+    "builder": 1,
+    "better": "mine",
+    "reason": "The builder's own evidence says FCA authorisation was 'missed'. The fine is stated with its amount but no date, which gives 0 + 0.5 at most, or 0 + 1 if a fine with an amount but no date counts as fully found. Either way the total cannot reach 1 unless the fine is scored 1, and the rubric's 0.5 is defined as 'missing its date or amount'. Ambiguous rubric; I read 'or' as either one missing.",
+    "evidence": "G regulatory_summary: 'FCA status is “unknown”, no FRN is recorded'; key_risk: 'a £21,091,300 fine' (no date)."
+   },
+   {
+    "item": "Linklaters G key_facts",
+    "mine": 0,
+    "builder": 0.5,
+    "better": "toss-up, lean mine",
+    "reason": "G says 'only 5 officers were checked', but it puts the LLP at 35 members with no resignations, so it never registers the 336-member scale the GT fact is about. Partial credit is generous.",
+    "evidence": "G officers_summary: '35 active LLP designated members/members and no resigned officers'."
+   },
+   {
+    "item": "Carillion G wrong",
+    "mine": 0,
+    "builder": 1,
+    "better": "mine (rubric), builder (substance)",
+    "reason": "The text is accurate: Carillion PLC is one of the director's companies and it is in liquidation. The circular phoenix score is a design flaw, not a false statement about the company, and G hedges it ('not evidence by itself of fraud'). It does inflate fraud_risk to 'high'. Report it as a structural defect (08 point 3 already does) rather than as a wrong statement.",
+    "evidence": "'citing Keith Robertson Cochrane's association with 32 of 50 companies ... including Carillion PLC, which is in liquidation'."
+   },
+   {
+    "item": "BrewDog G wrong",
+    "mine": 0,
+    "builder": 1,
+    "better": "mine (rubric)",
+    "reason": "Same as Carillion: the stated basis is true. The score is meaningless, but it is not a factual error about BrewDog.",
+    "evidence": "'BOER, Giny had 1 of 1 companies dissolved/failed, with BREWDOG PLC listed as being in administration'."
+   },
+   {
+    "item": "Wilko G gap_as_clear",
+    "mine": 0,
+    "builder": 1,
+    "better": "mine",
+    "reason": "The builder says Wilko's sanctions line has 'no caveat'. It does have one: the same sentence block ends 'no sanctions entities were screened'. The scores.json evidence is factually wrong here, and so is 08's 'Wilko's and Linklaters' don't'.",
+    "evidence": "G Wilko fraud_signals_summary: 'No disqualified officers or sanctions hits were reported ... no sanctions entities were screened.'"
+   },
+   {
+    "item": "Linklaters G gap_as_clear",
+    "mine": 0,
+    "builder": 1,
+    "better": "builder",
+    "reason": "I missed this blind. 'No sanctions hits are reported' with 0 entities screened and no caveat counts as gap-as-clear. Revised mine to 1.",
+    "evidence": "'No disqualified officers and no sanctions hits are reported.' (no screening caveat; evidence item says 'Entities screened: 0')."
+   },
+   {
+    "item": "Revolut P wrong",
+    "mine": 2,
+    "builder": 1,
+    "better": "mine",
+    "reason": "Beyond the €3.5m fine (both agree), P's trade check states a false fact and passes a mismatch as 'consistent'. Its own company record labels 62090 'Other information technology service activities'. E-money issuance is not IT services. The builder logged only the empty FCA summary as cosmetic.",
+    "evidence": "trade check: 'matches SIC code 62090, which covers electronic money services'; company.sic: '62090 Other information technology service activities'."
+   },
+   {
+    "item": "Linklaters P gap_as_clear",
+    "mine": 1,
+    "builder": 0,
+    "better": "mine (borderline)",
+    "reason": "The FCA check returns not_applicable 'by SIC code' when the LLP has no SIC codes. A check that ran on no data is presented as a negative conclusion. Mitigation: a law firm usually needs no FCA authorisation, so the outcome is probably right while the stated basis is not.",
+    "evidence": "FCA: 'Not a regulated trade by SIC code'; trade check: 'SIC codes not provided, cannot assess consistency'; company.sic: []."
+   },
+   {
+    "item": "Wilko A wrong_added",
+    "mine": 1,
+    "builder": 0,
+    "better": "mine",
+    "reason": "The broker email (external) turns P's hedged 'Filed as dormant (or SIC 99999)' into 'WILKO LIMITED files as dormant'. That is exactly the claim the ground truth corrected: the last accounts are micro-entity, not dormant. The guardrail passed it.",
+    "evidence": "A Wilko email: 'given WILKO LIMITED files as dormant but the proposal describes a trading business'."
+   },
+   {
+    "item": "Tesco/Revolut A minor plurals",
+    "mine": "2 minor",
+    "builder": 0,
+    "better": "mine (minor)",
+    "reason": "'why directors left' for Tesco (1 resignation) and 'directors who joined' for Revolut (1 appointment). The judge blocked the identical plural error on Monzo but passed these, so the guardrail is inconsistent. Partly inherited from P's template question 'Directors left in the last year. Why?'.",
+    "evidence": "Tesco P: 'Resigned in the last 12 months: GARNIER ... (May 2026)' only."
+   },
+   {
+    "item": "Revolut A caught_core_error",
+    "mine": "partial",
+    "builder": 1,
+    "better": "mine",
+    "reason": "The news agent says the result doesn't say which Revolut entity was affected. It never says the fine was on a different entity. In the same run, the A broker email propagates P's error to the broker ('provide the client’s account of the serious adverse news about the company'), so the external output repeats the error. Net effect on what leaves the building: the error is carried forward.",
+    "evidence": "news: 'does not identify the regulator ... say which Revolut entity was affected'; email: 'the client’s account of the serious adverse news about the company'."
+   },
+   {
+    "item": "Monzo/Thames A guardrail",
+    "mine": "agree",
+    "builder": "agree",
+    "reason": "Both blocked drafts are as described.",
+    "evidence": ""
+   }
+  ],
+  "agreements": "Identity 9/9 and status 9/9 for all systems; band G 8/9 (Tesco miss), P 9/9; P key facts 9/9; G wrong on Wilko/Tesco/Revolut future-dated filings and Linklaters member count; P Revolut €3.5m entity error; route_kept 9/9.",
+  "builder_missed": [
+   "P Revolut SIC 62090 false statement and a trade mismatch passed as consistent.",
+   "P Linklaters FCA not_applicable on empty SIC.",
+   "A Wilko email asserting 'files as dormant' (the corrected GT trap), sent to an external audience.",
+   "A Revolut email propagating P's €3.5m error to the broker.",
+   "Inconsistent judge on plurals (blocked on Monzo, passed on Tesco/Revolut).",
+   "P Linklaters media: 'nothing adverse' while G found the Law360 sexual-harassment tribunal claim, so P's news search missed a real item (outside GT).",
+   "P Carillion media: KPMG's audit fine and 'Philip Green was a Number 10 adviser' counted as adverse regulatory news about Carillion (category noise).",
+   "G's referral and band on Wilko and Linklaters are right for the wrong reasons (the other entity's collapse; a phoenix score from 1 of 17 dissolved). Band 8/9 flatters G."
+  ],
+  "overstated_in_08": [
+   "'0 added; caught P's 1' for A: by my count 1 added (plus 2 minor), and the catch is partial and contradicted by A's own broker email.",
+   "'Wilko's and Linklaters' don't' caveat sanctions: Wilko's does.",
+   "G '6 wrong': 4 under the rubric. Two are design flaws (circular phoenix), real but not false statements.",
+   "'P: 1 error': 2.",
+   "'Over the day, the agent layer found two real defects': not verifiable from these 9 runs; in this batch it found 0 cleanly."
+  ],
+  "understated_in_08": [
+   "G key facts '3 of 9' could fairly be 2.",
+   "How much A's external outputs (broker emails) can carry errors that the guardrail passes."
+  ]
+ }
+}

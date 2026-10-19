@@ -412,3 +412,88 @@ company's (needs an entity check on regulator fines); (2) Revolut's FCA check ha
 10. "I gave the old agent graph a better model. It got more polite, not more right." (08)
 11. "My agent caught my rules' mistake, and couldn't do anything about it" (Revolut; agents explain, rules decide).
 12. "The agent's narrative found a rule bug: when a director left matters" (rules 19e).
+
+## Logged items and the external review (19 Oct, 22:20–22:45)
+
+**Input.** The four items logged in step 3, plus an independent review Tej commissioned from another AI agent
+(an underwriter-style UI review, a UI designer review and a UAT table, run against live Monzo report
+93d29f9e008044a7). Three of the reviewers' P1 findings turned out to share causes with the logged items.
+
+**Same bug, two disguises.** Revolut's €3.5m fine (on Revolut Bank UAB) counted as Revolut Ltd's, and a
+profile of Monzo Bank Europe DAC listed under "About this company" for Monzo Bank Limited, are one defect:
+the news reading had "this company / not this company" and nothing in between. Group companies sharing a
+brand fell into "yes". Fix: the model now also returns `entity_named` (the legal entity the article names,
+the fined entity for a fine) and may answer `related`. A code check backs it up: if the named entity starts
+with the company's brand and adds words the registered name doesn't have ("Revolut" + "Bank UAB"), it's
+related whatever the model said. A brand alone ("Monzo") can't be told apart by name, so the model's answer
+stands there. Related news is shown under its own heading and as a note; it can't be a reason for the route.
+Trade-off accepted: Tesco Stores Limited news is "related" when screening Tesco PLC. Legally right; an
+underwriter still sees it.
+
+**The agents said "no news finding" under a £21m fine.** Not a model error. The agent layer decided
+eligibility from *flags*, and earlier on 19 Oct we demoted "news of an FCA action already found" to a note
+so the same fact wasn't a reason twice. That dedup silently removed the news from the agents' view, and the
+skip message filled the gap with a sentence that wasn't true. Fix: the MCP summary now carries news counts
+(adverse about this company, about a related company, not reviewed); the news agent runs on any adverse
+item, flag or note; the skip message says what was read ("read 12 results: nothing adverse to explain").
+Lesson for the series: a dedup in the core changed what the agents could see, and nothing failed loudly.
+
+**Three different coverage counts on one report.** "13 of 13 checks applied", "0 couldn't check", and the
+agent review's "1 check couldn't run" were all describing the CCJ check, which the tool doesn't do (paid
+data). Fix: one coverage function (`casefile.coverage`) with four states: completed (ran over everything; not
+the same as cleared), couldn't check (a source failed), not covered by this tool, not applicable. CheckResult
+gets `out_of_scope`; CCJ stays `couldnt_check` (never clear) but counts as not covered. The report stores
+`coverage`, and the ledger header, rules summary, file note, MCP summary and agent review all print its text.
+
+**Smaller fixes.**
+- Revolut's FCA check: "info" status with an empty summary. Any info check with no summary now uses its notes.
+- `company_record` (MCP) returns the insolvency record: cases, dates and `began_on`, the date rule 19e
+  measures from. The director agent is told to use it rather than a Gazette date. That closes the gap where
+  the judge disputed a correct "1 month before" (Thames Water / Babylon).
+- The director broker question counts people and companies: "A director was involved with a company that…".
+
+**Tests:** 277 (34 new). Commit 0ff4551.
+
+**Independent rescoring** of `eval/scores.json` started in parallel: a separate agent, blind to the
+builder's scores until its own are written (`eval/scores_independent.json`).
+
+## Live re-run, rules 19f, and the independent rescoring (19 Oct, 22:35–23:00)
+
+**The fix met a new article.** Re-running Revolut live after the entity fix, Brave returned a different story:
+"Italy fines Revolut over $13 million". The model named the entity "Revolut", which for REVOLUT LTD normalises
+to the company's own name, so the code check called it exact and the fine became a reason again. Italy's
+regulator acts on the EU entities, not the UK one, but nothing in the headline says so. Rule 19f: for a company
+with a corporate owner on its PSC register (so other companies share the brand), a regulator's action counts
+only when the article names this entity *with its legal form*; otherwise it's "may be about this company",
+shown and never a reason. Standalone companies keep the old behaviour ("HSE fines Smith Builders" still counts).
+A UK regulator's action on this firm still reaches the route through the FCA check, which reads the Register,
+not the news. On the 19f re-run the model itself answered "related" for the Italy fine.
+
+**Live re-runs, same proposals as the eval (rules 19f):**
+- Revolut 1b6456a0087b4455: refer; reasons now the overdue confirmation statement and the trade/SIC mismatch.
+  The Italy fine is listed under another company in the group. Coverage line identical everywhere.
+- Monzo 198c0e28c6ca4be0: refer; the FCA's own release names Monzo Bank Ltd, so it stays this company's news
+  (a note under the FCA action); a Guardian piece naming only "Monzo" is "may be about". Agent review: the news
+  agent now runs (it was skipped with "no news finding" before); the director agent dates Nivaura's insolvency
+  from the Companies House record (21 Nov 2023) via the new `began_on`. $0.0028, 27.6 s, 0 rewrites.
+
+**The independent rescoring** (separate agent, blind until its scores were written; `eval/scores_independent.json`,
+summary in 08) changed four headline numbers: G wrong 6 → 4, G facts 3 → 2, P wrong 1 → 2, A added 0 → 1, and
+"agents caught P's error" → partly. Two of its findings were checked against Supabase and hold. What it found
+that matters most:
+- *P's second error:* the trade check passed "Payments and e-money" against SIC 62090 (IT services). The model
+  got bare codes and guessed what they cover. Now it gets the labels and is told to read them literally.
+- *The agents' one wrong statement came from the core.* Wilko's broker email said "files as dormant"; the core's
+  broker question said that whether the accounts or only the SIC code (99999) were dormant. The guardrail passed
+  it because it was "in the evidence". A guardrail that checks agents against the report can't catch the
+  report's own mistakes. Fixed at the source: the finding and question say which signal fired.
+- *The guardrail's judge is inconsistent:* it blocked "companies" for one company, passed "directors" for one
+  director twice.
+- *My write-up overstated the agents.* "A second reader that catches the core's mistakes" is withdrawn in 08.
+  This is the most useful thing the rescoring did, and it's the reason to have one.
+
+**Blog note.** The honest story for angle 11 is now: the agent flagged doubt about the core's mistake, couldn't
+act on it by design, and its broker email still repeated the mistake. That is a better post than the one I was
+going to write.
+
+**Tests:** 284. Commits d5fc673 and the dormant-wording commit.

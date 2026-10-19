@@ -162,3 +162,18 @@ def test_skipped_news_never_says_no_finding_when_news_was_read():
     s = _summary([{"title": "Job advert", "about_this_company": "yes", "category": "neutral", "severity": "low"}] * 3)
     assert "news" not in eligible(s)
     assert skipped(s)["news"] == "The pre-screen read 3 news results: nothing adverse to explain."
+
+
+# --- independent rescoring: Wilko's email said "files as dormant"; its accounts are micro-entity ---------------
+
+def test_dormant_question_says_sic_when_only_the_sic_is_dormant():
+    checks = [{"check_id": "filings", "findings": [{"rule_id": "dormant_but_trading", "route": "refer", "text": "",
+                                                    "detail": {"basis": "sic"}}]}]
+    q = broker_questions(checks)[0]["question"]
+    assert "files as dormant" not in q and "SIC 99999" in q
+
+
+def test_dormant_question_unchanged_when_accounts_are_dormant():
+    checks = [{"check_id": "filings", "findings": [{"rule_id": "dormant_but_trading", "route": "refer", "text": "",
+                                                    "detail": {"basis": "accounts"}}]}]
+    assert broker_questions(checks)[0]["question"].startswith("The company files as dormant")

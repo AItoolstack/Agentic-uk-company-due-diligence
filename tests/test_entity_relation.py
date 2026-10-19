@@ -56,7 +56,7 @@ def test_group_company_fine_read_as_yes_is_corrected_to_related_and_never_refers
     assert "Revolut Bank UAB" in items[0].reason
     assert not [f for f in media.findings if f.route == Route.REFER]
     rel = [f for f in media.findings if f.rule_id == "media_related"]
-    assert rel and "Revolut Bank UAB" in rel[0].text and "not this one" in rel[0].text
+    assert rel and "(Revolut Bank UAB)" in rel[0].text and "not this one" in rel[0].text
     assert media.status == CheckStatus.INFO  # shown, never "nothing adverse"
 
 
@@ -105,3 +105,9 @@ def test_brand_only_regulator_news_still_counts_for_a_standalone_company():
 def test_regulator_action_naming_the_entity_with_its_legal_form_counts_in_a_group():
     media, _, items = _run("REVOLUT LTD", [{"about_this_company": "yes", "entity_named": "Revolut Ltd", **FINE}])
     assert items[0].about_this_company == "yes"
+
+
+def test_related_note_doesnt_repeat_a_bare_brand_as_the_entity():
+    media, _, _ = _run("REVOLUT LTD", [{"about_this_company": "related", "entity_named": "Revolut", **FINE}])
+    rel = next(f for f in media.findings if f.rule_id == "media_related")
+    assert "(Revolut)" not in rel.text and "another company in the group" in rel.text

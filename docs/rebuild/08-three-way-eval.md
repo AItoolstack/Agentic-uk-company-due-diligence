@@ -49,7 +49,7 @@ defaults, no rate-limit failures. The writing is careful; it hedges and flags it
 is what a model can't fix, because it isn't in the model:
 
 1. **Its sanctions screen never ran.** "Entities screened: 0" in 9 of 9 runs, and every brief says "no sanctions
-   hits". Seven also say nothing was screened; Wilko's and Linklaters' don't. That's the coverage failure from the
+   hits". Eight also say nothing was screened; Linklaters' doesn't. (Corrected after the independent rescoring: Wilko's does.) That's the coverage failure from the
    baseline, still there under a better model.
 2. **Its FCA check returned "unknown" for every firm**, including an authorised bank (Monzo, FRN 730427) and an
    e-money institution (Revolut, FRN 900562). It found Monzo's £21m fine only through web search.
@@ -91,12 +91,51 @@ cosmetic bug: Revolut's FCA check is "info" with an empty summary line. Both log
 | | Use it for |
 |---|---|
 | Rules + one call | The decision support: facts, gaps, route. 9/9 facts, 9/9 band, 1 error, 9 s, $0.0004. |
-| + agents | Explanation and drafting on top, and a second reader that catches the core's mistakes. +$0.0013 and ~14 s a case. |
+| + agents | Explanation and drafting on top. +$0.0013 and ~14 s a case. (The "second reader that catches the core's mistakes" claim is withdrawn: see the independent rescoring below.) |
 | Agent graph alone | Not for this. A strong model writes careful prose about checks that never ran. |
 
 ## Limits of this evaluation
 
 - 9 companies, one run each; no variance. The demo cases aren't included: the old graph can't run them (they're fixtures for the pre-screen's data layer), and they're covered by the test suite.
-- Scored by the system's builder. Mitigations: ground truth written first; every score has quoted evidence; raw runs kept. An independent rescoring would be better.
+- Scored first by the system's builder, then rescored blind by a separate agent (below). Where they differ, the independent score is the one to quote.
 - P's band score benefits from rules 19e, changed today partly because of the agent runs on these same companies (Tesco moved from refer to note). On 19c, P's band would be 8/9.
 - The three set-ups use different models for the core (G and A on gpt-6-luna; P on gpt-oss-20b).
+
+## Independent rescoring (19 Oct, 22:30–22:45)
+
+A separate agent that hadn't seen the scoring rescored all 27 runs from the raw payloads and the ground truth,
+writing its scores before opening `scores.json`. Full scores, evidence and every disagreement:
+`eval/scores_independent.json`. Two of its claims were spot-checked against Supabase and hold.
+
+| | G old graph | P pre-screen | A + agents |
+|---|---|---|---|
+| Key facts (of 9) | **2** (builder 3) | 9 | 9 (from P) |
+| Outcome in expected band | 8/9 | 9/9 | 9/9, route kept 9/9 |
+| Wrong statements | **4** (builder 6) | **2** (builder 1) | **1 added + 2 minor** (builder 0) |
+| Gap shown as clear | **1** (builder 2) | **1, borderline** (builder 0) | 1, passed through from P |
+| Caught P's error | – | – | **partly** (builder: yes) |
+
+**What changes.**
+- *G is a little better than written.* The circular phoenix score is a design flaw (point 3 above) but G states
+  its basis and hedges it, so it isn't a false statement. Monzo's FCA authorisation was missed, so G's facts are 2.
+- *P had a second error.* Revolut's trade check passed "Payments and e-money" as consistent with SIC 62090, which
+  is "Other information technology service activities". The model was given bare SIC numbers and guessed. Fixed
+  (rules 19f): it now gets the labels, and the live re-run refers Revolut on the mismatch.
+- *P's borderline gap.* Linklaters' FCA check said "not a regulated trade by SIC code"; an LLP has no SIC codes.
+  The answer is probably right for a law firm, but its stated basis didn't exist. Wording fixed.
+- *The agents' headline was overstated.* The Revolut news agent said the article didn't say which entity was
+  affected; it didn't say it was a different one, and the same run's broker email asked the broker about "the
+  serious adverse news", passing P's error on. And the Wilko broker email said "files as dormant". That wording
+  came from the core's own broker question, which said "files as dormant" whether the accounts or only the SIC
+  code (99999) were dormant; Wilko files micro-entity accounts. Fixed at the source; the guardrail passed it
+  because it was in the evidence.
+- *The guardrail is inconsistent on plurals.* It blocked "companies" for one company (Monzo) but passed "directors
+  left" for one director (Tesco) and "directors who joined" for one (Revolut). Logged.
+
+**Missed by both scorings, found by the rescorer:** P's news search found nothing adverse for Linklaters while G
+found a tribunal claim (outside the ground truth); P counted KPMG's audit fine as adverse news about Carillion.
+
+**Revised verdict.** The ranking holds: rules + one call is the most accurate and cheapest; the old graph is worst
+on facts and plumbing. The agent layer's value is explanation and drafting, not error correction: in this batch it
+flagged doubt about one core error but didn't correct it, and its one external output (the broker email) can
+carry a core error past the guardrail. "A second reader that catches the core's mistakes" is withdrawn.

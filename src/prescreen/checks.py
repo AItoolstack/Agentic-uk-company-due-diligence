@@ -352,12 +352,18 @@ def check_filings(data: CompanyData, req: PreScreenRequest | None = None) -> Che
     dormant = last_type == "dormant" or "99999" in (p.get("sic_codes") or [])
     if dormant:
         if trades or turnover:
+            # Say which: Wilko files micro-entity accounts with SIC 99999, and "files as dormant" went to a broker.
+            basis = "accounts" if last_type == "dormant" else "sic"
+            what = ("Its last accounts were filed as dormant" if basis == "accounts"
+                    else "Its registered activity is SIC 99999 (dormant company)")
             findings.append(Finding(rule_id="dormant_but_trading", route=Route.REFER,
-                                    text="Filed as dormant (or SIC 99999), but the proposal describes a trading "
-                                         "business. Ask why.", sources=src))
+                                    text=f"{what}, but the proposal describes a trading business. Ask why.",
+                                    detail={"basis": basis}, sources=src))
         else:
             findings.append(Finding(rule_id="dormant", route=Route.NOTE,
-                                    text="Filed as dormant / SIC 99999: a non-trading company.", sources=src))
+                                    text=("Last accounts filed as dormant: a non-trading company."
+                                          if last_type == "dormant" else
+                                          "Registered activity is SIC 99999 (dormant company)."), sources=src))
     if turnover is not None and last_type:
         if last_type == "micro-entity" and turnover > MICRO_TURNOVER:
             findings.append(Finding(rule_id="accounts_size_mismatch", route=Route.REFER,

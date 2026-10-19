@@ -137,15 +137,21 @@ def llp_words(text: str) -> str:
 def _counted_wording(checks: list[Any]) -> dict[str, str]:
     """Questions whose wording depends on how many people or companies are involved. The guardrail's judge
     caught "companies" for one company (Monzo, live), and the broker would have too."""
+    out: dict[str, str] = {}
+    dormant = [f for c in checks for f in (_d(c).get("findings") or []) if f.get("rule_id") == "dormant_but_trading"]
+    if dormant and (dormant[0].get("detail") or {}).get("basis") == "sic":
+        out["dormant_but_trading"] = ("The company's registered activity is 'dormant company' (SIC 99999), but the "
+                                      "proposal describes a trading business. Which company actually trades?")
     links = [f for c in checks for f in (_d(c).get("findings") or []) if f.get("rule_id") == "director_insolvent_links"]
     if not links:
-        return {}
+        return out
     people = {(f.get("detail") or {}).get("name") for f in links} - {None}
     total = sum(int((f.get("detail") or {}).get("count") or 1) for f in links)
     who = "A director was" if len(people) <= 1 else "Some directors were"
     what = "a company that" if total == 1 else "companies that"
-    return {"director_insolvent_links": f"{who} involved with {what} went into insolvency. Please give details, "
-                                        "and say what is different about this business."}
+    out["director_insolvent_links"] = (f"{who} involved with {what} went into insolvency. Please give details, "
+                                       "and say what is different about this business.")
+    return out
 
 
 def broker_questions(checks: list[Any], llp: bool = False) -> list[dict[str, Any]]:

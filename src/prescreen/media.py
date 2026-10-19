@@ -296,10 +296,12 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                and it.category not in ("", "neutral") and it.severity != "low"]
     if related:
         related.sort(key=lambda it: it.published or "", reverse=True)
-        names = sorted({it.entity_named for it in related if it.entity_named})
+        brand = _norm_entity(short_name(data.name))
+        names = sorted({it.entity_named for it in related
+                        if it.entity_named and _norm_entity(it.entity_named) not in (brand, _norm_entity(data.name))})
         findings.append(Finding(
             rule_id="media_related", route=Route.NOTE,
-            text=(f"{len(related)} adverse news item{'s' if len(related) != 1 else ''} about a related company"
+            text=(f"{len(related)} adverse news item{'s' if len(related) != 1 else ''} about another company in the group"
                   + (f" ({', '.join(names[:3])})" if names else "")
                   + f", not this one; latest: {related[0].title}"),
             detail={"titles": [it.title for it in related][:10], "entities": names},
