@@ -45,6 +45,7 @@ class Store(Protocol):
     async def purge(self) -> int: ...
     async def save_agent_run(self, run: dict[str, Any]) -> None: ...
     async def list_agent_runs(self, report_id: str, limit: int = 5) -> list[dict[str, Any]]: ...
+    async def save_eval_run(self, run_id: str, system: str, label: str, payload: dict[str, Any]) -> None: ...
 
 
 def _summary(payload: dict[str, Any], decisions: list[dict[str, Any]]) -> dict[str, Any]:
@@ -175,6 +176,9 @@ class FileStore:
 
     async def save_agent_run(self, run: dict[str, Any]) -> None:
         self._write(self.base / "agent_runs" / run["report_id"] / f"{run['run_id']}.json", run)
+
+    async def save_eval_run(self, run_id: str, system: str, label: str, payload: dict[str, Any]) -> None:
+        self._write(self.base / "eval_runs" / f"{run_id}.json", {"system": system, "label": label, **payload})
 
     async def list_agent_runs(self, report_id: str, limit: int = 5) -> list[dict[str, Any]]:
         if not REPORT_ID.fullmatch(report_id or ""):
@@ -315,6 +319,10 @@ class PgStore:
             "values (%s, %s, %s, %s, %s, %s, %s, %s) on conflict (id) do nothing",
             (run["run_id"], run["report_id"], run["created_at"], run.get("model", ""), run.get("status", ""),
              t.get("cost_usd", 0), t.get("wall_ms", 0), self._j(run)))
+
+    async def save_eval_run(self, run_id: str, system: str, label: str, payload: dict[str, Any]) -> None:
+        await self._exec("insert into eval_runs (id, system, label, payload) values (%s, %s, %s, %s) "
+                         "on conflict (id) do nothing", (run_id, system, label, self._j(payload)))
 
     async def list_agent_runs(self, report_id: str, limit: int = 5) -> list[dict[str, Any]]:
         if not REPORT_ID.fullmatch(report_id or ""):

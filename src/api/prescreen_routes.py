@@ -15,6 +15,7 @@ import asyncio
 import hmac
 import json
 import os
+import secrets
 import time
 from collections import deque
 
@@ -227,9 +228,15 @@ async def eval_legacy(body: dict) -> dict:
         agent_limit()
     except AgentLimit as err:
         raise HTTPException(429, str(err)) from err
-    return await run_legacy(query, provider=str(body.get("provider") or ""), model=str(body.get("model") or ""),
-                            fast_model=str(body.get("fast_model") or ""),
-                            structured_method=str(body.get("structured_method") or ""))
+    out = await run_legacy(query, provider=str(body.get("provider") or ""), model=str(body.get("model") or ""),
+                           fast_model=str(body.get("fast_model") or ""),
+                           structured_method=str(body.get("structured_method") or ""))
+    out["run_id"] = secrets.token_hex(8)
+    try:
+        await get_store().save_eval_run(out["run_id"], "legacy_graph", str(body.get("label") or query)[:200], out)
+    except Exception as err:  # noqa: BLE001 - the result still comes back
+        out["not_saved"] = f"{type(err).__name__}"
+    return out
 
 
 @router.get("/agents/config")
