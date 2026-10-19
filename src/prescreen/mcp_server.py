@@ -32,6 +32,7 @@ from mcp_types import ToolAnnotations
 
 from src.prescreen import casefile, demo_cases
 from src.prescreen.engine import STAGES, CompanyNotFound, SourceDown, run_prescreen
+from src.prescreen.checks import FCA_AUTHORISED
 from src.prescreen.identity import normalise_name, resolve
 from src.prescreen.models import COVER_LINES, PreScreenRequest
 from src.prescreen.rules import RULES_VERSION, THRESHOLDS
@@ -373,11 +374,12 @@ async def fca_firm_search(name: str) -> dict[str, Any]:
         services, _ = build_services(client)
         try:
             target = normalise_name(name)
-            firms = await services.fca.search_firms(name, want=lambda n: normalise_name(n) == target)
+            firms = await services.fca.search_firms(
+                name, want=lambda f: normalise_name(f["name"]) == target and f["status"].lower() in FCA_AUTHORISED)
         except SourceError as err:
             return _err("FCA Register", err)
     # The Register's own order is fuzzy; put exact name matches first so they survive the cut.
-    firms.sort(key=lambda f: normalise_name(f["name"]) != target)
+    firms.sort(key=lambda f: (normalise_name(f["name"]) != target, f["status"].lower() not in FCA_AUTHORISED))
     return {"source": "FCA Register", "firms": firms[:15], "exact_matches": sum(
                 normalise_name(f["name"]) == target for f in firms),
             "search": getattr(services.fca, "last_result_info", {}),

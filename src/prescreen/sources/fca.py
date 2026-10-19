@@ -52,9 +52,9 @@ class FCARegister:
 
     MAX_PAGES = 5
 
-    async def search_firms(self, name: str, want: Callable[[str], bool] | None = None) -> list[dict[str, str]]:
+    async def search_firms(self, name: str, want: Callable[[dict[str, str]], bool] | None = None) -> list[dict[str, str]]:
         """The Register's search is fuzzy and paged ("REVOLUT LTD" puts Revolut Ltd past page 1, live).
-        Follow ResultInfo's next link up to MAX_PAGES, stopping early once a name matches `want`."""
+        Follow ResultInfo's next link up to MAX_PAGES, stopping early once a row satisfies `want`."""
         raw = await self._get("/Search", {"q": name, "type": "firm"})
         if raw is NOT_FOUND or not isinstance(raw, dict):
             return []
@@ -63,7 +63,7 @@ class FCARegister:
         pages = 1
         while pages < self.MAX_PAGES and self.fixtures is None:
             nxt = self._next_url(raw.get("ResultInfo"))
-            if not nxt or (want and any(want(o["name"]) for o in self._parse(data))):
+            if not nxt or (want and any(want(o) for o in self._parse(data))):
                 break
             raw = await get_json(self.client, SOURCE, nxt, headers={
                 "X-Auth-Email": self.email, "X-Auth-Key": self.api_key, "Accept": "application/json"})

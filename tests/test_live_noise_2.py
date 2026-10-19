@@ -85,7 +85,8 @@ def test_fca_search_follows_the_registers_next_page_until_the_name_matches():
     import httpx
     base = "https://register.fca.org.uk/services/V0.1"
     pages = {
-        1: {"Data": [{"Name": "Revolut Trading Ltd", "Reference Number": "832790", "Status": "No longer authorised"}],
+        1: {"Data": [{"Name": "Revolut Trading Ltd", "Reference Number": "832790", "Status": "No longer authorised"},
+                     {"Name": "Revolut Ltd", "Reference Number": "975775", "Status": "Appointed representative"}],
             "ResultInfo": {"page": "1", "Next": f"{base}/Search?q=REVOLUT+LTD&type=firm&pgnp=2"}},
         2: {"Data": [{"Name": "Revolut Ltd", "Reference Number": "900562", "Status": "Authorised"}],
             "ResultInfo": {"page": "2", "Next": f"{base}/Search?q=REVOLUT+LTD&type=firm&pgnp=3"}},
@@ -102,13 +103,21 @@ def test_fca_search_follows_the_registers_next_page_until_the_name_matches():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
             fca = FCARegister(client, "key", "a@b.c", base)
             target = normalise_name("REVOLUT LTD")
-            return fca, await fca.search_firms("REVOLUT LTD", want=lambda n: normalise_name(n) == target)
+            return fca, await fca.search_firms("REVOLUT LTD", want=lambda f: normalise_name(f["name"]) == target
+                                              and f["status"] == "Authorised")
 
     fca, firms = asyncio.run(go())
-    assert [f["frn"] for f in firms] == ["832790", "900562"]
+    assert [f["frn"] for f in firms] == ["832790", "975775", "900562"]
     assert seen == [1, 2] and fca.last_result_info["pages_read"] == 2
 
 
 def test_fca_search_never_follows_a_link_off_the_register():
     assert FCARegister._next_url({"Next": "https://evil.example/Search?q=x"}) == ""
     assert FCARegister._next_url({"Next": "https://register.fca.org.uk/services/V0.1/Search?q=x&pgnp=2"})
+
+
+def test_authorised_record_wins_when_several_share_the_name():
+    from src.prescreen.checks import best_fca_match
+    firms = [{"name": "Revolut Ltd", "frn": "975775", "status": "Appointed representative"},
+             {"name": "Revolut Ltd", "frn": "900562", "status": "Authorised"}]
+    assert best_fca_match(firms, "REVOLUT LTD")["frn"] == "900562"

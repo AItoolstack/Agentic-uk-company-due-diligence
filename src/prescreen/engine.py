@@ -237,20 +237,22 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         if not fca_needed:
             return None, None
         target = C.normalise_name(data.name)
-        firms = await _safe(services.fca.search_firms(data.name, want=lambda n: C.normalise_name(n) == target))
+
+        def found(row: dict) -> bool:  # keep paging until an authorised firm of this exact name turns up
+            return C.normalise_name(row["name"]) == target and row["status"].lower() in C.FCA_AUTHORISED
+
+        firms = await _safe(services.fca.search_firms(data.name, want=found))
         discipline = None
-        # The Register's search is word-based; "REVOLUT LTD" can miss "Revolut Ltd" (live), so retry
-        # once with the bare name before calling the firm not found.
+        # The Register's search is fuzzy; if the full name found nothing exact, retry once with the bare name.
         if isinstance(firms, list) and not any(C.normalise_name(f["name"]) == target for f in firms) \
                 and target and target != data.name.upper().strip():
-            again = await _safe(services.fca.search_firms(target.title(),
-                                                          want=lambda n: C.normalise_name(n) == target))
+            again = await _safe(services.fca.search_firms(target.title(), want=found))
             if isinstance(again, list):
                 firms = firms + again
         if isinstance(firms, list):
-            exact = [f for f in firms if C.normalise_name(f["name"]) == target]
-            if exact:
-                discipline = await _safe(services.fca.disciplinary_history(exact[0]["frn"]))
+            best = C.best_fca_match(firms, data.name)
+            if best:
+                discipline = await _safe(services.fca.disciplinary_history(best["frn"]))
         return firms, discipline
 
     prev_names = [p.get("name", "") for p in profile.get("previous_company_names") or []]

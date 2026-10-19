@@ -951,6 +951,19 @@ def fca_applicable(data: CompanyData, req: PreScreenRequest) -> bool:
             or any(s.startswith(REGULATED_SIC_PREFIXES) for s in sics))
 
 
+FCA_AUTHORISED = {"authorised", "eea authorised", "registered", "eea registered",
+                  "authorised (temporary permission)", "temporary permission regime"}
+
+
+def best_fca_match(firms: list[dict[str, str]], name: str) -> dict[str, str] | None:
+    """Several Register records can share a name (live: 'Revolut Ltd' is both an appointed representative
+    and the authorised EMI). Prefer an authorised one."""
+    target = normalise_name(name)
+    exact = [f for f in firms if normalise_name(f["name"]) == target]
+    exact.sort(key=lambda f: f["status"].lower() not in FCA_AUTHORISED)
+    return exact[0] if exact else None
+
+
 def check_fca(data: CompanyData, req: PreScreenRequest, firms: Any, discipline: Any) -> CheckResult:
     title = "FCA authorisation"
     src = [SourceRef(label="FCA Register", url="https://register.fca.org.uk/s/")]
@@ -964,9 +977,8 @@ def check_fca(data: CompanyData, req: PreScreenRequest, firms: Any, discipline: 
                               text="Regulated trade, but FCA authorisation couldn't be checked. Ask for the FRN.",
                               sources=src)]
         return r
-    target = normalise_name(data.name)
-    exact = [f for f in firms if normalise_name(f["name"]) == target]
-    if not exact:
+    firm = best_fca_match(firms, data.name)
+    if firm is None:
         return _finish("fca", title, [Finding(
             rule_id="fca_not_found", route=Route.REFER,
             text="Regulated trade, but no FCA Register firm has this exact name. It may trade under another name "
@@ -974,13 +986,11 @@ def check_fca(data: CompanyData, req: PreScreenRequest, firms: Any, discipline: 
             detail={"register_names": [f"{f['name']} (FRN {f['frn']}, {f['status'] or 'status not given'})"
                                        for f in firms[:5]]},
             sources=src)], "", src, critical=False)
-    firm = exact[0]
     fsrc = [SourceRef(label=f"FCA Register FRN {firm['frn']}",
                       url=f"https://register.fca.org.uk/s/search?q={firm['frn']}&type=Companies")]
     findings = []
     status = firm["status"].lower()
-    authorised = status in {"authorised", "eea authorised", "registered", "eea registered",
-                             "authorised (temporary permission)", "temporary permission regime"}
+    authorised = status in FCA_AUTHORISED
     if authorised:
         findings.append(Finding(rule_id="fca_authorised", route=Route.NOTE,
                                 text=f"{firm['name']}, FRN {firm['frn']}: {firm['status']}. "
