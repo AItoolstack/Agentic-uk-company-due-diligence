@@ -59,6 +59,11 @@ class Finding(BaseModel):
     sources: list[SourceRef] = Field(default_factory=list)
     # Fraud indicators this finding is also evidence of (e.g. "phoenix"). Set by casefile.py.
     tags: list[str] = Field(default_factory=list)
+    # For the evidence drawer. event_date: when it happened (ISO), not when it was reported. relationship: how
+    # the person or entity relates to this company now. why_for_cover: set by casefile from the cover lines.
+    event_date: str = ""
+    relationship: str = ""
+    why_for_cover: str = ""
 
 
 class CheckResult(BaseModel):

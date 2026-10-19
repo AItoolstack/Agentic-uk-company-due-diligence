@@ -134,10 +134,17 @@ def llp_words(text: str) -> str:
     return text
 
 
-def _counted_wording(checks: list[Any]) -> dict[str, str]:
+def _counted_wording(checks: list[Any], llp: bool = False) -> dict[str, str]:
     """Questions whose wording depends on how many people or companies are involved. The guardrail's judge
     caught "companies" for one company (Monzo, live), and the broker would have too."""
     out: dict[str, str] = {}
+    member = "member" if llp else "director"
+    for rid, verb in (("officers_joined", "joined"), ("officers_left", "left")):
+        f = next((f for c in checks for f in (_d(c).get("findings") or []) if f.get("rule_id") == rid), None)
+        n = int(((f or {}).get("detail") or {}).get("count") or 0)
+        if n == 1:
+            out[rid] = (f"A new {member} joined in the last year. Who are they, and what do they bring?" if verb == "joined"
+                        else f"A {member} left in the last year. Why?")
     dormant = [f for c in checks for f in (_d(c).get("findings") or []) if f.get("rule_id") == "dormant_but_trading"]
     if dormant and (dormant[0].get("detail") or {}).get("basis") == "sic":
         out["dormant_but_trading"] = ("The company's registered activity is 'dormant company' (SIC 99999), but the "
@@ -160,7 +167,7 @@ def broker_questions(checks: list[Any], llp: bool = False) -> list[dict[str, Any
     llp=True words the questions for an LLP (members, not directors)."""
     ids = {f.get("rule_id") for c in checks for f in (_d(c).get("findings") or [])}
     ended = bool(ids & ENDED)
-    wording = _counted_wording(checks)
+    wording = _counted_wording(checks, llp)
     seen: set[str] = set()
     out: list[tuple[int, int, dict[str, Any]]] = []
     for ci, c in enumerate(checks):
@@ -541,3 +548,52 @@ def coverage(checks: list[Any]) -> dict[str, Any]:
             "not_covered": len(not_cov), "not_applicable": len(na),
             "couldnt_check_titles": [c["title"] for c in gaps], "not_covered_titles": [c["title"] for c in not_cov],
             "text": text}
+
+
+# ---------------------------------------------------------------------------
+# Evidence drawer fields: when it happened, and why it matters for the cover asked about
+# ---------------------------------------------------------------------------
+
+_MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+
+# Which cover lines each kind of finding weighs on most. Plain-English, one line, shown in the drawer.
+_RELEVANCE = {
+    "management": ({"management_liability", "financial_institutions", "professional_indemnity"},
+                   "Directors' track record weighs most on D&O / management liability."),
+    "regulatory": ({"management_liability", "financial_institutions", "professional_indemnity"},
+                   "Regulatory action weighs directly on D&O, PI and financial institutions cover."),
+    "financial": (set(), "Financial distress affects every line: claims handling, premium payment, continuity."),
+    "identity": (set(), "Who the insured really is underpins every line."),
+    "reputation": ({"management_liability", "cyber", "professional_indemnity"},
+                   "Adverse news is most relevant to D&O, PI and cyber."),
+}
+
+
+def _date_in(text: str) -> str:
+    """The latest date written in a finding's own text, as ISO. Rules write dates three ways."""
+    import re as _re
+    from datetime import date as _date
+    found = []
+    for y, m, d in _re.findall(r"\b(\d{4})-(\d{2})-(\d{2})\b", text):
+        found.append(_date(int(y), int(m), int(d)))
+    for d, mon, y in _re.findall(r"\b(\d{1,2}) ([A-Z][a-z]{2})[a-z]* (\d{4})\b", text):
+        if mon.lower() in _MONTHS:
+            found.append(_date(int(y), _MONTHS[mon.lower()], int(d)))
+    for d, m, y in _re.findall(r"\b(\d{2})/(\d{2})/(\d{4})\b", text):
+        found.append(_date(int(y), int(m), int(d)))
+    return max(found).isoformat() if found else ""
+
+
+def enrich_findings(checks: list[Any], cover_lines: list[str]) -> None:
+    """Fills event_date (when a rule didn't) and why_for_cover on every non-trivial finding, in place."""
+    lines = set(cover_lines or [])
+    for c in checks:
+        group = getattr(c, "group", "") or group_of(c.check_id)
+        weighs, text = _RELEVANCE.get(group, (set(), ""))
+        for f in c.findings:
+            if not f.event_date:
+                f.event_date = _date_in(f.text)
+            if f.route != "note" and text:
+                hit = sorted(lines & weighs)
+                f.why_for_cover = (text if not lines or not weighs or hit else
+                                   text + " Less direct for the cover asked about.")

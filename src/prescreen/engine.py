@@ -323,6 +323,7 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         for f in c.findings:
             f.tags = casefile.fraud_tags(f.rule_id)
     route, reasons = decide(results)
+    casefile.enrich_findings(results, req.cover_lines)
     card = company_card(data)
     unchecked = [c.title for c in results if c.status == CheckStatus.COULDNT_CHECK]
     return PreScreenReport(

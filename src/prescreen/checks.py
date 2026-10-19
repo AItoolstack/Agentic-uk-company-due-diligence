@@ -839,7 +839,9 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
                     " (no start date on the insolvency record)"
                 unknown_any.append(f"{to.get('company_name')} ({num})")
             insolvent.append({**to, "_tier": tier, "_words": words, "_status": status_words(st) if st != "dissolved"
-                              else "insolvent, dissolved" + (f" {ended:%b %Y}" if ended else "")})
+                              else "insolvent, dissolved" + (f" {ended:%b %Y}" if ended else ""),
+                              "_began": start.isoformat() if start else "",
+                              "_appointed": a.get("appointed_on") or "", "_left": a.get("resigned_on") or ""})
         if dissolved_plain:
             notes.append(f"{d.get('name', '')}: {dissolved_plain}")
         if res.get("truncated"):
@@ -870,8 +872,13 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
         capped = many and route == Route.OUTSIDE_APPETITE
         if capped:
             route = Route.REFER
+        began = sorted(c["_began"] for c in insolvent if c["_began"])
+        here_left = _parse_date(d.get("resigned_on"))
         findings.append(Finding(
             rule_id="director_insolvent_links", route=route,
+            event_date=began[0] if began else "",
+            relationship=(f"Former {member} here, resigned {here_left:%-d %b %Y}" if here_left
+                          else f"Current {member} here"),
             text=f"{name} was a {member} of {count} compan{'y' if count == 1 else 'ies'} that became insolvent "
                  f"in the last {T['director_lookback_years']} years: "
                  + ", ".join(label(c) for c in insolvent[:4]) +
@@ -879,6 +886,11 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
                  (f". They hold {res.get('total_results')} appointments (likely a group or non-executive), so "
                   "this is capped at refer" if capped else ""),
             detail={"count": count, "name": name, "in_post": len(in_post),
+                    "links": [{"company": c.get("company_name"), "number": c.get("company_number"),
+                               "began": c["_began"], "appointed": c["_appointed"], "left": c["_left"],
+                               "timing": c["_words"], "status": c["_status"],
+                               "insolvency_url": f"https://find-and-update.company-information.service.gov.uk/company/"
+                                                 f"{c.get('company_number')}/insolvency"} for c in insolvent],
                     "near": sum(c["_tier"] == "near" for c in insolvent),
                     "unknown": sum(c["_tier"] == "unknown" for c in insolvent)}, sources=[ref]))
 
@@ -944,9 +956,9 @@ def check_changes(data: CompanyData) -> CheckResult:
             continue
         a, r = _parse_date(o.get("appointed_on")), _parse_date(o.get("resigned_on"))
         if a and a >= cutoff:
-            joined.append(f"{o.get('name')} ({a:%b %Y})")
+            joined.append((a, o.get("name") or ""))
         if r and r >= cutoff:
-            left.append(f"{o.get('name')} ({r:%b %Y})")
+            left.append((r, o.get("name") or ""))
     psc_changes = []
     if isinstance(data.pscs, dict):
         for p in data.pscs.get("items") or []:
@@ -956,13 +968,25 @@ def check_changes(data: CompanyData) -> CheckResult:
             if ceased and ceased >= cutoff:
                 psc_changes.append(f"{p.get('name')} stopped being a PSC ({ceased:%b %Y})")
     findings = []
+    # Newest first, every name counted. Monzo's note listed 5 of 8 resignations with no "more" (19 Oct).
+    def people_line(rows: list[tuple[date, str]], show: int = 6) -> str:
+        rows = sorted(rows, key=lambda x: x[0], reverse=True)
+        names = ", ".join(f"{n} ({d:%b %Y})" for d, n in rows[:show])
+        return names + (f", and {len(rows) - show} more" if len(rows) > show else "")
+
+    def people_detail(rows: list[tuple[date, str]]) -> dict[str, Any]:
+        rows = sorted(rows, key=lambda x: x[0], reverse=True)
+        return {"count": len(rows), "people": [{"name": n, "date": d.isoformat()} for d, n in rows]}
+
     if joined:
         findings.append(Finding(rule_id="officers_joined", route=Route.NOTE,
-                                text="Appointed in the last 12 months: " + ", ".join(joined[:5]), sources=src[:1]))
+                                text=f"{len(joined)} appointed in the last 12 months: " + people_line(joined),
+                                detail=people_detail(joined), sources=src[:1]))
     if left:
         findings.append(Finding(rule_id="officers_left", route=Route.NOTE,
-                                text="Resigned in the last 12 months: " + ", ".join(left[:5]) +
-                                     ". At renewal, check this was presented.", sources=src[:1]))
+                                text=f"{len(left)} resigned in the last 12 months: " + people_line(left) +
+                                     ". At renewal, check this was presented.",
+                                detail=people_detail(left), sources=src[:1]))
     if psc_changes:
         findings.append(Finding(rule_id="psc_changed", route=Route.NOTE,
                                 text="Ownership changes: " + "; ".join(psc_changes[:4]) +
@@ -1203,12 +1227,17 @@ def check_fca(data: CompanyData, req: PreScreenRequest, firms: Any, discipline: 
         if recent:
             financial = req.financial_lines or not req.cover_lines
             short = [_short_discipline(line) for line in recent[:3]]
+            action_dates = [d for line in recent for d in (_parse_date(x) for x in
+                            re.findall(r"\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2}", line)) if d]
+            notices = [SourceRef(label="FCA final notice", url=u) for _, u in short if u]
             findings.append(Finding(
                 rule_id="fca_discipline", route=Route.REFER if financial else Route.NOTE,
+                event_date=max(action_dates).isoformat() if action_dates else "",
+                relationship=f"Action against {firm['name']} (FRN {firm['frn']})",
                 text=f"FCA action in the last {T['fca_discipline_years']} years: " + "; ".join(t for t, _ in short) +
                      ("." if financial else ". Relevant mainly for PI, D&O and financial institutions cover."),
                 detail={"actions": recent[:5]},
-                sources=fsrc + [SourceRef(label="FCA final notice", url=u) for _, u in short if u]))
+                sources=notices + fsrc))  # the final notice first: it's the primary source
     elif isinstance(discipline, SourceError):
         findings.append(Finding(rule_id="fca_discipline_unchecked", route=Route.NOTE,
                                 text=f"FCA disciplinary history couldn't be read ({discipline.plain}).", sources=fsrc))
