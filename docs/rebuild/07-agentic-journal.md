@@ -202,3 +202,60 @@ but FRN 975775, an *appointed representative*. Stopping at the first exact name 
 with that exact name turns up (page 4: FRN 900562, Registered), and prefer it.
 Lessons: (1) the MCP tools double as a live debugging console for the agent that built them;
 (2) "exact name match" is not identity; a name can belong to several Register records.
+
+---
+
+## Step 2: the agent layer (19 Oct, 08:00–)
+
+**What was built** (`src/agents_v2/`): a LangGraph supervisor that reaches the pre-screen *only* through
+the MCP server, three specialists, a guardrail on everything they write, and a trace of every call.
+
+```
+load_case (MCP) ──> plan ──> specialists, in parallel ──> assemble (code)
+                              director_history  news  broker_email
+                              each: tool loop over its own MCP allowlist ──> guardrail ──> one rewrite ──> show or withhold
+```
+
+**Decisions, and what was rejected:**
+
+| Decision | Rejected alternative | Why |
+|---|---|---|
+| Who *can* run is code (`eligible`): a director flag, a news flag, broker questions. The supervisor model can drop one with a reason, never add one | A free supervisor choosing from all agents | An agent with nothing to work on writes something anyway. Tested: a supervisor that asks for an ineligible agent gets `refused_additions` |
+| The final review is assembled by code; route, meaning and gaps copied word for word from the MCP summary | A model-written brief | Every retelling of the route is a chance to change it. Agent text goes underneath, labelled with who wrote it and how it was checked |
+| Agent loop in JSON mode (`{"call": …}` / `{"final": …}`), 3–6 steps | Native tool calling / `create_react_agent` | gpt-oss tool-call JSON already failed on the baseline; JSON turns run on either provider, and the step limit is ours |
+| Allowlist per agent, enforced in the MCP client wrapper; refusals are trace spans | Trusting the prompt | The broker-email agent has no `sanctions_screen`. A test makes it try; the call never reaches the server |
+| Agents can't pick the case: any `report_id` they pass is overwritten | Passing it through | One case per run; an agent can't wander into another report |
+| On the Space, agents call `/mcp` over real HTTP (127.0.0.1:7860), with the same access token as any client | In-process | The point is to show MCP as the integration surface. Locally and in tests it's in-process (same protocol, memory streams) |
+| Guardrail rules in code; model judge on top; judge outage shown as "rules only" | Judge only, or rules only | Rules are exact and free for the four known failures; a judge catches "alleged" stated as fact. If the judge can't run, that's a gap, and gaps are shown — the pre-screen's own rule, applied to the agents |
+| Broker email never *starts* on a compliance hold (code), and the guardrail blocks any external text on a hold | Guardrail only | Two independent locks. The first one means the cheapest case (0 model calls) is the most sensitive one |
+
+**Guardrail rules** (each with tests, `tests/test_agents_v2.py`):
+1. `couldnt_check_as_clear`: a sentence ties a check that couldn't run to a clearing phrase ("no CCJs",
+   "news is clean", "all checks clear"). Negated sentences ("couldn't be checked") pass.
+2. `route_changed`: names another route ("outside appetite" on a refer) or recommends a decision ("safe to
+   quote", "should be declined"). Explaining the route the rules gave is fine.
+3. `sanctions_leak`: anything about sanctions/compliance in broker text; any broker text on a hold; list detail
+   in internal text on a hold.
+4. `unsupported_fact`: company numbers, £ amounts, dates, years and percentages must appear in the evidence the
+   agent was given (ISO dates in the evidence match "14 September 2023" in prose).
+5. Judge: `unsupported_claim`, `allegation_as_fact`.
+Blocked → one rewrite with the problems listed → blocked again → withheld, reason shown, draft kept in the run
+for audit.
+
+**Things that broke or surprised while building:**
+1. *False positive on day one:* "decline" matched "sales were in decline". The route rule now needs
+   "decline the case/risk/quote" or "should be declined". Kept as a test.
+2. *The hold case runs nothing.* On Atlas (sanctions hold) no specialist is eligible, so the planner isn't
+   even called: zero model calls, zero cost. The safest path is also the cheapest.
+3. *Calder (Companies House down) runs nothing either*, and says why: "directors' other companies couldn't be
+   checked, so there's nothing to narrate". An agent layer that quietly did nothing would read as "nothing found".
+4. *A FK on agent runs.* `agent_runs.report_id` references `reports`; a report saved to files during a database
+   outage can't take a database agent run. The save failure is caught and shown (`not_saved`), never fatal.
+5. *Migration naming:* applied through the Supabase connector first, then the file renamed to the version
+   Supabase recorded (20261019071411), per the CI lesson from Phase A.
+
+**Numbers (scripted model, in-process vs HTTP, Northern Bake demo):** 14 spans; 3 MCP calls for the supervisor
+over HTTP (connect, find_company 0.2 s, prescreen_company 0.06 s on demo data), summary 3.5 KB; the
+broker_questions section 1.8 KB. Live numbers follow.
+
+**Tests:** 33 new (agents) + 2 (agent-run storage, files and Postgres). Suite 214.
