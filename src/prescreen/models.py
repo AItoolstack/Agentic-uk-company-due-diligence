@@ -74,6 +74,9 @@ class CheckResult(BaseModel):
     critical: bool = False
     # Which underwriter question this check answers (casefile.GROUPS). Set by the engine.
     group: str = ""
+    # True when the tool doesn't do this check at all (CCJs: paid data). Still couldnt_check, never clear,
+    # but counted as "not covered by this tool", not as a source that failed (casefile.coverage).
+    out_of_scope: bool = False
 
     @property
     def worst_route(self) -> Route | None:
@@ -106,7 +109,8 @@ class MediaItem(BaseModel):
     url: str
     published: str = ""
     source: str = ""
-    about_this_company: str = "unsure"  # yes | no | unsure | not_reviewed
+    about_this_company: str = "unsure"  # yes | related | no | unsure | not_reviewed
+    entity_named: str = ""              # the legal entity the article names, as the model read it
     category: str = ""
     severity: str = "low"               # low | medium | high
     reason: str = ""
@@ -173,6 +177,7 @@ class PreScreenReport(BaseModel):
     broker_questions: list[dict[str, Any]] = Field(default_factory=list)
     proposal_vs_record: list[dict[str, Any]] = Field(default_factory=list)
     timeline: list[dict[str, Any]] = Field(default_factory=list)
+    coverage: dict[str, Any] = Field(default_factory=dict)  # casefile.coverage: one count used everywhere
 
 
 class DecisionRequest(BaseModel):

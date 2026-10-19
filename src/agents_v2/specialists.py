@@ -74,8 +74,11 @@ def eligible(summary: dict[str, Any]) -> dict[str, str]:
     if director_flags:
         out["director_history"] = f"{len(director_flags)} management finding(s) about directors' other companies"
     news_flags = [f for f in flags if (f.get("rule_id") or "").startswith("media")]
-    if news_flags:
-        out["news"] = f"{len(news_flags)} news finding(s) on the case"
+    news = summary.get("news") or {}
+    adverse = int(news.get("adverse_about_this_company") or 0) + int(news.get("adverse_about_related_company") or 0)
+    if news_flags or adverse:
+        out["news"] = (f"{adverse} adverse news item(s) on the case" if adverse
+                       else f"{len(news_flags)} news finding(s) on the case")
     if summary.get("route") != "compliance_hold" and summary.get("broker_questions"):
         out["broker_email"] = f"{len(summary['broker_questions'])} question(s) for the broker"
     return out
@@ -91,8 +94,11 @@ def skipped(summary: dict[str, Any]) -> dict[str, str]:
                                    if "directors_insolvency" in gaps else
                                    "No finding about directors' other companies.")
     if "news" not in can:
+        n = int((summary.get("news") or {}).get("results") or 0)
         out["news"] = ("News couldn't be checked, so there's nothing to read. That is not a clear result."
-                       if "media" in gaps else "No news finding on the case.")
+                       if "media" in gaps else
+                       f"The pre-screen read {n} news result{'s' if n != 1 else ''}: nothing adverse to explain."
+                       if n else "No news results for this company.")
     if "broker_email" not in can:
         out["broker_email"] = ("Held: compliance hold. Nothing goes to the broker until compliance clears the case."
                                if summary.get("route") == "compliance_hold" else "No questions for the broker.")
@@ -130,7 +136,7 @@ def _render_news(final: dict[str, Any]) -> str:
         line = f"{standing}: {it.get('what_happened') or it.get('title', '')}".strip()
         if it.get("what_is_alleged"):
             line += f" Alleged, not established: {it['what_is_alleged']}"
-        if str(it.get("about_this_company", "")).lower() in ("possibly", "unsure", "no"):
+        if str(it.get("about_this_company", "")).lower() in ("possibly", "unsure", "no", "related"):
             line += f" (About this company: {it.get('about_this_company')}.)"
         parts.append(line)
     if final.get("summary"):
@@ -154,7 +160,9 @@ DIRECTOR_HISTORY = Spec(
             "companies. The pre-screen has already found the flag; your job is the story behind it: what each "
             "linked company was, what happened to it and when, and whether the director was in post near the end. "
             "Look up the linked companies named in the flag (company_record, gazette_notices). Keep each director "
-            "to three or four sentences. Say what the record doesn't show (for example, the reason a company failed)."
+            "to three or four sentences. Say what the record doesn't show (for example, the reason a company failed). "
+            "company_record includes a linked company's insolvency record: insolvency.began_on is the date the "
+            "pre-screen measures 'in post when it began' from, so use it for timing rather than a Gazette date."
             "\n\n" + SHARED_RULES),
     final_format=('{"directors": [{"name": "...", "story": "..."}], '
                   '"not_known": ["things the record doesn\'t show"]}'),
@@ -174,10 +182,12 @@ NEWS = Spec(
             "has happened (on record: a fine, a court result, a filed insolvency) from what is alleged (claims, "
             "charges, investigations, reports). Read the news section of the report. Only cover items the "
             "pre-screen marked as about the company or possibly about it, most serious first, at most six. "
-            "Say when it isn't clear the item is about this company rather than another with a similar name."
+            "Say when it isn't clear the item is about this company rather than another with a similar name. "
+            "Items marked related are about another legal entity in the same group (a parent, subsidiary or "
+            "overseas sister company): say which entity, and never present them as this company's own record."
             "\n\n" + SHARED_RULES),
     final_format=('{"items": [{"title": "...", "url": "...", "what_happened": "...", "what_is_alleged": "...", '
-                  '"standing": "established|alleged|unclear", "about_this_company": "yes|possibly|no"}], '
+                  '"standing": "established|alleged|unclear", "about_this_company": "yes|related|possibly|no"}], '
                   '"summary": "one or two sentences"}'),
     render=_render_news,
     task=lambda s, focus: ("Read the news for this case and separate facts from allegations."

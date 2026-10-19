@@ -32,7 +32,7 @@ from mcp_types import ToolAnnotations
 
 from src.prescreen import casefile, demo_cases
 from src.prescreen.engine import STAGES, CompanyNotFound, SourceDown, run_prescreen
-from src.prescreen.checks import FCA_AUTHORISED
+from src.prescreen.checks import FCA_AUTHORISED, _went_insolvent as has_insolvency_record, insolvency_summary
 from src.prescreen.identity import normalise_name, resolve
 from src.prescreen.models import COVER_LINES, PreScreenRequest
 from src.prescreen.rules import RULES_VERSION, THRESHOLDS
@@ -98,11 +98,25 @@ def _limit() -> None:
 
 
 def _gap(c: dict[str, Any]) -> dict[str, Any]:
+    out_of_scope = casefile.is_out_of_scope(c)
     return {"check": c["title"], "check_id": c["check_id"], "group": casefile.GROUP_TITLES.get(c.get("group", ""), ""),
+            "kind": "not_covered_by_this_tool" if out_of_scope else "source_failed_or_incomplete",
             "reason": c.get("not_checked_reason") or c.get("summary", ""),
             "critical": bool(c.get("critical")),
             "means": ("Not checked. This is not a clear result." +
+                      (" This tool doesn't do this check; the underwriter uses another service." if out_of_scope else "") +
                       (" A critical check: the route can't be 'note' while it's missing." if c.get("critical") else ""))}
+
+
+def _news_counts(payload: dict[str, Any]) -> dict[str, int]:
+    """What the news reading found, flags and notes alike. A serious item can be a note (an FCA action already
+    found by the FCA check), and an agent must still see it (Monzo, live: "no news finding" under a £21m fine)."""
+    media = payload.get("media") or []
+    adverse = [m for m in media if m.get("category") not in ("", "neutral", None) and m.get("severity") not in ("low", None)]
+    return {"results": len(media),
+            "adverse_about_this_company": sum(m.get("about_this_company") in ("yes", "unsure") for m in adverse),
+            "adverse_about_related_company": sum(m.get("about_this_company") == "related" for m in adverse),
+            "not_reviewed": sum(m.get("about_this_company") == "not_reviewed" for m in media)}
 
 
 def summarise(payload: dict[str, Any]) -> dict[str, Any]:
@@ -140,6 +154,8 @@ def summarise(payload: dict[str, Any]) -> dict[str, Any]:
         "couldnt_check": [_gap(c) for c in checks if c.get("status") == "couldnt_check"],
         "flags": flags,
         "check_counts": counts,
+        "coverage": payload.get("coverage") or casefile.coverage(checks),
+        "news": _news_counts(payload),
         "proposal_differences": [r for r in payload.get("proposal_vs_record") or [] if r.get("verdict") in ("differs", "unknown")],
         "broker_questions": [] if hold else [q["question"] for q in payload.get("broker_questions") or []],
         "broker_questions_held": bool(hold and payload.get("broker_questions")),
@@ -300,8 +316,10 @@ def _err(source: str, err: Any) -> dict[str, Any]:
 
 @server.tool(annotations=READ_ONLY)
 async def company_record(company_number: str) -> dict[str, Any]:
-    """Companies House record for one company: profile, current officers and people with significant control.
-    Raw evidence for follow-up questions; use prescreen_company for an assessment."""
+    """Companies House record for one company: profile, current officers, people with significant control and,
+    when it has one, its insolvency record (case types and dates, plus the date the insolvency began as the
+    pre-screen's director-link rule measures it). Raw evidence for follow-up questions; use prescreen_company
+    for an assessment."""
     async with _client() as client:
         services, _ = build_services(client, company_number.upper())
         ch = services.ch
@@ -325,6 +343,11 @@ async def company_record(company_number: str) -> dict[str, Any]:
                              if i.get(k) is not None} for i in (items or [])[:30]]
             except SourceError as err:
                 out[key] = _err("Companies House", err)
+        if has_insolvency_record(profile):
+            try:
+                out["insolvency"] = insolvency_summary(await ch.insolvency(company_number.upper()))
+            except SourceError as err:
+                out["insolvency"] = _err("Companies House", err)
         return out
 
 

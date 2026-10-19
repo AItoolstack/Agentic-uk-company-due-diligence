@@ -35,8 +35,14 @@ CATEGORIES = [
 SYSTEM = """You screen search results for a UK commercial insurance underwriter.
 For each result decide:
 - about_this_company: "yes" only if the article is clearly about the exact legal entity described
-  (same business, same period). "no" if it is about another company, a predecessor that used the
-  same brand, a namesake, or a person with no link. "unsure" otherwise.
+  (same business, same period). "related" if it is about a different legal entity in the same group or
+  brand family: a parent, subsidiary or sister company, including an overseas one (for Revolut Ltd, a
+  fine on Revolut Bank UAB is "related"; for Monzo Bank Limited, Monzo Bank Europe DAC is "related").
+  "no" if it is about another company, a predecessor that used the same brand, a namesake, or a person
+  with no link. "unsure" otherwise.
+- entity_named: the legal entity the article names as the subject (e.g. "Revolut Bank UAB"), exactly as
+  written; "" if the article only uses the brand. For a fine, penalty or enforcement action, name the
+  entity that was fined or acted against.
 - category: one of CATEGORIES.
 - severity: "high" (insolvency, fraud, criminal or regulatory penalty, serious injury or death,
   major pollution), "medium" (investigation, lawsuit, warning, significant incident), "low" (neutral,
@@ -48,9 +54,37 @@ Base everything on the title, outlet, date and snippet given. Do not invent fact
 trade_consistency: when declared_trade is given, answer "consistent", "inconsistent" or "unclear" by comparing it
 with the SIC codes; use "not_asked" only when declared_trade is "(not given)". A dormant SIC (99999) with a
 trading business declared is "inconsistent".
-Reply with JSON only: {"items": [{"i": <index>, "about_this_company": "...", "category": "...",
+Reply with JSON only: {"items": [{"i": <index>, "about_this_company": "...", "entity_named": "...", "category": "...",
 "severity": "...", "reason": "..."}], "trade_consistency": {"verdict": "consistent|inconsistent|unclear|not_asked",
 "reason": "..."}}""".replace("CATEGORIES", ", ".join(CATEGORIES))
+
+
+_UK_FORMS = r"\b(limited|ltd|plc|llp|public limited company|the)\b"
+
+
+def _norm_entity(name: str) -> str:
+    s = re.sub(r"['\u2019]s\b", "", (name or "").lower())
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    s = re.sub(_UK_FORMS, " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def entity_relation(entity_named: str, registered_name: str, previous_names: list[str]) -> str:
+    """Code check on the model's reading. Returns "exact", "related" or "" (can't tell from the name).
+
+    "Revolut Bank UAB" against REVOLUT LTD is related: it starts with the brand but adds words the
+    registered name doesn't have ("Bank UAB"). A brand alone ("Monzo") can't be told apart by name,
+    so the model's answer stands."""
+    named = _norm_entity(entity_named)
+    if not named:
+        return ""
+    own = {_norm_entity(registered_name)} | {_norm_entity(n) for n in previous_names}
+    if named in own:
+        return "exact"
+    brand = _norm_entity(short_name(registered_name))
+    if brand and named.startswith(brand + " "):
+        return "related"
+    return ""
 
 
 def _published_date(value: str) -> date | None:
@@ -155,7 +189,8 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
             continue
         it = items[i]
         it.about_this_company = row.get("about_this_company", "unsure") if row.get("about_this_company") in (
-            "yes", "no", "unsure") else "unsure"
+            "yes", "related", "no", "unsure") else "unsure"
+        it.entity_named = str(row.get("entity_named") or "")[:120]
         it.category = row.get("category", "") if row.get("category") in CATEGORIES else "neutral"
         it.severity = row.get("severity", "low") if row.get("severity") in ("low", "medium", "high") else "low"
         it.reason = str(row.get("reason", ""))[:300]
@@ -170,6 +205,15 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                 it.about_this_company = "unsure"
                 it.reason = ("Reports a collapse or insolvency, but Companies House shows this company active with no "
                              "insolvency record; probably about another company that used the name. " + it.reason)[:300]
+
+    # Guard (Revolut, live): a fine on Revolut Bank UAB was read as a fine on Revolut Ltd. When the model names
+    # a different legal entity in the brand family, the article is related, not about this company, whatever
+    # it answered. Related news is shown but never becomes a reason for the route.
+    prev = [p.get("name", "") for p in data.profile.get("previous_company_names") or []]
+    for it in items:
+        if it.about_this_company in ("yes", "unsure") and entity_relation(it.entity_named, data.name, prev) == "related":
+            it.about_this_company = "related"
+            it.reason = (f"Names {it.entity_named}, a different legal entity from {data.name}. " + it.reason)[:300]
 
     # One finding per severity, not one per article: seven articles about one collapse are one fact.
     findings: list[Finding] = []
@@ -215,6 +259,18 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
             text=(f"{len(unsure)} serious news item{'s' if len(unsure) != 1 else ''} may be about this company; "
                   f"open and check: {unsure[0].title}"),
             sources=[SourceRef(label=it.source or "article", url=it.url) for it in unsure[:3]]))
+    related = [it for it in items if it.about_this_company == "related"
+               and it.category not in ("", "neutral") and it.severity != "low"]
+    if related:
+        related.sort(key=lambda it: it.published or "", reverse=True)
+        names = sorted({it.entity_named for it in related if it.entity_named})
+        findings.append(Finding(
+            rule_id="media_related", route=Route.NOTE,
+            text=(f"{len(related)} adverse news item{'s' if len(related) != 1 else ''} about a related company"
+                  + (f" ({', '.join(names[:3])})" if names else "")
+                  + f", not this one; latest: {related[0].title}"),
+            detail={"titles": [it.title for it in related][:10], "entities": names},
+            sources=[SourceRef(label=it.source or "article", url=it.url) for it in related[:3]]))
     excluded = sum(1 for it in items if it.about_this_company == "no")
     summary_clear = (f"{len(items)} results reviewed ({provider}); nothing adverse about this company"
                      + (f"; {excluded} excluded as about a different entity." if excluded else "."))

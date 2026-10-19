@@ -126,6 +126,7 @@ def build_graph(toolbox: Toolbox, model: AgentModel, judge_model: AgentModel | N
             "route_meaning": s.get("route_meaning"),
             "route_reasons": s.get("route_reasons") or [],
             "couldnt_check": s.get("couldnt_check") or [],
+            "coverage": s.get("coverage") or {},
             "rules_version": s.get("rules_version"),
             "plan": state.get("plan") or {},
             "sections": sections,

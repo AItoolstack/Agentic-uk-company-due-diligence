@@ -106,7 +106,7 @@ def test_report_carries_proposal_rows_and_file_note_lists_gaps():
     note = casefile.file_note(report.model_dump(mode="json"))
     assert note.startswith("INTERNAL") and "PRE-SCREEN:" in note
     if report.couldnt_check:
-        assert "Not checked" in note and "not a clear" in note
+        assert report.coverage["text"] in note and "not a clear" in note
     for g in casefile.GROUPS:
         if any(c.group == g["id"] for c in report.checks):
             assert g["title"] + ":" in note

@@ -95,16 +95,11 @@ ROUTE_WORDS = {
 
 
 def rules_summary(route: Route, reasons: list[str], checks: list[CheckResult]) -> str:
-    ran = [c for c in checks if c.status != CheckStatus.NOT_APPLICABLE]
-    clear = sum(1 for c in ran if c.status in (CheckStatus.CLEAR, CheckStatus.INFO))
-    flagged = sum(1 for c in ran if c.status == CheckStatus.FLAG)
-    unchecked = [c.title for c in ran if c.status == CheckStatus.COULDNT_CHECK]
-    parts = [f"{ROUTE_WORDS[route]}. {len(ran)} checks: {clear} without flags, {flagged} flagged, "
-             f"{len(unchecked)} couldn't be checked."]
+    cov = casefile.coverage(checks)
+    flagged = sum(1 for c in checks if c.status == CheckStatus.FLAG)
+    parts = [f"{ROUTE_WORDS[route]}. {cov['text']} {flagged} flagged."]
     if reasons:
         parts.append("Main reason: " + reasons[0])
-    if unchecked:
-        parts.append("Not checked: " + ", ".join(unchecked) + ".")
     parts.append("A recommendation only; the underwriter decides.")
     return " ".join(parts)
 
@@ -348,6 +343,7 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         company=card,
         broker_questions=casefile.broker_questions(results, llp=profile.get("type") == "llp"),
         proposal_vs_record=casefile.proposal_vs_record(req, card, results, today),
+        coverage=casefile.coverage(results),
         timeline=_timeline(data),
     )
 

@@ -134,12 +134,27 @@ def llp_words(text: str) -> str:
     return text
 
 
+def _counted_wording(checks: list[Any]) -> dict[str, str]:
+    """Questions whose wording depends on how many people or companies are involved. The guardrail's judge
+    caught "companies" for one company (Monzo, live), and the broker would have too."""
+    links = [f for c in checks for f in (_d(c).get("findings") or []) if f.get("rule_id") == "director_insolvent_links"]
+    if not links:
+        return {}
+    people = {(f.get("detail") or {}).get("name") for f in links} - {None}
+    total = sum(int((f.get("detail") or {}).get("count") or 1) for f in links)
+    who = "A director was" if len(people) <= 1 else "Some directors were"
+    what = "a company that" if total == 1 else "companies that"
+    return {"director_insolvent_links": f"{who} involved with {what} went into insolvency. Please give details, "
+                                        "and say what is different about this business."}
+
+
 def broker_questions(checks: list[Any], llp: bool = False) -> list[dict[str, Any]]:
     """One question per rule that needs an answer, worst route first, then in check order; at most
     MAX_QUESTIONS, with notes only filling spare places. `checks` are CheckResult models or their dicts.
     llp=True words the questions for an LLP (members, not directors)."""
     ids = {f.get("rule_id") for c in checks for f in (_d(c).get("findings") or [])}
     ended = bool(ids & ENDED)
+    wording = _counted_wording(checks)
     seen: set[str] = set()
     out: list[tuple[int, int, dict[str, Any]]] = []
     for ci, c in enumerate(checks):
@@ -166,7 +181,8 @@ def broker_questions(checks: list[Any], llp: bool = False) -> list[dict[str, Any
             rank = {"note": 0, "refer": 1, "outside_appetite": 2, "compliance_hold": 3}.get(f.get("route"), 0)
             out.append((-rank, ci, {"rule_id": rid, "check_id": c.get("check_id"), "route": f.get("route"),
                                     "group": group_of(c.get("check_id", "")),
-                                    "question": llp_words(BROKER_QUESTIONS[rid]) if llp else BROKER_QUESTIONS[rid],
+                                    "question": (llp_words(wording.get(rid, BROKER_QUESTIONS[rid])) if llp
+                                                 else wording.get(rid, BROKER_QUESTIONS[rid])),
                                     "because": f.get("text", "")}))
     ranked = [q for _, _, q in sorted(out, key=lambda x: (x[0], x[1]))]
     serious = [q for q in ranked if q["route"] != "note"]
@@ -352,9 +368,10 @@ def file_note(report: dict[str, Any]) -> str:
                     tags = f.get("tags") or fraud_tags(f.get("rule_id", ""))
                     lines.append(f"      - {f.get('text')}" + (f" [fraud indicator: {', '.join(tags)}]" if tags else ""))
 
-    unchecked = r.get("couldnt_check") or []
-    if unchecked:
-        lines += ["", "Not checked (absence of a finding here is not a clear): " + ", ".join(unchecked) + "."]
+    cov = r.get("coverage") or coverage(checks)
+    lines += ["", "Coverage: " + cov["text"]]
+    if cov["couldnt_check"] or cov["not_covered"]:
+        lines.append("Absence of a finding in a check that wasn't done is not a clear result.")
 
     rows = [x for x in (r.get("proposal_vs_record") or []) if x.get("verdict") == "differs"]
     if rows:
@@ -483,3 +500,38 @@ def timeline(data: Any, years: int = 5, limit: int = 30) -> list[dict[str, Any]]
         inc = [e for e in out if e["text"] == "Incorporated"]
         out = out[:limit - len(inc)] + inc
     return out
+
+
+# ---------------------------------------------------------------------------
+# Coverage: one account of what was checked, used by the report, the UI, the file note, the MCP server
+# and the agent layer. The external review found three different counts on one Monzo report.
+# ---------------------------------------------------------------------------
+
+def is_out_of_scope(c: Any) -> bool:
+    c = _d(c)
+    if c.get("out_of_scope"):
+        return True
+    # Reports saved before the flag existed.
+    return c.get("check_id") == "ccj" and c.get("status") == "couldnt_check"
+
+
+def coverage(checks: list[Any]) -> dict[str, Any]:
+    """completed = the check ran over everything it needed (clear, worth reading or flagged).
+    couldnt_check = it applies and the tool does it, but a source failed or was incomplete.
+    not_covered = it applies but this tool doesn't do it (CCJs).
+    not_applicable = it doesn't apply to this company. Completed never means cleared."""
+    cs = [_d(c) for c in checks]
+    na = [c for c in cs if c.get("status") == "not_applicable"]
+    not_cov = [c for c in cs if c.get("status") == "couldnt_check" and is_out_of_scope(c)]
+    gaps = [c for c in cs if c.get("status") == "couldnt_check" and not is_out_of_scope(c)]
+    done = [c for c in cs if c.get("status") in ("clear", "info", "flag")]
+    applies = len(cs) - len(na)
+    text = f"{len(done)} of {applies} checks completed."
+    if gaps:
+        text += f" Couldn't check: {', '.join(c['title'] for c in gaps)}."
+    if not_cov:
+        text += f" Not covered by this tool: {', '.join(c['title'] for c in not_cov)}."
+    return {"total": len(cs), "applies": applies, "completed": len(done), "couldnt_check": len(gaps),
+            "not_covered": len(not_cov), "not_applicable": len(na),
+            "couldnt_check_titles": [c["title"] for c in gaps], "not_covered_titles": [c["title"] for c in not_cov],
+            "text": text}

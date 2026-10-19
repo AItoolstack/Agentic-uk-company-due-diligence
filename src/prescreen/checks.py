@@ -152,6 +152,9 @@ def _finish(check_id: str, title: str, findings: list[Finding], clear_summary: s
         status, summary = CheckStatus.FLAG, _join([f.text for f in flagged])
     elif findings:
         status, summary = CheckStatus.INFO, clear_summary if info_summary is None else info_summary
+        if not summary:
+            # Never an empty line above the notes (Revolut's FCA check, live 19 Oct).
+            summary = _join([f.text for f in findings])
     else:
         status, summary = CheckStatus.CLEAR, clear_summary
     return CheckResult(check_id=check_id, title=title, status=status, summary=summary,
@@ -640,6 +643,22 @@ def insolvency_start(record: Any) -> tuple[date | None, bool]:
               for d in c.get("dates") or [] if d.get("type") in INSOLVENCY_START_DATES]
     starts = [x for x in starts if x]
     return (min(starts) if starts else None), False
+
+
+def insolvency_summary(record: Any) -> dict[str, Any]:
+    """The insolvency record in the shape the MCP tool returns, with the start date the director-link
+    rule (19e) uses, so an agent can check the rule's timing against the same evidence."""
+    if not isinstance(record, dict):
+        return {"cases": [], "began_on": None, "solvent_wind_up": False,
+                "note": "Companies House returned no insolvency record."}
+    began, solvent = insolvency_start(record)
+    cases = [{"type": c.get("type"), "number": c.get("number"),
+              "dates": [{"type": d.get("type"), "date": d.get("date")} for d in c.get("dates") or []]}
+             for c in record.get("cases") or []]
+    return {"cases": cases, "began_on": began.isoformat() if began else None, "solvent_wind_up": solvent,
+            "note": ("A members' voluntary liquidation: a solvent wind-up, debts paid in full." if solvent else
+                     "began_on is the earliest petition, winding-up, administration, CVA or receivership date."
+                     if began else "No start date on record: timing unknown.")}
 
 
 def _relevant_window_cut(data: CompanyData) -> date:
@@ -1195,5 +1214,5 @@ def check_ccj() -> CheckResult:
     return CheckResult(
         check_id="ccj", title="County court judgments", status=CheckStatus.COULDNT_CHECK,
         summary="Not checked: CCJ data is paid (Registry Trust or a credit reference agency) and isn't connected.",
-        not_checked_reason="paid source not connected",
+        not_checked_reason="paid source not connected", out_of_scope=True,
         sources=[SourceRef(label="TrustOnline", url="https://www.trustonline.org.uk/")])

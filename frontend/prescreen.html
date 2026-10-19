@@ -521,7 +521,18 @@ function humanReason(t) {
   if (/no_key|not connected|paid source/i.test(s)) return s;
   return s;
 }
-const notCovered = c => c.check_id === "ccj" && /not connected|paid/i.test(c.not_checked_reason || c.summary || "");
+const notCovered = c => c.status === "couldnt_check" && (c.out_of_scope || c.kind === "not_covered_by_this_tool" || (c.check_id === "ccj" && /not connected|paid/i.test(c.not_checked_reason || c.reason || c.summary || "")));
+// One coverage account everywhere: the report's own when it has one, else computed the same way as the server.
+function coverageOf(checks) {
+  const na = checks.filter(c => c.status === "not_applicable"), nc = checks.filter(notCovered);
+  const gaps = checks.filter(c => c.status === "couldnt_check" && !notCovered(c));
+  const done = checks.filter(c => ["clear", "info", "flag"].includes(c.status));
+  const applies = checks.length - na.length;
+  let text = `${done.length} of ${applies} checks completed.`;
+  if (gaps.length) text += ` Couldn't check: ${gaps.map(c => c.title || c.check).join(", ")}.`;
+  if (nc.length) text += ` Not covered by this tool: ${nc.map(c => c.title || c.check).join(", ")}.`;
+  return {applies, completed: done.length, couldnt_check: gaps.length, not_covered: nc.length, not_applicable: na.length, text};
+}
 const order = c => c.status === "flag" ? -RANK[worst(c)] - 1 : ({couldnt_check: 0, info: 1, clear: 2, not_applicable: 3}[c.status]);
 function fmtDate(s) { if (!s) return ""; const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric"}); }
 function yearsSince(s) { const d = new Date(s); if (isNaN(d)) return ""; const y = Math.floor((Date.now() - d) / 31557600000); return y < 1 ? "under a year" : `${y} year${y === 1 ? "" : "s"}`; }
@@ -804,7 +815,7 @@ function renderLedger(r, byGroup) {
   const counts = {flag: 0, couldnt_check: 0, info: 0, clear: 0, not_applicable: 0, not_covered: 0};
   r.checks.forEach(c => notCovered(c) ? counts.not_covered++ : counts[c.status]++);
   return `<section class="panel ledger" aria-label="Everything that was checked">
-    <header><h2>What was checked</h2><span class="aside">${r.checks.length - counts.not_applicable} of ${r.checks.length} checks applied to this company</span></header>
+    <header><h2>What was checked</h2><span class="aside">${(() => { const cv = r.coverage && r.coverage.text ? r.coverage : coverageOf(r.checks); return `${cv.completed} of ${cv.applies} completed${cv.couldnt_check ? `, ${cv.couldnt_check} couldn't check` : ""}${cv.not_covered ? `, ${cv.not_covered} not covered by this tool` : ""}`; })()}</span></header>
     <div class="body"><div class="lgrid">${byGroup.map(g => `<div class="lcol">
       <h3><a href="#g-${g.id}" data-jumpg="${g.id}" style="color:inherit;text-decoration:none">${esc(g.title)}</a></h3><div class="q">${esc(g.question)}</div>
       ${g.checks.map(c => { const w = c.status === "flag" ? " " + worst(c) : "";
@@ -883,10 +894,11 @@ function render(r) {
   const media = r.media || [];
   const about = media.filter(m => m.about_this_company === "yes" || m.about_this_company === "unsure");
   const aside = media.filter(m => m.about_this_company === "no");
+  const related = media.filter(m => m.about_this_company === "related");
   const unread = media.filter(m => m.about_this_company === "not_reviewed");
   const newsItem = (m, cls = "") => `<div class="ni ${cls}"><div class="t"><a href="${safeUrl(m.url)}" target="_blank" rel="noopener noreferrer">${esc(m.title)}</a>${
       m.severity && m.severity !== "low" && cls !== "set-aside" ? `<span class="sev ${esc(m.severity)}">${esc(m.severity)}</span>` : ""}</div>
-    <div class="m">${esc(m.source)}, ${esc(fmtDate((m.published || "").slice(0, 10)) || "undated")}${m.category && m.category !== "neutral" ? ", " + esc(m.category.replace(/_/g, " ")) : ""}${m.about_this_company === "unsure" ? ", may not be this company" : ""}</div>
+    <div class="m">${esc(m.source)}, ${esc(fmtDate((m.published || "").slice(0, 10)) || "undated")}${m.category && m.category !== "neutral" ? ", " + esc(m.category.replace(/_/g, " ")) : ""}${m.about_this_company === "unsure" ? ", may not be this company" : ""}${m.about_this_company === "related" && m.entity_named ? ", names " + esc(m.entity_named) : ""}</div>
     ${m.reason ? `<div class="r">${esc(m.reason)}</div>` : ""}</div>`;
   const demo = r.meta && r.meta.data === "demo";
   const qs = r.broker_questions || [];
@@ -940,8 +952,9 @@ ${pvrGiven.length ? `<section class="panel" id="pvr" style="scroll-margin-top:90
 
         ${media.length ? `<section class="panel news"><header><h2>News and web</h2><span class="aside">${media.length} result${media.length === 1 ? "" : "s"}, read against this company</span></header>
           ${about.length ? `<h4>About this company</h4>${about.map(m => newsItem(m)).join("")}` : ""}
+          ${related.length ? `<h4>About a related company in the same group, not this one</h4>${related.map(m => newsItem(m)).join("")}` : ""}
           ${unread.length ? `<h4>Not reviewed</h4>${unread.map(m => newsItem(m)).join("")}` : ""}
-          ${aside.length ? `<h4>Before this company took its name: probably a different business, but worth a look</h4>${aside.map(m => newsItem(m, "set-aside")).join("")}` : ""}
+          ${aside.length ? `<h4>Set aside as about a different business (a namesake or an earlier company with this name), worth a look</h4>${aside.map(m => newsItem(m, "set-aside")).join("")}` : ""}
         </section>` : ""}
 
         <section class="panel agents" id="agent-review"><header><h2>Agent review</h2><span class="aside">specialist agents over the MCP server: they explain, the rules decide</span></header>
@@ -990,7 +1003,7 @@ function renderAgentRun(run, cfg) {
   const v = run.review || {}, plan = v.plan || {}, t = (run.trace || {}).totals || {};
   if (v.stopped) return `<div class="body"><p class="msg err">${esc(v.stopped)}</p>${agentButton(cfg, true)}</div>`;
   const ran = (plan.run || []).map(n => AGENT_NAME[n] || n);
-  const notRun = Object.entries(plan.not_run || {}).concat(Object.entries(plan.dropped || {}));
+  const notRun = Object.entries(plan.not_run || {}).concat(Object.entries(plan.dropped || {}).map(([n, why]) => [n, "Not selected by the planner: " + why]));
   const secs = (v.sections || []).map(x => {
     const g = x.guardrail || {};
     const chip = x.status === "ok" ? `<span class="chip ok">${icon("tick")} checked: ${esc(g.checked_by || "rules")}</span>`
@@ -1004,7 +1017,7 @@ function renderAgentRun(run, cfg) {
   const spans = (run.trace || {}).spans || [];
   return `<div class="body">${AGENT_INTRO}<p class="plan">${ran.length ? `Ran: ${esc(ran.join(", "))}.` : "No specialist had anything to work on."} <span class="aside">Planned by ${esc(plan.planned_by || "rules")}.</span></p>
     ${notRun.length ? `<p class="plan not">${notRun.map(([n, why]) => `${esc(AGENT_NAME[n] || n)}: ${esc(why)}`).join("<br>")}</p>` : ""}
-    <p class="plan not">Route unchanged: ${esc(ROUTE[v.route] || v.route)}. ${(v.couldnt_check || []).length} check${(v.couldnt_check || []).length === 1 ? "" : "s"} couldn't run and stay unchecked.</p>
+    <p class="plan not">Route unchanged: ${esc(ROUTE[v.route] || v.route)}. ${esc((v.coverage && v.coverage.text) || `${(v.couldnt_check || []).length} check${(v.couldnt_check || []).length === 1 ? "" : "s"} not done, and never treated as clear.`)}</p>
     </div>${secs}
     <div class="tracebar"><span><b>${t.model_calls}</b> model calls</span><span><b>${t.tool_calls}</b> MCP tool calls</span><span><b>${(t.input_tokens || 0).toLocaleString("en-GB")}</b> in / <b>${(t.output_tokens || 0).toLocaleString("en-GB")}</b> out tokens</span>
       <span><b>$${(t.cost_usd || 0).toFixed(4)}</b></span><span><b>${((t.wall_ms || 0) / 1000).toFixed(1)}s</b></span><span>${esc(run.model)} · MCP ${esc(run.transport)}</span><span>${esc(new Date(run.created_at).toLocaleString("en-GB"))}</span></div>
