@@ -241,7 +241,7 @@ def test_sanctions_name_and_dob_match_is_compliance_hold():
 def test_llp_members_are_checked_and_screened():
     report = _run("OC000005", cover_lines=["professional_indemnity"])
     disq = _check(report, "directors_disqualified")
-    assert disq.status == CheckStatus.CLEAR and "3 director(s)" in disq.summary
+    assert disq.status == CheckStatus.CLEAR and "3 member(s)" in disq.summary
     assert "officers_left" in _rules(report)
     assert report.route == Route.NOTE
 

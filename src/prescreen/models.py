@@ -166,6 +166,7 @@ class PreScreenReport(BaseModel):
     summary: str = ""
     summary_by: str = "rules"  # "rules" or the model name
     llm_calls: int = 0
+    llm_usage: dict[str, Any] = Field(default_factory=dict)  # tokens in/out and model, for cost
     elapsed_seconds: float = 0.0
     decision: dict[str, Any] | None = None
     company: dict[str, Any] = Field(default_factory=dict)  # identity card: what the underwriter confirms first

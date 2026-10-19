@@ -72,8 +72,9 @@ def get_llm(
     kwargs: dict[str, Any] = {
         "model": effective_model,
         "model_provider": effective_provider,
-        "temperature": effective_temp,
     }
+    if effective_temp is not None:  # newer OpenAI models reject temperature; None leaves it out
+        kwargs["temperature"] = effective_temp
 
     # Pass API key explicitly only when we have it.
     # init_chat_model also picks up standard env vars (OPENAI_API_KEY etc.) automatically.

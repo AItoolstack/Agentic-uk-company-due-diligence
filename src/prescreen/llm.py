@@ -46,6 +46,7 @@ class JSONChat:
         self.api_key = api_key
         self.scripted = scripted  # tests: canned responses, consumed in order
         self.calls = 0
+        self.usage = {"input_tokens": 0, "output_tokens": 0, "model": ""}  # summed over calls (evaluation)
 
     @property
     def available(self) -> bool:
@@ -118,9 +119,14 @@ class JSONChat:
                 if resp.status_code >= 400:
                     raise LLMError(f"model returned HTTP {resp.status_code}")
                 try:
-                    choice = (resp.json().get("choices") or [{}])[0]
+                    data = resp.json()
+                    choice = (data.get("choices") or [{}])[0]
                 except ValueError as exc:
                     raise LLMError("model response wasn't JSON") from exc
+                u = data.get("usage") or {}
+                self.usage["input_tokens"] += int(u.get("prompt_tokens") or 0)
+                self.usage["output_tokens"] += int(u.get("completion_tokens") or 0)
+                self.usage["model"] = data.get("model") or self.model
                 if choice.get("finish_reason") == "length":
                     raise _BadJSON("the answer was cut off at the token limit")
                 return (choice.get("message") or {}).get("content") or ""

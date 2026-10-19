@@ -214,6 +214,23 @@ async def changes_seen(company_number: str) -> dict:
 # Agent review (src/agents_v2): specialist agents over the MCP server. They explain; the route stays the rules'.
 # ---------------------------------------------------------------------------
 
+@router.post("/eval/legacy")
+async def eval_legacy(body: dict) -> dict:
+    """Three-way evaluation only: run the old research graph (src/graph.py) on one query with a chosen model and
+    return its brief with every model call metered. Same access token and hourly cap as agent reviews."""
+    from src.agents_v2.service import AgentLimit, agent_limit
+    from src.evaluation.legacy_run import run_legacy
+    query = str(body.get("query") or "").strip()
+    if not 10 <= len(query) <= 300:
+        raise HTTPException(422, "query must be 10-300 characters")
+    try:
+        agent_limit()
+    except AgentLimit as err:
+        raise HTTPException(429, str(err)) from err
+    return await run_legacy(query, provider=str(body.get("provider") or ""), model=str(body.get("model") or ""),
+                            fast_model=str(body.get("fast_model") or ""))
+
+
 @router.get("/agents/config")
 async def agents_config() -> dict:
     from src.agents_v2.service import config as agent_config

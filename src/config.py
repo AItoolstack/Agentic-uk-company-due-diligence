@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # LLM -- model-agnostic via LangChain init_chat_model
     chat_model_provider: str = Field(default="openai", alias="CHAT_MODEL_PROVIDER")
     chat_model: str = Field(default="gpt-4o", alias="CHAT_MODEL")
-    openai_temperature: float = Field(default=0.0, alias="OPENAI_TEMPERATURE")
+    openai_temperature: float | None = Field(default=0.0, alias="OPENAI_TEMPERATURE")
     chat_model_fast: str = Field(default="", alias="CHAT_MODEL_FAST")
 
     # Provider API keys

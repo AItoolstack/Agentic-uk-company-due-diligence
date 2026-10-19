@@ -448,3 +448,38 @@ def test_unusable_turns_are_traced_with_their_shape():
     assert d["status"] == "ok"
     notes = [sp for sp in out["trace"]["spans"] if sp["kind"] == "note"]
     assert notes and "answer" in notes[0]["error"]
+
+
+# ---------------------------------------------------------------------------
+# Three-way evaluation: the old graph, metered
+# ---------------------------------------------------------------------------
+
+def test_legacy_run_meters_every_model_call_and_restores_settings(monkeypatch):
+    from langchain_core.language_models.fake_chat_models import FakeListChatModel
+
+    from src import llm as llm_module
+    from src.config import settings
+    from src.evaluation import legacy_run
+
+    class Graph:
+        async def ainvoke(self, state):
+            m = llm_module.get_llm()
+            await m.ainvoke("one")
+            await m.ainvoke("two")
+            return {"errors": [{"message": "a source failed"}], "iteration_count": 1}
+
+    built = {}
+
+    def fake_get_llm(*a, **k):
+        built["temperature"] = settings.openai_temperature
+        built["model"] = settings.chat_model
+        return FakeListChatModel(responses=["a", "b"])
+    fake_get_llm.cache_clear = lambda: None
+    monkeypatch.setattr(llm_module, "get_llm", fake_get_llm)
+    monkeypatch.setattr("src.api.routes.get_research_graph", lambda: Graph())
+    before = (settings.chat_model_provider, settings.chat_model, settings.openai_temperature)
+    out = asyncio.run(legacy_run.run_legacy("Create a due diligence brief for Monzo", provider="openai",
+                                            model="gpt-6-luna"))
+    assert built == {"temperature": None, "model": "gpt-6-luna"}
+    assert out["totals"]["model_calls"] == 2 and out["errors"] == ["a source failed"]
+    assert (settings.chat_model_provider, settings.chat_model, settings.openai_temperature) == before

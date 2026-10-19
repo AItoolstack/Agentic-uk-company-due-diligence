@@ -557,18 +557,19 @@ def check_directors_disqualified(data: CompanyData) -> CheckResult:
                 text=f"{_who(d)} matches a disqualified director on name and date of birth" +
                      (f"; disqualified until {until}." if until else "."),
                 sources=hit_src))
-    scope = (f"{len(people)} director(s)" + (f" of {total}" if total > len(people) else "") +
+    member = "member" if data.profile.get("type") == "llp" else "director"
+    scope = (f"{len(people)} {member}(s)" + (f" of {total}" if total > len(people) else "") +
              " checked by name and date of birth, including any who resigned in the last 12 months")
     if total > len(people):
         findings.append(Finding(rule_id="directors_capped", route=Route.NOTE,
-                                text=f"Only the first {len(people)} of {total} directors were checked."))
+                                text=f"Only the first {len(people)} of {total} {member}s were checked."))
     if officers_truncated(data):
         failed.append("officers beyond the first page")
     if total > len(people):
-        failed.append(f"{total - len(people)} directors over the {len(people)}-director limit")
+        failed.append(f"{total - len(people)} {member}s over the {len(people)}-{member} limit")
     if failed:
         result = _couldnt("directors_disqualified", title,
-                          "not every director could be checked (" + "; ".join(failed[:4]) + ")", True, src)
+                          f"not every {member} could be checked (" + "; ".join(failed[:4]) + ")", True, src)
         result.findings = findings
         return result
     return _finish("directors_disqualified", title, findings, scope + "; none disqualified.", src, critical=True)

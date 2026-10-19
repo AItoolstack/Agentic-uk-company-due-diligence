@@ -343,6 +343,7 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         media=media_items,
         summary=rules_summary(route, reasons, results),
         llm_calls=services.llm.calls,
+        llm_usage=dict(getattr(services.llm, "usage", {}) or {}),
         elapsed_seconds=round(time.perf_counter() - t0, 2),
         company=card,
         broker_questions=casefile.broker_questions(results, llp=profile.get("type") == "llp"),
