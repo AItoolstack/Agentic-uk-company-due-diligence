@@ -792,13 +792,19 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
                                "liquidation, a solvent wind-up")
                 continue
             when = start or ended
-            if when is not None and when < history_cut:
-                continue  # outside the lookback
             if when is None:
                 resigned = _parse_date(a.get("resigned_on"))
                 if resigned is not None and resigned < history_cut:
                     continue  # as before: unknown timing, only directors in post within the lookback
             tier, words = classify_link(a, start, ended)
+            if when is not None and when < history_cut:
+                # Outside the lookback. Said out loud when it would otherwise have counted (Tesco, live: the
+                # only director link began Apr 2021, so the route changed; that mustn't happen silently).
+                if tier in ("in_post", "near"):
+                    excused.append(f"{_surname_of(d)}: {to.get('company_name')} ({num}), "
+                                   f"{'began' if start else 'dissolved'} {when:%b %Y}, more than "
+                                   f"{T['director_lookback_years']} years ago")
+                continue
             if tier in ("long_before", "after"):
                 excused.append(f"{_surname_of(d)}: {to.get('company_name')} ({num}), {words}")
                 continue
@@ -858,8 +864,8 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
     if excused:
         findings.append(Finding(
             rule_id="director_link_not_counted", route=Route.NOTE,
-            text=f"Not counted ({member}s left long before the insolvency, joined after it, or the wind-up was "
-                 f"solvent): " + "; ".join(excused[:8]) + (f"; and {len(excused) - 8} more" if len(excused) > 8 else "")
+            text=f"Not counted ({member}s left long before the insolvency or joined after it, the wind-up was "
+                 f"solvent, or it began more than {T['director_lookback_years']} years ago): " + "; ".join(excused[:8]) + (f"; and {len(excused) - 8} more" if len(excused) > 8 else "")
                  + "."))
     if notes:
         findings.append(Finding(

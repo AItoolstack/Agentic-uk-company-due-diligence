@@ -144,10 +144,19 @@ def test_joined_just_before_is_counted_and_called_a_possible_rescue():
     assert f.route == Route.REFER and "possibly a rescue appointment" in f.text
 
 
-def test_insolvency_older_than_the_lookback_is_ignored():
+def test_insolvency_older_than_the_lookback_is_not_counted_but_is_shown():
+    # Tesco, live: the only director link (in post) began Apr 2021, so the route moved refer -> note.
     r = _run([_appt("ZZ900002", "A LTD", "liquidation", "2012-01-01")],
              {"ZZ900002": _ins("creditors-voluntary-liquidation", "wound-up-on", "2019-03-01")})
-    assert "director_insolvent_links" not in _rules(r)
+    rules = _rules(r)
+    assert "director_insolvent_links" not in rules
+    assert "began Mar 2019, more than 5 years ago" in rules["director_link_not_counted"].text
+
+
+def test_old_insolvency_they_had_long_left_is_not_even_mentioned():
+    r = _run([_appt("ZZ900002", "A LTD", "liquidation", "2005-01-01", "2010-01-01")],
+             {"ZZ900002": _ins("creditors-voluntary-liquidation", "wound-up-on", "2019-03-01")})
+    assert "director_link_not_counted" not in _rules(r)
 
 
 def test_dissolved_company_uses_its_insolvency_start_date():
