@@ -378,3 +378,37 @@ liability and trade credit) is not done.
 
 **Tests:** 22 new in `tests/test_director_timing.py` (each tier, MVL, unknown/unreadable, rescue, lookback,
 phoenix, Northern Bake still declines). Suite 242.
+
+## Step 3: the three-way evaluation (19 Oct, 21:27–22:10)
+
+Full write-up: `08-three-way-eval.md`; ground truth and scores with evidence in `eval/`.
+
+**How it was made fair.** The old graph ran on the same model as the agents (`gpt-6-luna`), through a new
+eval-only endpoint that meters every LangChain model call. Its first run failed for a reason unrelated to the
+architecture (OpenAI's strict schema mode rejects two of its schemas; errors swallowed, "low risk" anyway), so
+the scored runs give it non-strict structured output. Ground truth was written before any run.
+
+**Headline (9 real companies):** key facts 3/9 (old graph) vs 9/9 (rules); wrong statements 6 vs 1; outcome
+band 8/9 vs 9/9; $0.0048 and 89 s vs $0.0004 and 9 s per company. Agents on top: +$0.0013 and ~14 s, route
+unchanged 9/9, and they caught the pre-screen's one error (Revolut: a Lithuanian group company's fine counted as
+Revolut Ltd's).
+
+**The lesson for the series.** A better model fixed everything the baseline blamed on the free tier (identity,
+defaults, rate limits) and nothing that was structural: the old sanctions screen screened 0 entities in 9/9
+runs and every brief still said "no sanctions hits"; its FCA check said "unknown" for an authorised bank;
+its phoenix score counted the company itself. Careful prose on top of checks that never ran is the worst
+combination: it reads as diligence.
+
+**Instrumentation built for this:** `/api/prescreen/eval/legacy` (old graph, metered, saved to `eval_runs`),
+token usage on the pre-screen's call (`llm_usage`).
+
+**Found and logged, not yet fixed:** (1) pre-screen news reading accepts a group company's fine as the
+company's (needs an entity check on regulator fines); (2) Revolut's FCA check has an empty summary;
+(3) `company_record` doesn't return insolvency case dates, so agents can't verify rule 19e's timing;
+(4) the broker question for director links says "companies" even when there's one.
+
+## Blog angles, updated
+
+10. "I gave the old agent graph a better model. It got more polite, not more right." (08)
+11. "My agent caught my rules' mistake, and couldn't do anything about it" (Revolut; agents explain, rules decide).
+12. "The agent's narrative found a rule bug: when a director left matters" (rules 19e).

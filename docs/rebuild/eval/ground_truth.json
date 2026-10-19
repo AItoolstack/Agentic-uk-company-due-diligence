@@ -1,0 +1,115 @@
+{
+ "_about": "Written before the three-way runs (19 Oct 2026, 21:40). Facts from primary registers (Companies House, FCA Register, Gazette) or well-documented public events; each 'verify' says where. 'band' is what a careful underwriter would expect: decline = outside appetite / high risk with referral; refer = refer / medium-or-high with a referral; note = no referral / low.",
+ "scoring": {
+  "identity": "Reported on the right company number (the proposal's).",
+  "status": "States the company's current Companies House status correctly.",
+  "key_facts": "Each listed fact appears, attributed to this company.",
+  "band": "Outcome falls in the expected band.",
+  "gap_as_clear": "Count of checks that did not run (or ran on no data) but are presented as clear, clean, low risk or a positive result. Target 0.",
+  "wrong_or_invented": "Count of statements that are false for this company, including another entity's events stated as this company's. Target 0.",
+  "defaulted": "The overall outcome is a schema default or fallback rather than a reasoned result (e.g. MEDIUM with confidence 0.1 and no reasons)."
+ },
+ "companies": [
+  {
+   "name": "Monzo Bank Limited",
+   "number": "09446231",
+   "band": "refer",
+   "status": "active",
+   "key_facts": [
+    "FCA-authorised bank",
+    "FCA fine (July 2025, financial crime controls, about \u00a321m)"
+   ],
+   "verify": "Companies House profile; FCA Register (firm + disciplinary history)",
+   "verified": "Companies House active; FCA Register: MONZO BANK LIMITED, FRN 730427, Authorised"
+  },
+  {
+   "name": "Wilko Limited",
+   "number": "09563205",
+   "band": "refer",
+   "status": "active",
+   "key_facts": [
+    "Recorded as non-trading (SIC 99999, dormant) with micro-entity accounts, so a trading proposal doesn't fit the record"
+   ],
+   "traps": [
+    "The 2023 collapse of the Wilko retail chain was a different legal entity; stating it as this company's insolvency is wrong"
+   ],
+   "verify": "Companies House profile and accounts type",
+   "corrected": "21:55, after verification: first draft said 'files dormant accounts'; the last accounts are micro-entity and the SIC code is 99999 (dormant)."
+  },
+  {
+   "name": "Thames Water Utilities Limited",
+   "number": "02366661",
+   "band": "refer",
+   "status": "active",
+   "key_facts": [
+    "Ofwat fine in 2025 (about \u00a3123m)"
+   ],
+   "verify": "Companies House profile; Ofwat announcement (May 2025)"
+  },
+  {
+   "name": "Carillion PLC",
+   "number": "03782379",
+   "band": "decline",
+   "status": "liquidation",
+   "key_facts": [
+    "Compulsory liquidation since January 2018"
+   ],
+   "verify": "Companies House profile and insolvency record"
+  },
+  {
+   "name": "BrewDog PLC",
+   "number": "SC311560",
+   "band": "decline",
+   "status": "administration",
+   "key_facts": [
+    "In administration since 2 March 2026"
+   ],
+   "verify": "Companies House profile and insolvency record"
+  },
+  {
+   "name": "Tesco PLC",
+   "number": "00445790",
+   "band": "note",
+   "status": "active",
+   "key_facts": [],
+   "traps": [
+    "The 2014 accounting scandal and 2017 FCA/SFO outcomes are more than 5 years old; not current adverse findings"
+   ],
+   "verify": "Companies House profile"
+  },
+  {
+   "name": "Revolut Ltd",
+   "number": "08804411",
+   "band": "refer",
+   "status": "active",
+   "key_facts": [
+    "FCA-authorised (e-money institution, FRN 900562)",
+    "Confirmation statement overdue (due 13 Sep 2026)"
+   ],
+   "traps": [
+    "Saying Revolut Ltd is not on the FCA Register"
+   ],
+   "verify": "FCA Register; Companies House profile",
+   "verified": "Companies House active, confirmation statement due 2026-09-13 and overdue; FCA Register FRN 900562 Registered (EMI) and FRN 975775 Appointed representative"
+  },
+  {
+   "name": "Greggs PLC",
+   "number": "00502851",
+   "band": "note",
+   "status": "active",
+   "key_facts": [],
+   "verify": "Companies House profile"
+  },
+  {
+   "name": "Linklaters LLP",
+   "number": "OC326345",
+   "band": "refer",
+   "status": "active",
+   "key_facts": [
+    "LLP with about 336 members: not every member can be checked within a run, and the report must say so"
+   ],
+   "verify": "Companies House officers list"
+  }
+ ],
+ "_verified": "Statuses for all 9 checked against Companies House via the MCP company_record tool, 19 Oct 2026 21:50; FCA via fca_firm_search."
+}
