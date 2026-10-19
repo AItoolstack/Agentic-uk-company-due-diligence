@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from src.prescreen.models import CheckResult, CheckStatus, Route
 
-RULES_VERSION = "draft-2026-10-19d"
+RULES_VERSION = "draft-2026-10-19e"
 
 THRESHOLDS = {
     # Company age
@@ -24,7 +24,13 @@ THRESHOLDS = {
     "director_insolvent_refer": 1,     # DRAFT: links to this many insolvent companies -> refer
     "director_insolvent_decline": 2,   # DRAFT: this many or more -> outside appetite
     "many_appointments": 20,           # DRAFT: directors with this many appointments are capped at refer
-    "phoenix_young_months": 24,        # DRAFT: similar-name insolvent predecessor + company younger than this
+    "phoenix_young_months": 24,
+    # When a director left, measured from the date the linked company's insolvency began (CH insolvency record).
+    "director_in_post_months": 12,     # in post, or left within this -> counts fully (s.216 IA 1986 uses 12 months)
+    "director_relevant_months": 36,    # left within this -> counts, refer at most (the IP's conduct report: 3 years)
+                                       # left earlier -> not counted, shown as a note
+    "rescue_join_months": 6,           # joined within this before it began -> said "possibly a rescue appointment"
+    "max_linked_insolvency_lookups": 40,        # DRAFT: similar-name insolvent predecessor + company younger than this
     "max_directors_checked": 15,
     "max_dissolved_profiles_per_director": 8,
     "max_dissolved_profiles_total": 30,

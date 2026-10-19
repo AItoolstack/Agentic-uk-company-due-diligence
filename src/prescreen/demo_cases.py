@@ -49,6 +49,11 @@ def _appt(number: str, name: str, status: str, appointed: str, resigned: str | N
     return a
 
 
+def _ins(case_type: str, date_type: str, when: str) -> dict[str, Any]:
+    return {"cases": [{"type": case_type, "number": "1", "dates": [{"type": date_type, "date": when}]}],
+            "status": []}
+
+
 def _profile(number: str, name: str, created: str, *, status: str = "active", detail: str = "",
              acc_due: str = "2027-06-30", acc_overdue: bool = False, cs_due: str = "2027-03-01",
              cs_overdue: bool = False, sic: list[str] | None = None, links_extra: dict | None = None,
@@ -175,6 +180,10 @@ def cases(day: int = 1) -> dict[str, dict[str, Any]]:
             "/company/ZZ900003": {"company_number": "ZZ900003", "company_name": "EXAMPLE EVENTS LTD",
                                   "company_status": "dissolved", "date_of_cessation": "2023-09-01",
                                   "links": {"insolvency": "/company/ZZ900003/insolvency"}},
+            # When each insolvency began (rules 19e count by how close the director was to it).
+            "/company/ZZ900001/insolvency": _ins("creditors-voluntary-liquidation", "wound-up-on", _d(250)),
+            "/company/ZZ900002/insolvency": _ins("creditors-voluntary-liquidation", "wound-up-on", "2023-06-01"),
+            "/company/ZZ900003/insolvency": _ins("creditors-voluntary-liquidation", "wound-up-on", "2022-11-01"),
             # Dissolved without insolvency: housekeeping, not counted.
             "/company/ZZ900004": {"company_number": "ZZ900004", "company_name": "EXAMPLE PROPERTY LTD",
                                   "company_status": "dissolved", "date_of_cessation": "2021-03-01", "links": {}},

@@ -76,6 +76,7 @@ class CompanyData:
     gazette_notices: Any = None                                  # The Gazette insolvency notices
     appointments: dict[str, Any] = field(default_factory=dict)   # officer_id -> response
     linked_profiles: dict[str, Any] = field(default_factory=dict)  # company number -> profile
+    linked_insolvency: dict[str, Any] = field(default_factory=dict)  # company number -> /insolvency response
     disqualified: dict[str, Any] = field(default_factory=dict)   # name -> search response
     disq_details: dict[str, Any] = field(default_factory=dict)   # self link -> detail
     parent_pscs: dict[str, Any] = field(default_factory=dict)    # parent number -> PSC response
@@ -620,6 +621,118 @@ def _went_insolvent(profile: Any) -> bool:
     return "insolvency" in (profile.get("links") or {}) or bool(profile.get("has_insolvency_history"))
 
 
+# When an insolvency began, from the Companies House insolvency record. The earliest of these dates on any case.
+INSOLVENCY_START_DATES = {"petitioned-on", "ordered-to-wind-up-on", "wound-up-on", "administration-started-on",
+                          "voluntary-arrangement-started-on", "instrumented-on", "moratorium-started-on"}
+SOLVENT_CASES = {"members-voluntary-liquidation"}  # a solvent wind-up: the company paid its debts in full
+
+
+def insolvency_start(record: Any) -> tuple[date | None, bool]:
+    """(start date, solvent). solvent=True when every case on record is a members' voluntary liquidation.
+    (None, False) when the record is missing or has no start date: timing unknown."""
+    if not isinstance(record, dict):
+        return None, False
+    cases = record.get("cases") or []
+    if cases and all((c.get("type") or "") in SOLVENT_CASES for c in cases):
+        return None, True
+    starts = [_parse_date(d.get("date")) for c in cases if (c.get("type") or "") not in SOLVENT_CASES
+              for d in c.get("dates") or [] if d.get("type") in INSOLVENCY_START_DATES]
+    starts = [x for x in starts if x]
+    return (min(starts) if starts else None), False
+
+
+def _relevant_window_cut(data: CompanyData) -> date:
+    """A director who left before this can't be within the relevant window of an insolvency in the lookback."""
+    return _years_ago(data.today, T["director_lookback_years"]) - timedelta(days=round(30.44 * T["director_relevant_months"]))
+
+
+def linked_companies_to_profile(data: CompanyData) -> list[str]:
+    """Dissolved companies (within the lookback) whose profile we need to see if they went through insolvency."""
+    numbers: list[str] = []
+    people, _ = people_to_check(data)
+    cut = _relevant_window_cut(data)
+    for d in people:
+        res = data.appointments.get(officer_id(d) or "")
+        if not isinstance(res, dict):
+            continue
+        per_person = 0
+        for a in res.get("items") or []:
+            to = a.get("appointed_to") or {}
+            num = to.get("company_number", "")
+            if not num or num == data.number or to.get("company_status") != "dissolved":
+                continue
+            resigned = _parse_date(a.get("resigned_on"))
+            if resigned and resigned < cut:
+                continue
+            if num not in numbers and per_person < T["max_dissolved_profiles_per_director"]:
+                numbers.append(num)
+                per_person += 1
+    return numbers[: T["max_dissolved_profiles_total"]]
+
+
+def linked_insolvencies_to_read(data: CompanyData) -> list[str]:
+    """Linked companies whose insolvency record we read for its start date: those in an insolvency status now,
+    and dissolved ones that went through insolvency. Needs linked_profiles to be filled first."""
+    numbers: list[str] = []
+    people, _ = people_to_check(data)
+    cut = _relevant_window_cut(data)
+    for d in people:
+        res = data.appointments.get(officer_id(d) or "")
+        if not isinstance(res, dict):
+            continue
+        for a in res.get("items") or []:
+            to = a.get("appointed_to") or {}
+            num, st = to.get("company_number", ""), to.get("company_status", "")
+            resigned = _parse_date(a.get("resigned_on"))
+            if not num or num == data.number or num in numbers or (resigned and resigned < cut):
+                continue
+            if st in INSOLVENT_STATUSES or (st == "dissolved" and _went_insolvent(data.linked_profiles.get(num))):
+                numbers.append(num)
+    return numbers[: T["max_linked_insolvency_lookups"]]
+
+
+def _months(a: date, b: date) -> int:
+    """Whole months from a to b (negative if b is before a)."""
+    return (b.year - a.year) * 12 + (b.month - a.month) - (1 if b.day < a.day else 0)
+
+
+def _gap_words(months: int) -> str:
+    years, rest = divmod(months, 12)
+    if not years:
+        return f"{rest} month{'s' if rest != 1 else ''}"
+    return f"{years} year{'s' if years != 1 else ''}" + (f" {rest} month{'s' if rest != 1 else ''}" if rest else "")
+
+
+def classify_link(appointment: dict[str, Any], start: date | None, ended: date | None) -> tuple[str, str]:
+    """How close a director was to a linked company's insolvency. Returns (tier, words):
+      in_post   in post when it began, or left within director_in_post_months before (s.216 uses 12 months)
+      near      left within director_relevant_months before (the insolvency conduct report covers 3 years)
+      long_before  left earlier than that: not counted
+      after     joined after it began: not counted
+      unknown   no start date on record: counted, but at most refer
+    `ended` (dissolution date) is used only when there's no start date; it's later than the start, so a
+    director who left within the window of the dissolution is counted rather than excused."""
+    resigned = _parse_date(appointment.get("resigned_on"))
+    appointed = _parse_date(appointment.get("appointed_on"))
+    when = start or ended
+    if when is None:
+        return "unknown", "timing unknown"
+    approx = "" if start else " (dated by dissolution; start date not on record)"
+    if appointed and appointed > when:
+        return "after", f"joined {appointed:%b %Y}, after it {'began' if start else 'ended'}"
+    if resigned is None or resigned >= when:
+        rescue = appointed and _months(appointed, when) < T["rescue_join_months"]
+        return "in_post", ("in post when it began" if start else "in post when it was dissolved") + approx + \
+            (f"; joined only {_gap_words(max(_months(appointed, when), 0))} before, possibly a rescue appointment"
+             if rescue else "")
+    gap = _months(resigned, when)
+    if gap < T["director_in_post_months"]:
+        return "in_post", f"left {_gap_words(gap)} before it began" + approx
+    if gap < T["director_relevant_months"]:
+        return "near", f"left {_gap_words(gap)} before it began" + approx
+    return "long_before", f"left {_gap_words(gap)} before it began" + approx
+
+
 def check_directors_insolvency(data: CompanyData) -> CheckResult:
     title = "Directors: other companies"
     n = data.number
@@ -630,9 +743,10 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
     created = _parse_date(data.profile.get("date_of_creation"))
     young = created is not None and _months_between(created, data.today) < T["phoenix_young_months"]
     history_cut = _years_ago(data.today, T["director_lookback_years"])
-    findings, failed, notes = [], [], []
+    findings, failed, notes, excused, unknown_any = [], [], [], [], []
     src = []
     unread_linked = 0
+    member = "member" if data.profile.get("type") == "llp" else "director"
 
     for d in people:
         name, oid = _who(d), officer_id(d)
@@ -651,16 +765,13 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
         dissolved_plain = 0
         for a in items:
             to = a.get("appointed_to") or {}
-            if to.get("company_number") == n:
+            num = to.get("company_number", "")
+            if num == n:
                 continue
-            resigned = _parse_date(a.get("resigned_on"))
             st = to.get("company_status", "")
-            if st in INSOLVENT_STATUSES:
-                # Event date unknown: count it if they were in post in the lookback window.
-                if resigned is None or resigned >= history_cut:
-                    insolvent.append({**to, "_when": "current"})
-            elif st == "dissolved":
-                prof = data.linked_profiles.get(to.get("company_number", ""))
+            ended = None
+            if st == "dissolved":
+                prof = data.linked_profiles.get(num)
                 if prof is None:
                     dissolved_plain += 1
                     continue
@@ -668,12 +779,35 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
                     unread_linked += 1
                     dissolved_plain += 1
                     continue
-                ceased = _parse_date(prof.get("date_of_cessation")) if isinstance(prof, dict) else None
-                in_post_near_end = resigned is None or (ceased and resigned >= ceased - timedelta(days=365 * 3))
-                if _went_insolvent(prof) and ceased and ceased >= history_cut and in_post_near_end:
-                    insolvent.append({**to, "_when": f"insolvent, dissolved {ceased:%b %Y}"})
-                else:
+                if not _went_insolvent(prof):
                     dissolved_plain += 1
+                    continue
+                ended = _parse_date(prof.get("date_of_cessation"))
+            elif st not in INSOLVENT_STATUSES:
+                continue
+            record = data.linked_insolvency.get(num)
+            start, solvent = insolvency_start(record)
+            if solvent:
+                excused.append(f"{_surname_of(d)}: {to.get('company_name')} ({num}) was a members' voluntary "
+                               "liquidation, a solvent wind-up")
+                continue
+            when = start or ended
+            if when is not None and when < history_cut:
+                continue  # outside the lookback
+            if when is None:
+                resigned = _parse_date(a.get("resigned_on"))
+                if resigned is not None and resigned < history_cut:
+                    continue  # as before: unknown timing, only directors in post within the lookback
+            tier, words = classify_link(a, start, ended)
+            if tier in ("long_before", "after"):
+                excused.append(f"{_surname_of(d)}: {to.get('company_name')} ({num}), {words}")
+                continue
+            if tier == "unknown":
+                words += " (insolvency record couldn't be read)" if isinstance(record, SourceError) else \
+                    " (no start date on the insolvency record)"
+                unknown_any.append(f"{to.get('company_name')} ({num})")
+            insolvent.append({**to, "_tier": tier, "_words": words, "_status": status_words(st) if st != "dissolved"
+                              else "insolvent, dissolved" + (f" {ended:%b %Y}" if ended else "")})
         if dissolved_plain:
             notes.append(f"{d.get('name', '')}: {dissolved_plain}")
         if res.get("truncated"):
@@ -684,30 +818,49 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
             continue
 
         def label(c: dict) -> str:
-            how = status_words(c.get("company_status", "")) if c["_when"] == "current" else c["_when"]
-            return f"{c.get('company_name')} ({c.get('company_number')}, {how})"
+            return f"{c.get('company_name')} ({c.get('company_number')}, {c['_status']}; {c['_words']})"
 
-        predecessor = [c for c in insolvent if _similar_names(c.get("company_name", ""), data.name)]
+        in_post = [c for c in insolvent if c["_tier"] == "in_post"]
+        predecessor = [c for c in insolvent if _similar_names(c.get("company_name", ""), data.name)
+                       and c["_tier"] in ("in_post", "unknown")]
         if predecessor and young:
+            sure = predecessor[0]["_tier"] == "in_post"
             findings.append(Finding(
-                rule_id="phoenix_pattern", route=Route.OUTSIDE_APPETITE,
-                text=f"{name} was a director of {label(predecessor[0])}, which has a similar name, and this company "
+                rule_id="phoenix_pattern", route=Route.OUTSIDE_APPETITE if sure else Route.REFER,
+                text=f"{name} was a {member} of {label(predecessor[0])}, which has a similar name, and this company "
                      f"is under {T['phoenix_young_months']} months old. Possible phoenix: s.216 prohibited-name "
                      "rules may apply. Ask the broker about the old company; a senior underwriter can override "
-                     "for a genuine pre-pack sale.", sources=[ref]))
+                     "for a genuine pre-pack sale." + ("" if sure else " Timing unknown, so capped at refer."),
+                sources=[ref]))
         count = len(insolvent)
-        route = Route.OUTSIDE_APPETITE if count >= T["director_insolvent_decline"] else Route.REFER
-        if many and route == Route.OUTSIDE_APPETITE:
+        # Only links where they were in post (or left within 12 months) can make a case outside appetite.
+        route = Route.OUTSIDE_APPETITE if len(in_post) >= T["director_insolvent_decline"] else Route.REFER
+        capped = many and route == Route.OUTSIDE_APPETITE
+        if capped:
             route = Route.REFER
         findings.append(Finding(
             rule_id="director_insolvent_links", route=route,
-            text=f"{name} was a director, in the last {T['director_lookback_years']} years, of {count} "
-                 f"compan{'y' if count == 1 else 'ies'} that became insolvent: "
+            text=f"{name} was a {member} of {count} compan{'y' if count == 1 else 'ies'} that became insolvent "
+                 f"in the last {T['director_lookback_years']} years: "
                  + ", ".join(label(c) for c in insolvent[:4]) +
+                 (f" (and {count - 4} more)" if count > 4 else "") +
                  (f". They hold {res.get('total_results')} appointments (likely a group or non-executive), so "
-                  "this is capped at refer" if many and count >= T["director_insolvent_decline"] else ""),
-            detail={"count": count, "name": name}, sources=[ref]))
+                  "this is capped at refer" if capped else ""),
+            detail={"count": count, "name": name, "in_post": len(in_post),
+                    "near": sum(c["_tier"] == "near" for c in insolvent),
+                    "unknown": sum(c["_tier"] == "unknown" for c in insolvent)}, sources=[ref]))
 
+    if unknown_any:
+        findings.append(Finding(
+            rule_id="director_link_dates_unknown", route=Route.NOTE,
+            text="When these insolvencies began isn't on record, so they're counted but can't make the case "
+                 "outside appetite on their own: " + ", ".join(unknown_any[:6]) + "."))
+    if excused:
+        findings.append(Finding(
+            rule_id="director_link_not_counted", route=Route.NOTE,
+            text=f"Not counted ({member}s left long before the insolvency, joined after it, or the wind-up was "
+                 f"solvent): " + "; ".join(excused[:8]) + (f"; and {len(excused) - 8} more" if len(excused) > 8 else "")
+                 + "."))
     if notes:
         findings.append(Finding(
             rule_id="director_dissolved_context", route=Route.NOTE,
@@ -715,7 +868,7 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
                  "is normal): " + "; ".join(notes)))
     if total > len(people):
         findings.append(Finding(rule_id="directors_capped", route=Route.NOTE,
-                                text=f"Only the first {len(people)} of {total} directors were checked."))
+                                text=f"Only the first {len(people)} of {total} {member}s were checked."))
     if officers_truncated(data):
         failed.append("officers beyond the first page")
     if total > len(people):
@@ -723,16 +876,22 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
     if failed or unread_linked:
         why = []
         if failed:
-            why.append("not every director's other companies could be read (" + "; ".join(failed[:4]) + ")")
+            why.append(f"not every {member}'s other companies could be read (" + "; ".join(failed[:4]) + ")")
         if unread_linked:
             why.append(f"{unread_linked} dissolved companies couldn't be checked for insolvency")
         result = _couldnt("directors_insolvency", title, "; ".join(why), True, src)
         result.findings = findings
         return result
     return _finish("directors_insolvency", title, findings,
-                   f"{len(people)} director(s), including any who resigned in the last 12 months: no links to "
-                   f"companies that became insolvent in the last {T['director_lookback_years']} years.",
+                   f"{len(people)} {member}(s), including any who resigned in the last 12 months: no links to "
+                   f"companies that became insolvent in the last {T['director_lookback_years']} years while they "
+                   "were in post or shortly before.",
                    src, critical=True)
+
+
+def _surname_of(d: dict[str, Any]) -> str:
+    name = d.get("name", "")
+    return (name.split(",")[0] if "," in name else name.split(" ")[-1]).strip().title() or "a director"
 
 
 # ---------------------------------------------------------------------------

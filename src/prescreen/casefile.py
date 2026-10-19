@@ -94,6 +94,7 @@ BROKER_QUESTIONS: dict[str, str] = {
     "no_psc": "No one is registered as owning or controlling the company. Who are the owners?",
     "officers_joined": "New directors joined in the last year. Who are they, and what do they bring?",
     "officers_left": "Directors left in the last year. Why?",
+    "director_link_dates_unknown": "For the directors' earlier companies that became insolvent, when did each director leave, and when did the insolvency begin?",
     "phoenix_pattern": "A director's earlier company with a similar name went into insolvency. Please confirm whether this business continues it, and give details.",
     "psc_changed": "Ownership changed in the last year. Who bought in, and was anything else about the business changed?",
     "psc_secrecy_jurisdiction": "An owner is registered in a jurisdiction where ownership is hard to see. Who are the ultimate owners?",
@@ -125,9 +126,18 @@ ENDED_KEEP = {"company_closed", "company_insolvent", "winding_up_petition", "pho
               "director_disqualified", "trade_mismatch"}
 
 
-def broker_questions(checks: list[Any]) -> list[dict[str, Any]]:
+def llp_words(text: str) -> str:
+    """LLPs have members, not directors (Linklaters, live)."""
+    for a, b in (("Directors", "Members"), ("directors", "members"), ("Director", "Member"), ("director", "member"),
+                 ("the full board", "all the members"), ("the board", "the members")):
+        text = text.replace(a, b)
+    return text
+
+
+def broker_questions(checks: list[Any], llp: bool = False) -> list[dict[str, Any]]:
     """One question per rule that needs an answer, worst route first, then in check order; at most
-    MAX_QUESTIONS, with notes only filling spare places. `checks` are CheckResult models or their dicts."""
+    MAX_QUESTIONS, with notes only filling spare places. `checks` are CheckResult models or their dicts.
+    llp=True words the questions for an LLP (members, not directors)."""
     ids = {f.get("rule_id") for c in checks for f in (_d(c).get("findings") or [])}
     ended = bool(ids & ENDED)
     seen: set[str] = set()
@@ -149,13 +159,15 @@ def broker_questions(checks: list[Any]) -> list[dict[str, Any]]:
             # Notes only get a question where a note is still worth asking about.
             if f.get("route") == "note" and rid not in {"company_new", "officers_joined", "officers_left",
                                                          "psc_changed", "director_previously_disqualified",
-                                                         "fca_discipline", "media_medium"}:
+                                                         "fca_discipline", "media_medium",
+                                                         "director_link_dates_unknown"}:
                 continue
             seen.add(rid)
             rank = {"note": 0, "refer": 1, "outside_appetite": 2, "compliance_hold": 3}.get(f.get("route"), 0)
             out.append((-rank, ci, {"rule_id": rid, "check_id": c.get("check_id"), "route": f.get("route"),
                                     "group": group_of(c.get("check_id", "")),
-                                    "question": BROKER_QUESTIONS[rid], "because": f.get("text", "")}))
+                                    "question": llp_words(BROKER_QUESTIONS[rid]) if llp else BROKER_QUESTIONS[rid],
+                                    "because": f.get("text", "")}))
     ranked = [q for _, _, q in sorted(out, key=lambda x: (x[0], x[1]))]
     serious = [q for q in ranked if q["route"] != "note"]
     notes = [q for q in ranked if q["route"] == "note"]

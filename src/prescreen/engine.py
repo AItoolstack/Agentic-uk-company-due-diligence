@@ -226,6 +226,10 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         asyncio.gather(*[_safe(ch.pscs(p)) for p in parents]),
     )
     data.linked_profiles = dict(zip(linked, linked_profiles))
+    # When each linked insolvency began: a director who left years before it can't have caused it (rules 19e).
+    to_read = C.linked_insolvencies_to_read(data)
+    records = await asyncio.gather(*[_safe(ch.insolvency(num)) for num in to_read])
+    data.linked_insolvency = dict(zip(to_read, records))
     data.disq_details = dict(zip(detail_links, details))
     data.parent_pscs = {p: r for p, r in zip(parents, parent_pscs) if isinstance(r, dict)}
     tick("directors", "done", f"{len(people)} checked")
@@ -341,7 +345,7 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         llm_calls=services.llm.calls,
         elapsed_seconds=round(time.perf_counter() - t0, 2),
         company=card,
-        broker_questions=casefile.broker_questions(results),
+        broker_questions=casefile.broker_questions(results, llp=profile.get("type") == "llp"),
         proposal_vs_record=casefile.proposal_vs_record(req, card, results, today),
         timeline=_timeline(data),
     )
