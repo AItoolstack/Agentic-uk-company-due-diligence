@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from src.prescreen.models import CheckResult, CheckStatus, Route
 
-RULES_VERSION = "draft-2026-10-19e"
+RULES_VERSION = "draft-2026-10-19f"
 
 THRESHOLDS = {
     # Company age

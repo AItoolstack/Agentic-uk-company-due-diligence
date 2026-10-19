@@ -73,8 +73,12 @@ def test_questions_are_capped_and_notes_only_fill_spare_places():
 
 
 def test_news_of_an_fca_action_already_found_is_a_note_not_a_second_reason():
+    import json as _json
+
     from tests.test_prescreen import MONZO_LLM, _run
-    report = _run("09446231", llm_answers=[MONZO_LLM], cover_lines=["management_liability"])
+    named = _json.loads(MONZO_LLM)
+    named["items"][0]["entity_named"] = "Monzo Bank Limited"  # names the entity, so it is about this company
+    report = _run("09446231", llm_answers=[_json.dumps(named)], cover_lines=["management_liability"])
     media = [f for c in report.checks for f in c.findings if f.rule_id == "media_high"]
     assert media and all(f.route == Route.NOTE and f.text.startswith("News coverage of the FCA action") for f in media)
     assert any(f.rule_id == "fca_discipline" and f.route == Route.REFER for c in report.checks for f in c.findings)
@@ -85,3 +89,11 @@ def test_news_of_an_fca_action_already_found_is_a_note_not_a_second_reason():
 def test_serious_and_medium_news_ask_one_question():
     checks = [_c("media", _f("media_high", Route.REFER), _f("media_medium", Route.NOTE))]
     assert [q["rule_id"] for q in casefile.broker_questions(checks)] == ["media_high"]
+
+
+def test_brand_only_fca_news_in_a_group_is_shown_not_a_reason_and_the_register_still_refers():
+    from tests.test_prescreen import MONZO_LLM, _run
+    report = _run("09446231", llm_answers=[MONZO_LLM], cover_lines=["management_liability"])
+    rules = {f.rule_id: f for c in report.checks for f in c.findings}
+    assert "media_high" not in rules and rules["media_unsure"].route == Route.NOTE
+    assert rules["fca_discipline"].route == Route.REFER and report.route == Route.REFER

@@ -1154,7 +1154,10 @@ def check_fca(data: CompanyData, req: PreScreenRequest, firms: Any, discipline: 
     src = [SourceRef(label="FCA Register", url="https://register.fca.org.uk/s/")]
     if not fca_applicable(data, req):
         return CheckResult(check_id="fca", title=title, status=CheckStatus.NOT_APPLICABLE,
-                           summary="Not a regulated trade by SIC code, and not marked as needing authorisation.",
+                           summary=("Not a regulated trade by SIC code, and not marked as needing authorisation."
+                                    if data.profile.get("sic_codes") else
+                                    "No SIC codes on record (LLPs don't file them), and not marked as needing "
+                                    "authorisation. Tick 'should be FCA authorised' in the proposal if it is."),
                            sources=src)
     if isinstance(firms, SourceError) or firms is None:
         r = _couldnt("fca", title, _err_text(firms), False, src)

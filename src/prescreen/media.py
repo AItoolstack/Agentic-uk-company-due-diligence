@@ -25,6 +25,7 @@ from src.prescreen.rules import THRESHOLDS as T
 from src.prescreen.llm import JSONChat, LLMError
 from src.prescreen.models import CheckResult, CheckStatus, Finding, MediaItem, Route, SourceRef
 from src.prescreen.sources.http import SourceError
+from src.prescreen.sic import label as sic_label
 from src.prescreen.sources.news import short_name
 
 CATEGORIES = [
@@ -48,11 +49,13 @@ For each result decide:
   major pollution), "medium" (investigation, lawsuit, warning, significant incident), "low" (neutral,
   routine, positive, or only a passing mention). If the company is only the victim, the place where it
   happened or a bystander (a shoplifter caught in its store, a fraud committed against it), severity is "low".
+  A licence, authorisation or registration being granted is "neutral", severity "low".
 - reason: one short sentence in plain English, saying what the article reports and why it is or
   isn't about this company.
 Base everything on the title, outlet, date and snippet given. Do not invent facts.
 trade_consistency: when declared_trade is given, answer "consistent", "inconsistent" or "unclear" by comparing it
-with the SIC codes; use "not_asked" only when declared_trade is "(not given)". A dormant SIC (99999) with a
+with the SIC codes and their labels, reading the labels literally (don't assume a code covers more than its label
+says); use "not_asked" only when declared_trade is "(not given)". A dormant SIC (99999) with a
 trading business declared is "inconsistent".
 Reply with JSON only: {"items": [{"i": <index>, "about_this_company": "...", "entity_named": "...", "category": "...",
 "severity": "...", "reason": "..."}], "trade_consistency": {"verdict": "consistent|inconsistent|unclear|not_asked",
@@ -87,6 +90,19 @@ def entity_relation(entity_named: str, registered_name: str, previous_names: lis
     return ""
 
 
+def names_this_entity(entity_named: str, registered_name: str, previous_names: list[str]) -> bool:
+    """Stricter than entity_relation: the article names this entity *with its legal form* ("Revolut Ltd"),
+    not just the brand ("Revolut"), which for REVOLUT LTD normalises to the same thing."""
+    return (entity_relation(entity_named, registered_name, previous_names) == "exact"
+            and re.search(_UK_FORMS.replace("|the", ""), (entity_named or "").lower()) is not None)
+
+
+def in_group(data: CompanyData) -> bool:
+    """A corporate owner on the PSC register means other companies share the brand."""
+    items = data.pscs.get("items") if isinstance(data.pscs, dict) else []
+    return any("corporate" in (p.get("kind") or "") and not p.get("ceased_on") for p in items or [])
+
+
 def _published_date(value: str) -> date | None:
     if not value:
         return None
@@ -119,7 +135,10 @@ def identity_facts(data: CompanyData, declared_trade: str) -> dict[str, Any]:
         "previous_names": [f"{x.get('name')} (until {x.get('ceased_on')})" for x in p.get("previous_company_names") or []],
         "registered_office_town": addr.get("locality", ""),
         "status": p.get("company_status"),
-        "sic_codes": p.get("sic_codes") or [],
+        # Codes with their official labels: given bare numbers, the model guessed 62090 ("Other information
+        # technology service activities") covered e-money and passed Revolut's trade as consistent.
+        "sic_codes": [f"{c} {sic_label(c)}".strip() if sic_label(c) else f"{c} (label not known: say unclear)"
+                      for c in p.get("sic_codes") or []],
         "active_directors": [o.get("name") for o in active_officers(data)][:10],
         "declared_trade": declared_trade or "(not given)",
     }
@@ -214,6 +233,20 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
         if it.about_this_company in ("yes", "unsure") and entity_relation(it.entity_named, data.name, prev) == "related":
             it.about_this_company = "related"
             it.reason = (f"Names {it.entity_named}, a different legal entity from {data.name}. " + it.reason)[:300]
+
+    # Guard (Revolut, live re-run): "Italy fines Revolut" names only the brand. In a group with regulated firms
+    # in several countries, a regulator's action can't be pinned on this UK entity from the brand alone. When the
+    # company is part of a group (a corporate owner on its PSC register) and the article doesn't name this exact
+    # entity with its legal form, it's "may be about this company": shown, never a reason. A UK regulator's
+    # action on this firm still reaches the route through the FCA check, from the Register itself.
+    if in_group(data):
+        for it in items:
+            if (it.about_this_company == "yes" and it.category == "regulatory_action"
+                    and not names_this_entity(it.entity_named, data.name, prev)):
+                it.about_this_company = "unsure"
+                it.reason = ("Names only the brand"
+                             + (f" ({it.entity_named})" if it.entity_named else "")
+                             + ", not which company in the group was acted against. " + it.reason)[:300]
 
     # One finding per severity, not one per article: seven articles about one collapse are one fact.
     findings: list[Finding] = []

@@ -31,10 +31,14 @@ def test_previous_name_counts_as_exact():
     assert entity_relation("Focus FS Limited", "MONZO BANK LIMITED", ["FOCUS FS LIMITED"]) == "exact"
 
 
-def _run(name, rows, status="active"):
+GROUP_PSC = {"items": [{"kind": "corporate-entity-person-with-significant-control", "name": "PARENT HOLDINGS LTD"}]}
+
+
+def _run(name, rows, status="active", group=True):
     profile = {"company_number": "08804411", "company_name": name, "company_status": status,
                "date_of_creation": "2013-12-06", "has_insolvency_history": False, "links": {}}
-    data = CompanyData(number="08804411", profile=profile, today=date(2026, 10, 19))
+    data = CompanyData(number="08804411", profile=profile, today=date(2026, 10, 19),
+                       pscs=GROUP_PSC if group else {"items": []})
     results = [{"title": f"Story {i}", "url": f"https://news.example/{i}", "published": "2026-05-01",
                 "source": "news.example", "snippet": "fine"} for i in range(len(rows))]
     answer = {"items": [{"i": i, **r} for i, r in enumerate(rows)],
@@ -70,12 +74,34 @@ def test_own_fine_still_refers():
     assert media.status == CheckStatus.FLAG
 
 
-def test_brand_only_naming_keeps_the_models_answer():
-    media, _, items = _run("MONZO BANK LIMITED", [{"about_this_company": "yes", "entity_named": "Monzo", **FINE}])
+def test_regulator_action_naming_only_the_brand_is_unsure_not_a_reason():
+    # Live re-run, 19 Oct: "Italy fines Revolut over $13 million" named only the brand.
+    media, _, items = _run("REVOLUT LTD", [{"about_this_company": "yes", "entity_named": "Revolut", **FINE}])
+    assert items[0].about_this_company == "unsure"
+    assert "Names only the brand (Revolut)" in items[0].reason
+    assert [f.rule_id for f in media.findings] == ["media_unsure"]
+    assert not [f for f in media.findings if f.route == Route.REFER]
+
+
+def test_regulator_action_with_no_entity_named_is_unsure():
+    media, _, items = _run("MONZO BANK LIMITED", [{"about_this_company": "yes", **FINE}])
+    assert items[0].entity_named == "" and items[0].about_this_company == "unsure"
+
+
+def test_brand_only_naming_keeps_the_models_answer_for_other_news():
+    collapse = {"category": "operational_incident", "severity": "high", "reason": "outage"}
+    media, _, items = _run("MONZO BANK LIMITED", [{"about_this_company": "yes", "entity_named": "Monzo", **collapse}])
     assert items[0].about_this_company == "yes"
     assert [f.rule_id for f in media.findings] == ["media_high"]
 
 
-def test_missing_entity_named_is_harmless():
-    media, _, items = _run("MONZO BANK LIMITED", [{"about_this_company": "yes", **FINE}])
-    assert items[0].entity_named == "" and items[0].about_this_company == "yes"
+def test_brand_only_regulator_news_still_counts_for_a_standalone_company():
+    # No corporate owner: a small firm's "HSE fines Smith Builders" names the brand, and nothing else shares it.
+    media, _, items = _run("REVOLUT LTD", [{"about_this_company": "yes", "entity_named": "Revolut", **FINE}], group=False)
+    assert items[0].about_this_company == "yes"
+    assert [f.rule_id for f in media.findings] == ["media_high"]
+
+
+def test_regulator_action_naming_the_entity_with_its_legal_form_counts_in_a_group():
+    media, _, items = _run("REVOLUT LTD", [{"about_this_company": "yes", "entity_named": "Revolut Ltd", **FINE}])
+    assert items[0].about_this_company == "yes"
