@@ -325,3 +325,56 @@ starts" path is proven on demo data only (0 model calls, 0 cost).
 | "Couldn't check" | became "clean" | shown, never clear | shown; agents blocked from calling it clear |
 | Cost per case | – | ~$0 (Groq free tier) | $0.0003–$0.0074 extra |
 | Extra time | – | 10–60 s | 7–50 s |
+
+## Rules 19e: when a director left matters (19 Oct, 21:13–22:00)
+
+**Where it came from.** The director-history agent's live narrative for Monzo showed what the rule couldn't:
+Burbidge left SYMBIOCO in May 2022, and its administration began in Dec 2025. The rule counted it anyway,
+because for a company *currently* in an insolvency status it had no event date, so anyone in post at any time
+in the 5-year window counted. Tej asked for an underwriter's view; the reasoning agreed (logged with the commit):
+
+| Director's position, measured from when the insolvency **began** | 19e | Anchor |
+|---|---|---|
+| In post, or left < 12 months before | counts fully; 2+ such links = outside appetite | s.216 IA 1986 (prohibited names) covers directors in the 12 months before liquidation |
+| Left 12–36 months before | counts, refer at most | the insolvency practitioner's conduct report covers directors in the 3 years before |
+| Left > 36 months before, or joined after it began | not counted, **shown** | can't have caused or traded through it |
+| Start date not on record / record unreadable | counted, refer at most, broker asked for dates | a gap is never resolved in the company's favour |
+| Members' voluntary liquidation | not counted, shown | a solvent wind-up: debts paid in full |
+| Joined < 6 months before | counted, "possibly a rescue appointment" | turnaround and lender-appointed directors |
+
+The start date comes from the Companies House insolvency record of each linked company (earliest petition,
+winding-up, administration, CVA or receivership date): one extra call per linked insolvent company, capped at 40.
+The 5-year lookback now applies to that date. Phoenix with unknown timing refers instead of declining.
+Agents didn't change a route; the evidence they surfaced led a human to change a rule, with tests, as a new
+rules version. That's the intended loop.
+
+**Re-run of the 9 live companies, same proposals:**
+
+| Company | Route 19c/d → 19e | What changed in the director check |
+|---|---|---|
+| Monzo | refer → refer | Burbidge/SYMBIOCO dropped ("left 3 years 6 months before it began"); WIREWAX was a **members' voluntary liquidation**; Lake/Nivaura stays ("in post when it began") |
+| Thames Water | refer → refer | De Brunner 4 → 2: FAGUS HOLDCO and PLATAFORMA were **solvent MVLs**. The two Babylon companies stay, flagged "joined 1–3 months before, possibly a rescue appointment". Gething's HARRABEL was an MVL; Pearson's link began Nov 2020, outside the 5 years |
+| **Tesco** | **refer → note** | Gilliland/Curious Drinks: the insolvency began around Apr 2021 (Gazette), outside 5 years; the old rule dated it by dissolution (Aug 2022) |
+| Wilko, Carillion, Revolut | unchanged | MVLs now shown as not counted (Wilko: TRADING OLD; Carillion: WEIR USA INVESTMENTS) |
+| BrewDog, Greggs | unchanged | nothing new |
+| Linklaters | refer → refer | broker questions now say "members" |
+
+**The bigger finding wasn't the one we went looking for.** The rule fix was about *timing*. The re-run showed
+the old rule also counted **solvent wind-ups** as insolvencies: Companies House status "liquidation" covers a
+members' voluntary liquidation, which is a company closing with its debts paid. Across the batch the old rule
+counted 9 director links and 19e counts 3. Of the 6 that dropped: 3 were MVLs, 2 began more than 5 years ago,
+1 the director had left 3.5 years before. MVLs appear 13 times in the "not counted" notes across 5 companies:
+group restructures and investment vehicles (a VCT, holdcos) close this way all the time.
+
+**Something the re-run caught in the fix itself.** Tesco's route changed because its only director link fell
+outside the lookback, and that exclusion was *silent*: not in the "not counted" note, just gone. Correct by the
+rule, wrong by the product's own principle (never drop something without saying so). Fixed: a link that would
+have counted but is older than the lookback is listed with its date. Without the live re-run comparison
+(old findings vs new, company by company) this would have shipped.
+
+**Remaining:** the disqualification check's text still says "directors" for LLPs (only the director-link check
+and broker questions were changed); cover-line weighting (director history should weigh most on D&O/management
+liability and trade credit) is not done.
+
+**Tests:** 22 new in `tests/test_director_timing.py` (each tier, MVL, unknown/unreadable, rescue, lookback,
+phoenix, Northern Bake still declines). Suite 242.

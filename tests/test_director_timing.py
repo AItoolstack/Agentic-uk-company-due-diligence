@@ -153,6 +153,13 @@ def test_insolvency_older_than_the_lookback_is_not_counted_but_is_shown():
     assert "began Mar 2019, more than 5 years ago" in rules["director_link_not_counted"].text
 
 
+def test_very_old_insolvency_is_not_listed():
+    # Tesco, live: INFUZIONS LIMITED, began Apr 2009. Near misses are worth showing; 17 years ago isn't.
+    r = _run([_appt("ZZ900002", "A LTD", "liquidation", "2005-01-01")],
+             {"ZZ900002": _ins("creditors-voluntary-liquidation", "wound-up-on", "2009-04-01")})
+    assert "director_link_not_counted" not in _rules(r)
+
+
 def test_old_insolvency_they_had_long_left_is_not_even_mentioned():
     r = _run([_appt("ZZ900002", "A LTD", "liquidation", "2005-01-01", "2010-01-01")],
              {"ZZ900002": _ins("creditors-voluntary-liquidation", "wound-up-on", "2019-03-01")})

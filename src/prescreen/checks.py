@@ -800,7 +800,7 @@ def check_directors_insolvency(data: CompanyData) -> CheckResult:
             if when is not None and when < history_cut:
                 # Outside the lookback. Said out loud when it would otherwise have counted (Tesco, live: the
                 # only director link began Apr 2021, so the route changed; that mustn't happen silently).
-                if tier in ("in_post", "near"):
+                if tier in ("in_post", "near") and when >= _relevant_window_cut(data):  # near misses only
                     excused.append(f"{_surname_of(d)}: {to.get('company_name')} ({num}), "
                                    f"{'began' if start else 'dissolved'} {when:%b %Y}, more than "
                                    f"{T['director_lookback_years']} years ago")
