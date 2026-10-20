@@ -627,3 +627,25 @@ route colour when counted); History marks material events with a tint and glyph 
 everything with a line saying so instead of an empty panel; Proposal gets given / differ / turnover-read-as numbers and
 an amber row where the proposal differs. Header facts are a grid (no second-line wrap); at 1024–1279 px the summary
 and facts go to two/three columns and the reasons table lays out automatically. 50 of 50 offline checks.
+
+## 20 Oct, late morning: rules 20h to 20i, live check back to 9/9
+
+Each 20h live check moved one company, and each time a news item was the cause:
+
+| Run | Commit | Result | Cause |
+|---|---|---|---|
+| 39405890520 | 30279ff (20h) | Tesco note → refer | "sfo v tesco dpa 2017", undated, read as recent |
+| 39406969153 | cdcc628 (undated items take the latest year they name) | Tesco still refer | 2024 retrospective on the 2014-17 scandal |
+| 39408240250 | 8071fe7 (model gives event_year; retrospectives dated by it) | Tesco still refer | Pinsent Masons on the 2017 DPA, page dated 2025-12-05, model said 2025 |
+| 39410374785 | 69a5b27 (20i: news search back to 20g) | Tesco note again; Greggs note → refer | 740 job cuts (30 Sep) and a food critic's ranking rated "high operational incident" |
+| 39411925334 | adc212c / 8551fc5 (operational incident capped at medium) | **9/9 unchanged** | |
+
+What stays from 20h: auditor or adviser fines are that firm's news (KPMG / Carillion); licences granted are routine;
+undated items take the latest year in their headline; a retrospective is dated by its event year.
+What's reverted: mixing adverse web results into the news (16 results). Web pages carry update dates rather than
+publication dates, and the mix never surfaced the Linklaters tribunal claim it was added for.
+New in 20i: an operational incident (job cuts, closures, outage) is at most medium, a note. This matches the prompt's own
+definition of high.
+
+Still open: the Linklaters tribunal claim is not found by the search; Linklaters takes about 130 s and 321 members
+exceed the 15-member check limit (a product decision).
