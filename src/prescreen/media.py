@@ -273,6 +273,11 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                 and not entity_relation(it.entity_named, data.name, prev_names_all):
             it.about_this_company = "no"
             it.reason = (f"About {it.entity_named}, not this company. " + it.reason)[:300]
+        # Rules 20i (Greggs, live): 740 job cuts and a food critic's ranking came back "high operational incident".
+        # High is for insolvency, fraud, penalties, serious injury or death, major pollution; an operational incident
+        # (job cuts, closures, an outage) is at most medium, a note. Injury or death is health and safety.
+        if it.category == "operational_incident" and it.severity == "high":
+            it.severity = "medium"
         if it.severity != "low" and _LICENCE_GRANTED.search(it.title) and not _LICENCE_LOST.search(it.title):
             it.severity, it.category = "low", "neutral"
             it.reason = ("A licence or authorisation being granted is routine. " + it.reason)[:300]

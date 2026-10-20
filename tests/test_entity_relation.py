@@ -90,7 +90,7 @@ def test_regulator_action_with_no_entity_named_is_unsure():
 
 
 def test_brand_only_naming_keeps_the_models_answer_for_other_news():
-    collapse = {"category": "operational_incident", "severity": "high", "reason": "outage"}
+    collapse = {"category": "health_and_safety", "severity": "high", "reason": "worker killed"}
     media, _, items = _run("MONZO BANK LIMITED", [{"about_this_company": "yes", "entity_named": "Monzo", **collapse}])
     assert items[0].about_this_company == "yes"
     assert [f.rule_id for f in media.findings] == ["media_high"]
@@ -187,3 +187,12 @@ def test_event_year_never_makes_news_newer():
     row = {"about_this_company": "yes", "entity_named": "Tesco PLC", "event_year": 2026, **FINE}
     media, _, _ = _run("TESCO PLC", [row], group=False, published="2017-03-28")
     assert [f.rule_id for f in media.findings] == ["media_old"]
+
+
+def test_an_operational_incident_is_at_most_a_note():
+    # Greggs, live 20 Oct: "Greggs to shut four factories and cut 740 jobs" came back high.
+    cuts = {"category": "operational_incident", "severity": "high", "reason": "job cuts"}
+    media, _, items = _run("GREGGS PLC", [{"about_this_company": "yes", "entity_named": "Greggs", **cuts}], group=False,
+                           titles={0: "Greggs to shut four factories and cut 740 jobs"})
+    assert items[0].severity == "medium"
+    assert [f.rule_id for f in media.findings] == ["media_medium"]
