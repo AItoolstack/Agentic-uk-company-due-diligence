@@ -172,3 +172,18 @@ def test_undated_serious_news_is_dated_by_the_year_in_its_headline():
     media, _, items = _run("TESCO PLC", data_rows, group=False, titles={0: "sfo v tesco dpa 2017"}, published="")
     assert not [f for f in media.findings if f.route == Route.REFER]
     assert [f.rule_id for f in media.findings] == ["media_old"]
+
+
+def test_a_retrospective_is_dated_by_its_event_year():
+    # Live, 20 Oct (rules 20h): a 2024 article on Tesco's 2014-17 accounting scandal referred Tesco as recent news.
+    row = {"about_this_company": "yes", "entity_named": "Tesco PLC", "event_year": 2017, **FINE}
+    media, _, items = _run("TESCO PLC", [row], group=False, published="2024-05-13",
+                           titles={0: "Nearly three years later, Tesco continues to deal with the fallout from its accounting scandal"})
+    assert items[0].event_year == 2017
+    assert [f.rule_id for f in media.findings] == ["media_old"]
+
+
+def test_event_year_never_makes_news_newer():
+    row = {"about_this_company": "yes", "entity_named": "Tesco PLC", "event_year": 2026, **FINE}
+    media, _, _ = _run("TESCO PLC", [row], group=False, published="2017-03-28")
+    assert [f.rule_id for f in media.findings] == ["media_old"]

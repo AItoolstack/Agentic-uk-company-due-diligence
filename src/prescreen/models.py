@@ -118,6 +118,7 @@ class MediaItem(BaseModel):
     entity_named: str = ""              # the legal entity the article names, as the model read it
     category: str = ""
     severity: str = "low"               # low | medium | high
+    event_year: int | None = None       # when the reported event happened, if the article says (a 2017 fine reported in 2024)
     reason: str = ""
 
 

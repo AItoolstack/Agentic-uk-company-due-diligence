@@ -46,6 +46,8 @@ For each result decide:
 - entity_named: the legal entity the article names as the subject (e.g. "Revolut Bank UAB"), exactly as
   written; "" if the article only uses the brand. For a fine, penalty or enforcement action, name the
   entity that was fined or acted against.
+- event_year: the year the main event the article reports actually happened, when the title or snippet makes it
+  clear (a fine imposed in 2017 discussed in a 2024 article is 2017); null if unclear.
 - category: one of CATEGORIES.
 - severity: "high" (insolvency, fraud, criminal or regulatory penalty, serious injury or death,
   major pollution), "medium" (investigation, lawsuit, warning, significant incident), "low" (neutral,
@@ -59,7 +61,7 @@ trade_consistency: when declared_trade is given, answer "consistent", "inconsist
 with the SIC codes and their labels, reading the labels literally (don't assume a code covers more than its label
 says); use "not_asked" only when declared_trade is "(not given)". A dormant SIC (99999) with a
 trading business declared is "inconsistent".
-Reply with JSON only: {"items": [{"i": <index>, "about_this_company": "...", "entity_named": "...", "category": "...",
+Reply with JSON only: {"items": [{"i": <index>, "about_this_company": "...", "entity_named": "...", "event_year": <year or null>, "category": "...",
 "severity": "...", "reason": "..."}], "trade_consistency": {"verdict": "consistent|inconsistent|unclear|not_asked",
 "reason": "..."}}""".replace("CATEGORIES", ", ".join(CATEGORIES))
 
@@ -251,6 +253,11 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
         it.category = row.get("category", "") if row.get("category") in CATEGORIES else "neutral"
         it.severity = row.get("severity", "low") if row.get("severity") in ("low", "medium", "high") else "low"
         it.reason = str(row.get("reason", ""))[:300]
+        try:
+            y = int(row.get("event_year")) if row.get("event_year") not in (None, "") else None
+            it.event_year = y if y and 1900 < y <= data.today.year else None
+        except (TypeError, ValueError):
+            it.event_year = None
 
     # Guard (rules 20h; Carillion, live): "KPMG ... is fined record £21m" over its Carillion audits was read as a fine
     # on Carillion. When the model names a different firm as the one acted against (no brand word in it), the article
@@ -325,6 +332,10 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
     snippets = {id(it): results[i].get("snippet", "") for i, it in enumerate(items)}
 
     def when(it: MediaItem) -> str:
+        # A retrospective is dated by its event (Tesco, live 20 Oct: a 2024 law-firm piece on the 2014-17 accounting
+        # scandal read as recent serious news). The event year only ever makes an item older, never newer.
+        if it.event_year and (not it.published or str(it.event_year) < it.published[:4]):
+            return f"{it.event_year}-12-31"
         if it.published:
             return it.published[:10]
         years = [int(y) for y in re.findall(r"\b(19[89]\d|20[0-4]\d)\b", f"{it.title} {snippets.get(id(it), '')}")]
