@@ -47,10 +47,12 @@ class _RequireAccessToken:
 
     async def __call__(self, scope, receive, send) -> None:
         token = os.environ.get("PRESCREEN_ACCESS_TOKEN", "")
-        if scope["type"] == "http" and token:
+        # Guest codes or public examples without an owner code would otherwise leave MCP open: refuse instead.
+        shared = bool(os.environ.get("PRESCREEN_GUEST_CODES") or os.environ.get("PRESCREEN_PUBLIC_EXAMPLES"))
+        if scope["type"] == "http" and (token or shared):
             headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
             given = headers.get("x-access-token") or headers.get("authorization", "").removeprefix("Bearer ").strip()
-            if not hmac.compare_digest(given, token):
+            if not token or not hmac.compare_digest(given, token):
                 await send({"type": "http.response.start", "status": 401,
                             "headers": [(b"content-type", b"application/json"), (b"www-authenticate", b"Bearer")]})
                 await send({"type": "http.response.body",

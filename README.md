@@ -110,6 +110,29 @@ has a gap says "not checked, which is not a clear result".
 Space's host is allowed automatically (`SPACE_HOST`); elsewhere list hosts in `MCP_ALLOWED_HOSTS`.
 MCP runs share the `PRESCREEN_RUNS_PER_HOUR` limit with the API.
 
+## Sharing a demo
+
+A deployment can serve three kinds of visitor (`src/prescreen/access.py`):
+
+| Visitor | Sends | Can | Models |
+|---|---|---|---|
+| Owner | `PRESCREEN_ACCESS_TOKEN` | everything | `AGENT_PROVIDER` (may be paid) |
+| Guest | a demo code from `PRESCREEN_GUEST_CODES` | run pre-screens and agent reviews on their own cases, within a daily allowance; read the examples | free only (Groq) |
+| Anyone | nothing | open the example cases in `PRESCREEN_PUBLIC_EXAMPLES`, read-only, with their saved agent runs | none |
+
+`python scripts/guest_code.py acme-jo --days 30` makes a code and prints the entry to add to
+`PRESCREEN_GUEST_CODES`. Only the code's hash is stored; delete the entry to end it early.
+
+A guest is never moved onto a paid model. `GUEST_AGENT_PROVIDER` must be a free provider (anything else is
+refused), and when the free tier's limit is reached the guest is told to come back tomorrow. Guest runs on live
+data are marked "Demonstration" on the page and in the file note. Allowances (5 pre-screens and 2 agent reviews
+a code a day, 40 and 10 across all guests by default) are counted in memory, so a restart resets them.
+Watching, the watchlist, the old-graph evaluation and the legacy `/research/*` endpoints are owner-only. The MCP
+endpoint accepts the owner code only.
+
+Before giving guests agent reviews, run `.github/workflows/guest-model-check.yml`: the 9 evaluation companies
+through the agents on the guest model, with sections finished, failed calls and timings.
+
 ## How it's built
 
 `src/prescreen/`: `identity.py` (the identity gate), `sources/` (one small client per source; a

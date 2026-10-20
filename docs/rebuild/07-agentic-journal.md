@@ -649,3 +649,38 @@ definition of high.
 
 Still open: the Linklaters tribunal claim is not found by the search; Linklaters takes about 130 s and 321 members
 exceed the 15-member check limit (a product decision).
+
+## 20 Oct, afternoon: demo access for the blog series
+
+**Why.** The blog series plan (claude/blog-series-plan.md in the ai-toolstack project) has a "Try it yourself"
+post. Tej's decisions: code stays public; a live demo is given on request; workshops later. Agent reviews run
+on paid OpenAI, so guests must not be able to spend money.
+
+**What changed (branch `demo-access`, not deployed).**
+- `src/prescreen/access.py`: three kinds of caller. Owner (the existing access token), guest (a demo code,
+  stored hashed in `PRESCREEN_GUEST_CODES` with a last day), public (no code, only when
+  `PRESCREEN_PUBLIC_EXAMPLES` lists saved report ids). Nothing configured = everyone is the owner, as before.
+- Guests run on free models only. Agent reviews: `GUEST_AGENT_PROVIDER` (default groq, model
+  openai/gpt-oss-120b); any provider not on the free list is refused with a 503, never used. The pre-screen's
+  news reading moves to Groq for guests if the server's own setting is paid. No fallback: when Groq's free
+  limit is hit, the run fails and says so.
+- Daily allowances per code (5 pre-screens, 2 agent reviews) and across guests (40 and 10). A run that
+  never started (company not found, a register down) is given back.
+- Guests see their own cases plus the examples; examples are read-only for everyone but the owner. Watching,
+  changes and the old-graph evaluation are owner-only. Reports record `meta.run_by`; guest live runs carry
+  `meta.demonstration`, shown as a pill and a line on the page and in the file note.
+- The case page: a public Desk shows the example cases and a demo-code box with a "request a code" link;
+  guests see their allowance in the status bar; the watch controls show only for the owner.
+- The owner can run an agent review on the guest model (`?model=guest`) and
+  `.github/workflows/guest-model-check.yml` does that for the 9 evaluation companies.
+- Groq runs record $0 in the trace (free tier), not another model's list price.
+- Found while doing this: `/research/sync`, `/research/stream` and `/research/chat` (the old graph, which calls
+  the server's model) had no access check at all. Harmless while the Space is private; not once it's public.
+  Now owner-only whenever any access setting exists. MCP likewise refuses everyone if guest codes or examples
+  are set without an owner code, instead of staying open.
+
+**Checks.** Tests 331 → 349 (`tests/test_demo_access.py`, 18). Offline UI checks 50 of 50 as owner;
+public and guest pages screenshotted at 1440 and 390 px with no script errors.
+
+**Not done, needs Tej.** The Space is private (live checks use HF_TOKEN), so a public demo also means making
+the Space public. GROQ_API_KEY must be on the Space. The guest-model check hasn't run. Allowances reset on restart.

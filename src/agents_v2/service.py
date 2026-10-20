@@ -60,14 +60,20 @@ def config() -> dict[str, Any]:
 
 async def run_agent_review(report_id: str = "", company_query: str = "", proposal: dict[str, Any] | None = None,
                            scripted: Scripted | None = None, judge_scripted: Scripted | None = None,
-                           mcp_url: str | None = None, server: Any = None, store: bool = True) -> dict[str, Any]:
+                           mcp_url: str | None = None, server: Any = None, store: bool = True,
+                           provider: str | None = None, model_name: str | None = None, judge: bool | None = None,
+                           run_by: str = "owner") -> dict[str, Any]:
+    """provider / model_name / judge override the environment for one run. The API passes them for guests
+    (access.guest_agent_model: free providers only); the judge then uses the same free model."""
     trace = Trace()
     created = datetime.now(timezone.utc).isoformat()
+    use_judge = judge_enabled() if judge is None else (judge and judge_enabled())
     async with httpx.AsyncClient(timeout=90) as http:
-        model = AgentModel(trace, client=http, scripted=scripted)
+        model = AgentModel(trace, model=model_name, provider=provider, client=http, scripted=scripted)
         judge_model = None
-        if judge_enabled():
-            judge_model = AgentModel(trace, model=os.environ.get("AGENT_GUARDRAIL_MODEL") or None, client=http,
+        if use_judge:
+            judge_name = model_name if provider else (os.environ.get("AGENT_GUARDRAIL_MODEL") or None)
+            judge_model = AgentModel(trace, model=judge_name, provider=provider, client=http,
                                      scripted=judge_scripted if judge_scripted is not None else
                                      (scripted and _no_problems))
         async with Toolbox(trace, url=mcp_url, server=server) as toolbox:
@@ -87,6 +93,8 @@ async def run_agent_review(report_id: str = "", company_query: str = "", proposa
         "model": model.model,
         "judge_model": judge_model.model if judge_model else "",
         "transport": transport,
+        "provider": model.provider,
+        "run_by": run_by,
         "scripted": scripted is not None,
         "review": review,
         "trace": trace.to_dict(),

@@ -356,6 +356,8 @@ def file_note(report: dict[str, Any]) -> str:
     ]
     if (r.get("meta") or {}).get("data") == "demo":
         lines.append("DEMO DATA: not a real assessment.")
+    elif (r.get("meta") or {}).get("demonstration"):
+        lines.append("DEMONSTRATION RUN: public-record checks run for a demo, not an assessment of this company.")
     lines += ["", f"Recommended route: {ROUTE_WORDS.get(r.get('route'), r.get('route'))}"]
     for reason in (r.get("route_reasons") or [])[:6]:
         if hold and _is_sanctions_text(reason, checks_all):

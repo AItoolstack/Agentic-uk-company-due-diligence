@@ -1,0 +1,37 @@
+name: agents on the guest model
+
+# Before guests get agent reviews: the 9 evaluation companies through the agents on the free guest model
+# (GUEST_AGENT_PROVIDER / GUEST_AGENT_MODEL on the Space, default Groq openai/gpt-oss-120b). Run by hand,
+# after the Space has GROQ_API_KEY. 9 pre-screens and 9 agent reviews, spaced out for Groq's per-minute limit.
+# Needs repository secrets: HF_TOKEN, PRESCREEN_ACCESS_TOKEN (the owner code). Nothing prints either value.
+on:
+  workflow_dispatch:
+    inputs:
+      gap:
+        description: seconds between companies
+        default: "20"
+
+concurrency: live-check
+
+jobs:
+  guest-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install httpx
+      - name: Agents on the guest model
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          PRESCREEN_ACCESS_TOKEN: ${{ secrets.PRESCREEN_ACCESS_TOKEN }}
+          SPACE_URL: https://aitoolstack-agentic-uk-company-due-diligence.hf.space
+          GAP: ${{ inputs.gap }}
+        run: python scripts/guest_model_check.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: guest-model-check
+          path: guest-model-check.json

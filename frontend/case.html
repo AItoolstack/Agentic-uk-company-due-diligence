@@ -595,25 +595,45 @@ async function loadConfig() {
   const demo = S.config && S.config.data === "demo";
   $("#rail-demo").hidden = !demo; $("#tb-demo").hidden = !demo;
   $("#policy").textContent = S.config ? S.config.rules_version : "policy";
+  const r = (S.config && S.config.caller && S.config.caller.role) || "owner";
+  $('[data-navid="watch"]').hidden = r !== "owner"; $('[data-navid="new"]').hidden = r === "public";
 }
+/* Who is looking (access.py): "owner", "guest" (a demo code: free models, daily allowance, own cases plus the
+   examples) or "public" (no code: the example cases, read-only). */
+const caller = () => (S.config && S.config.caller) || {role: "owner"};
+const role = () => caller().role;
 function accessPanel() {
-  if (!S.needCode) return "";
-  return `<section class="panel" aria-labelledby="h-code"><div class="ph"><h2 id="h-code">Access code</h2></div>
+  const pub = role() === "public";
+  if (!S.needCode && !pub) return "";
+  const url = caller().request_url || "";
+  const ask = url ? ` <a href="${esc(url)}" rel="noopener noreferrer" target="_blank">Ask for a demo code<span class="sr"> (opens in a new tab)</span></a>.` : "";
+  return `<section class="panel" aria-labelledby="h-code"><div class="ph"><h2 id="h-code">${pub ? "Run your own pre-screen" : "Access code"}</h2></div>
     <form class="pb" id="code-form" style="display:flex;gap:8px;flex-wrap:wrap">
-      <label class="sr" for="code-in">Access code</label>
-      <input type="text" id="code-in" autocomplete="off" style="flex:1 1 200px" placeholder="Access code">
+      <label class="sr" for="code-in">${pub ? "Demo code" : "Access code"}</label>
+      <input type="text" id="code-in" autocomplete="off" style="flex:1 1 200px" placeholder="${pub ? "Demo code" : "Access code"}">
       <button class="btn pri" type="submit">Use code</button>
-      <p class="hint" style="margin:0;width:100%">This service needs an access code. It's kept in this browser tab only.</p>
+      <p class="hint" style="margin:0;width:100%">${pub ? `The cases on this page are saved runs you can open and read. To run a company of your own, enter a demo code.${ask}` : `This service needs an access code. It's kept in this browser tab only.${ask}`}</p>
     </form></section>`;
+}
+function allowanceText() {
+  const a = caller().allowance; if (!a) return "";
+  const left = k => Math.max(0, Math.min(a[k].limit - a[k].used, a[k].service_left));
+  return `${plural(left("prescreen"), "pre-screen")} and ${plural(left("agent_review"), "agent review")} left today on this demo code`;
 }
 function wireAccess() {
   const f = $("#code-form"); if (!f) return;
-  f.onsubmit = async e => { e.preventDefault(); try { sessionStorage.setItem("prescreen-code", $("#code-in").value.trim()); } catch (x) {} S.needCode = false; await loadConfig(); route(); };
+  f.onsubmit = async e => { e.preventDefault(); try { sessionStorage.setItem("prescreen-code", $("#code-in").value.trim()); } catch (x) {} S.needCode = false; S.agentCfg = null; S.allowanceFresh = true; await loadConfig(); route(); };
 }
 function statusBar(r) {
   const el = $("#statusbar");
   const by = `<span>Company Pre-Screen by <a href="https://www.ai-toolstack.com/">ai·toolstack</a></span>`;
-  if (!r) { el.innerHTML = `${by}<span>${S.config ? `Up to 30 pre-screens an hour on this service · reports kept 90 days unless decided or watched` : ""}</span>`; return; }
+  if (!r) {
+    const c = caller();
+    const text = !S.config ? "" : c.role === "public" ? "Example cases, read-only · a demo code lets you run your own"
+      : c.role === "guest" ? `Demo code ${esc(c.label)}: ${allowanceText()}, resets at midnight UTC${c.expires ? ` · works until ${esc(fmtDate(c.expires))}` : ""}`
+      : "Up to 30 pre-screens an hour on this service · reports kept 90 days unless decided or watched";
+    el.innerHTML = `${by}<span>${text}</span>`; return;
+  }
   const srcs = (r.sources_read || []).map(s => `${esc(s.label)} ${s.state === "skip" ? "not needed" : s.state === "error" ? "incomplete " + fmtTime(s.read_at) : fmtTime(s.read_at)}`);
   el.innerHTML = `${by}<span class="mono">${esc(r.report_id)}</span><span>Run ${esc(fmtWhen(r.created_at))} · ${Number(r.elapsed_seconds || 0).toFixed(1)} s</span><span>Policy <a class="mono" href="/api/prescreen/config">${esc(r.rules_version)}</a></span>
     ${srcs.length ? `<span>Registers read: ${srcs.join(" · ")}</span>` : `<span>Registers read at the run time</span>`}`;
@@ -630,10 +650,12 @@ function renderDesk() {
   statusBar(null);
   const f = S.form;
   const demoCases = (S.config && S.config.demo_cases) || [];
+  const pub = role() === "public", owner = role() === "owner";
+  if (role() === "guest" && !S.allowanceFresh) { S.allowanceFresh = true; loadConfig().then(() => statusBar(null)); }
   $("#screen").innerHTML = deskHeader() + `<div class="wrap"><div class="desk">
     <div class="deskl">
       ${accessPanel()}
-      <section class="panel" aria-labelledby="h-new" id="new">
+      ${pub ? "" : `<section class="panel" aria-labelledby="h-new" id="new">
         <div class="ph"><h2 id="h-new">New pre-screen</h2></div>
         ${f.rerunOf ? `<div class="pb" style="padding-bottom:0"><div class="msg">Re-running <b>${esc(titleCase(f.rerunName))}</b> with an edited proposal: a new case, linked to <a href="/case/${esc(f.rerunOf)}" data-nav>the earlier one</a>. <button class="btn" type="button" id="cancel-rerun" style="min-height:28px;margin-top:6px">Start fresh instead</button></div></div>` : ""}
         <form class="pb" id="new-form" novalidate style="display:flex;flex-direction:column;gap:14px">
@@ -660,21 +682,21 @@ function renderDesk() {
           <button class="btn pri" type="submit" id="run-btn" style="min-height:40px">Run pre-screen</button>
           <div class="hint" id="run-hint" style="margin-top:-6px"></div>
         </form>
-      </section>
-      ${demoCases.length ? `<section class="panel" aria-labelledby="h-demo"><div class="ph"><h2 id="h-demo">Demo companies</h2><span class="pill p-demo">Demo data</span></div>
+      </section>`}
+      ${demoCases.length && !pub ? `<section class="panel" aria-labelledby="h-demo"><div class="ph"><h2 id="h-demo">Demo companies</h2><span class="pill p-demo">Demo data</span></div>
         <ul style="list-style:none;margin:0;padding:6px 0">${demoCases.map(c => `<li><button type="button" class="rowbtn" data-demo="${esc(c.company_number)}" style="padding:8px 16px;box-sizing:border-box"><span class="mono s13" style="flex:none;width:76px">${esc(c.company_number)}</span><span class="s13">${esc(c.label)}</span></button></li>`).join("")}</ul></section>` : ""}
     </div>
     <div class="deskr">
       <div id="cands"></div>
-      <section class="panel" aria-labelledby="h-rec" id="cases"><div class="ph"><h2 id="h-rec">Recent cases</h2>
+      <section class="panel" aria-labelledby="h-rec" id="cases"><div class="ph"><h2 id="h-rec">${pub ? "Example cases" : "Recent cases"}</h2>
         <div role="group" aria-label="Filter cases" class="chips right" id="case-filters"></div></div>
         <div id="cases-body"><div class="empty">Loading…</div></div></section>
-      <section class="panel" aria-labelledby="h-w" id="watch"><div class="ph"><h2 id="h-w">Watchlist changes</h2><span class="sub small">Re-checked every morning at 06:17 from the registers; news isn't re-read</span></div>
-        <div id="changes-body"><div class="empty">Loading…</div></div></section>
+      ${owner ? `<section class="panel" aria-labelledby="h-w" id="watch"><div class="ph"><h2 id="h-w">Watchlist changes</h2><span class="sub small">Re-checked every morning at 06:17 from the registers; news isn't re-read</span></div>
+        <div id="changes-body"><div class="empty">Loading…</div></div></section>` : ""}
     </div></div></div>`;
-  wireAccess(); wireForm(); renderCandidates(); loadCases(); loadChanges();
+  wireAccess(); if (!pub) wireForm(); renderCandidates(); loadCases(); if (owner) loadChanges();
   const h = location.hash.slice(1);
-  if (h === "new" || !h) { if (h === "new") $("#q").focus(); }
+  if (h === "new" || !h) { if (h === "new" && $("#q")) $("#q").focus(); }
   else { const el = document.getElementById(h); if (el) { el.scrollIntoView({block: "start"}); const hd = el.querySelector("h2"); if (hd) { hd.tabIndex = -1; hd.focus({preventScroll: true}); } } }
 }
 
@@ -772,13 +794,13 @@ function renderCases() {
   fl.innerHTML = FILTERS.map(([id, name]) => `<button class="chip" type="button" data-filter="${id}" aria-pressed="${S.casesFilter === id}">${esc(name)}${c.counts && c.counts[id] ? ` <span class="sr">,</span><span style="opacity:.75">${c.counts[id]}</span>` : ""}</button>`).join("");
   $$("[data-filter]", fl).forEach(b => b.onclick = () => { S.casesFilter = b.dataset.filter; S.casesPage = 1; loadCases(); });
   if (!c.rows.length) {
-    body.innerHTML = `<div class="empty">${S.casesFilter === "all" ? "No cases yet. Run a pre-screen to start one." : "No cases match this filter."}</div>`;
+    body.innerHTML = `<div class="empty">${S.casesFilter === "all" ? (role() === "public" ? "No example cases yet." : "No cases yet. Run a pre-screen to start one.") : "No cases match this filter."}</div>`;
     if (S.casesFilter === "all" && !S.form.q) { const q = $("#q"); if (q && document.activeElement === document.body) q.focus(); }
     return;
   }
   const pages = Math.max(1, Math.ceil(c.total / c.per_page));
   body.innerHTML = `<div class="tw"><table class="tbl stack" style="min-width:0"><thead><tr><th scope="col">Company</th><th scope="col">Route</th><th scope="col">Coverage</th><th scope="col">Decision</th><th scope="col">Cover</th><th scope="col">Run</th></tr></thead><tbody>
-    ${c.rows.map(r => `<tr><td data-l="Company"><a href="/case/${esc(r.report_id)}" data-nav><b style="font-weight:600">${esc(titleCase(r.company_name))}</b></a><div class="mono sub small">${esc(r.company_number)}${r.data === "demo" ? " · demo" : ""}${r.rerun_of ? " · re-run" : ""}</div></td>
+    ${c.rows.map(r => `<tr><td data-l="Company"><a href="/case/${esc(r.report_id)}" data-nav><b style="font-weight:600">${esc(titleCase(r.company_name))}</b></a><div class="mono sub small">${esc(r.company_number)}${r.data === "demo" ? " · demo" : ""}${r.rerun_of ? " · re-run" : ""}${role() !== "owner" && r.run_by === "owner" ? " · example" : ""}</div></td>
       <td data-l="Route">${routePill(r.route)}</td><td data-l="Coverage">${coverageCell(r.coverage)}</td><td data-l="Decision">${decisionPill(r.decision)}</td>
       <td data-l="Cover">${esc(r.cover && r.cover.length ? r.cover.join(", ") : "General")}</td>
       <td data-l="Run" class="mono">${esc(fmtShort(r.created_at))}${r.stale ? ` <span class="pill p-note">Stale</span>` : ""}</td></tr>`).join("")}
@@ -865,7 +887,7 @@ async function runPrescreen(number, name) {
     }
     if (!report) throw new ApiError("The pre-screen stopped before it finished.", 500);
     clearInterval(RUN_TIMER);
-    S.form.rerunOf = ""; S.form.rerunName = "";
+    S.form.rerunOf = ""; S.form.rerunName = ""; S.allowanceFresh = false;
     S.report = report; S.tab = "overview"; S.openDrawer = ""; S.agentRun = null; S.brokerView = "q"; S.recordingAnother = false; S.checkFilter = "all"; S.checkOnly = "";
     history.replaceState(null, "", `/case/${report.report_id}`);
     await Promise.all([loadWatch(), loadAgentRun(report)]);
@@ -1042,12 +1064,13 @@ function caseHeader(r) {
   const read = (r.sources_read || []).filter(s => s.state === "done").map(s => s.read_at).sort().slice(-1)[0] || r.created_at;
   return `<header class="shead">
     <div class="crumb"><a href="/case#cases" data-nav>Cases</a> <span aria-hidden="true">/</span> ${esc(titleCase(r.company_name))}</div>
-    <div class="titlerow"><h1 id="case-title" tabindex="-1">${esc(titleCase(r.company_name))}</h1>${routePill(r.route)}${decPill}${demo ? `<span class="pill p-demo">Demo data</span>` : ""}
+    <div class="titlerow"><h1 id="case-title" tabindex="-1">${esc(titleCase(r.company_name))}</h1>${routePill(r.route)}${decPill}${demo ? `<span class="pill p-demo">Demo data</span>` : ""}${(r.meta || {}).demonstration ? `<span class="pill p-demo">Demonstration</span>` : ""}${r.read_only ? `<span class="pill p-note">Example · read-only</span>` : ""}
       <div class="acts">
-        <button class="btn" type="button" id="watch-btn" aria-pressed="${watched}">${watched ? "Watching" : "Watch"}</button>
+        ${role() === "owner" ? `<button class="btn" type="button" id="watch-btn" aria-pressed="${watched}">${watched ? "Watching" : "Watch"}</button>` : ""}
         <button class="btn" type="button" id="note-btn">Copy file note</button>
-        <button class="btn" type="button" id="rerun-btn">Re-run with this proposal</button>
+        ${role() === "public" ? "" : `<button class="btn" type="button" id="rerun-btn">Re-run with this proposal</button>`}
       </div></div>
+    ${(r.meta || {}).demonstration ? `<div class="msg" style="margin-top:8px">A demonstration run on public records, made with a demo code. It is not an assessment of this company.</div>` : ""}
     <div id="note-fallback"></div>
     <dl class="facts">
       <div><dt>Company number</dt><dd><a class="mono" href="https://find-and-update.company-information.service.gov.uk/company/${esc(r.company_number)}" rel="noopener noreferrer" target="_blank">${esc(r.company_number)}<span class="sr"> on Companies House (opens in a new tab)</span></a></dd></div>
@@ -1212,13 +1235,17 @@ function overviewTab(r) {
 /* ======================================================================
    Right rail: Decision, Broker requests, Outstanding, Watch
    ====================================================================== */
-function railPanels(r) { return decisionPanel(r) + brokerPanel(r) + outstandingPanel(r) + watchPanel(r); }
+function railPanels(r) { return decisionPanel(r) + brokerPanel(r) + outstandingPanel(r) + (role() === "owner" ? watchPanel(r) : ""); }
 
 function decisionPanel(r) {
   const hold = isHold(r), decisions = r.decisions || [], last = decisions[decisions.length - 1];
   const expected = EXPECTED[r.route] || "refer";
   const hist = decisions.length ? `<div><div class="k" style="margin:4px 0 6px">Decision history</div><ol class="hist" reversed>${decisions.slice().reverse().map(d => `<li><span class="pill ${DECISION_PILL[d.decision] || "p-note"}">${esc(DECISION[d.decision] || d.decision)}</span>${d.overrides_route ? ` <span class="pill p-refer">Override</span>` : ""}
     <div class="s13">${esc(d.underwriter || "Unnamed")} · ${esc(fmtWhen(d.recorded_at))}${d.identity_confirmed ? " · identity confirmed" : ""}</div><div class="s13 sub">${esc(d.reason)}</div></li>`).join("")}</ol></div>` : "";
+  if (r.read_only) {
+    return `<section class="panel" aria-labelledby="h-dec" id="decision"><div class="ph"><h2 id="h-dec" tabindex="-1">Decision</h2></div>
+      <div class="pb" style="display:flex;flex-direction:column;gap:10px"><div class="s13">This is an example case, so decisions can't be recorded on it.${role() === "public" ? " With a demo code you can run your own pre-screen and record a decision there." : " Run your own pre-screen to record a decision."}</div>${hist}</div></section>`;
+  }
   if (last && !S.recordingAnother) {
     return `<section class="panel" aria-labelledby="h-dec" id="decision"><div class="ph"><h2 id="h-dec" tabindex="-1">Decision</h2><span class="sub small right">Records are added, never overwritten</span></div>
       <div class="pb" style="display:flex;flex-direction:column;gap:10px">
@@ -1405,7 +1432,7 @@ function analysisTab(r) {
   const run = S.agentRun, cov = coverageOf(r), cfg = S.agentCfg;
   const top = `<section class="panel" aria-labelledby="h-an"><div class="ph"><h2 id="h-an">Analysis</h2><span class="sub small">Agents read this case through the MCP tools. They explain; they can't change the route or record a decision.</span></div>
     <div class="pb" style="display:flex;flex-direction:column;gap:8px"><div class="s13"><b>Route unchanged: ${esc(ROUTE[r.route])}.</b> ${esc(cov.text)}</div>
-    ${isHold(r) ? `<div class="msg">The analysis doesn't run on a compliance hold.</div>` : `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ${run ? "" : "pri"}" type="button" id="agent-run" ${cfg && cfg.available === false ? "disabled" : ""}>${run ? "Run the analysis again" : "Run the analysis"}</button><span class="hint" id="agent-msg" role="status">${cfg && cfg.available === false ? "The analysis isn't set up on this server." : "Usually 20–60 seconds."}</span></div>`}</div></section>`;
+    ${isHold(r) ? `<div class="msg">The analysis doesn't run on a compliance hold.</div>` : r.read_only ? `<div class="s13 sub">${run ? "This is the saved analysis for this example case." : "No saved analysis for this example case."} ${role() === "public" ? "With a demo code you can run the analysis on a case of your own." : "Run your own pre-screen to try the analysis."}</div>` : `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ${run ? "" : "pri"}" type="button" id="agent-run" ${cfg && cfg.available === false ? "disabled" : ""}>${run ? "Run the analysis again" : "Run the analysis"}</button><span class="hint" id="agent-msg" role="status">${cfg && cfg.available === false ? "The analysis isn't set up on this server." : cfg && cfg.allowance ? `Usually 20–60 seconds. Runs on ${esc(cfg.model)} (free tier).` : "Usually 20–60 seconds."}</span></div>`}</div></section>`;
   if (!run) return top + prescreenHow(r);
   const v = run.review || {}, plan = v.plan || {}, t = (run.trace || {}).totals || {};
   if (v.stopped) return top + `<section class="panel"><div class="pb"><div class="msg bad">${esc(v.stopped)}</div></div></section>` + prescreenHow(r);
@@ -1476,10 +1503,11 @@ function wireCase(r) {
   const ha = $("#hist-all"); if (ha) ha.onclick = () => { S.histFilter.material = false; renderCase(); };
   const ep = $("#edit-prop"); if (ep) ep.onclick = () => { S.form = formFromRequest(r); go("/case#new"); };
   // header actions
-  $("#rerun-btn").onclick = () => rerun(r);
+  const rb = $("#rerun-btn"); if (rb) rb.onclick = () => rerun(r);
   const sr = $("#stale-rerun"); if (sr) sr.onclick = () => rerun(r);
+  if (role() === "public") $$("[data-rerun], #stale-rerun").forEach(b => b.remove());
   $$("[data-rerun]").forEach(b => b.onclick = () => rerun(r));
-  $("#watch-btn").onclick = () => toggleWatch(r);
+  const wb = $("#watch-btn"); if (wb) wb.onclick = () => toggleWatch(r);
   $("#note-btn").onclick = async () => {
     const btn = $("#note-btn");
     try {

@@ -56,6 +56,7 @@ def _summary(payload: dict[str, Any], decisions: list[dict[str, Any]]) -> dict[s
         "company_name": payload.get("company_name"), "route": payload.get("route"),
         "created_at": payload.get("created_at"), "decision": last.get("decision") if last else None,
         "data": (payload.get("meta") or {}).get("data", ""),
+        "run_by": (payload.get("meta") or {}).get("run_by", "owner"),
     }
 
 
@@ -277,6 +278,7 @@ class PgStore:
     async def recent(self, limit: int = 12) -> list[dict[str, Any]]:
         rows = await self._exec(
             "select r.id as report_id, r.company_number, r.company_name, r.route, r.created_at, r.data_mode as data, "
+            "coalesce(r.payload->'meta'->>'run_by', 'owner') as run_by, "
             "(select d.decision from decisions d where d.report_id = r.id order by d.recorded_at desc limit 1) as decision "
             "from reports r order by r.created_at desc limit %s", (limit,), "all")
         return [{**r, "created_at": r["created_at"].isoformat()} for r in rows]
@@ -285,7 +287,7 @@ class PgStore:
         from src.prescreen.caseview import case_row
         rows = await self._exec(
             "select r.id as report_id, r.company_number, r.company_name, r.route, r.created_at, r.data_mode, "
-            "r.payload->'coverage' as coverage, r.payload->'request' as request, r.payload->>'rerun_of' as rerun_of, "
+            "r.payload->'coverage' as coverage, r.payload->'meta'->>'run_by' as run_by, r.payload->'request' as request, r.payload->>'rerun_of' as rerun_of, "
             "(select to_jsonb(d) from (select decision, underwriter, recorded_at, overrides_route from decisions d "
             "  where d.report_id = r.id order by recorded_at desc limit 1) d) as last_decision, "
             "(select count(*) from decisions d where d.report_id = r.id) as decision_count "
@@ -298,7 +300,8 @@ class PgStore:
             row = case_row({"report_id": r["report_id"], "company_number": r["company_number"],
                             "company_name": r["company_name"], "route": r["route"],
                             "created_at": r["created_at"].isoformat(), "coverage": r.get("coverage") or {},
-                            "request": r.get("request") or {}, "meta": {"data": r.get("data_mode", "")},
+                            "request": r.get("request") or {},
+                            "meta": {"data": r.get("data_mode", ""), "run_by": r.get("run_by") or "owner"},
                             "rerun_of": r.get("rerun_of") or ""}, [last] if last else [])
             row["decision_count"] = int(r.get("decision_count") or 0)
             out.append(row)
