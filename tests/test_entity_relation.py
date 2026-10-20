@@ -130,3 +130,36 @@ def test_related_note_doesnt_repeat_a_bare_brand_as_the_entity():
     media, _, _ = _run("REVOLUT LTD", [{"about_this_company": "related", "entity_named": "Revolut", **FINE}])
     rel = next(f for f in media.findings if f.rule_id == "media_related")
     assert "(Revolut)" not in rel.text and "another company in the group" in rel.text
+
+
+def test_fine_on_the_auditor_is_not_this_companys_news():
+    # Live, 20 Oct (rules 20h): "KPMG ... is fined record £21m" over its Carillion audits counted against Carillion.
+    media, _, items = _run("CARILLION PLC", [{"about_this_company": "yes", "entity_named": "KPMG", **FINE}],
+                           group=False, titles={0: "KPMG boss says Carillion auditing was very bad as firm is fined record £21m"})
+    assert items[0].about_this_company == "no" and "About KPMG" in items[0].reason
+    assert not [f for f in media.findings if f.route == Route.REFER]
+
+
+def test_auditor_fine_in_the_headline_overrides_the_models_entity():
+    media, _, items = _run("CARILLION PLC", [{"about_this_company": "yes", "entity_named": "Carillion plc", **FINE}],
+                           group=False, titles={0: "KPMG boss says Carillion auditing was 'very bad' as firm is fined record £21m"})
+    assert items[0].about_this_company == "no" and items[0].entity_named == "KPMG"
+
+
+def test_a_person_named_stays_with_the_model_reading():
+    media, _, items = _run("CARILLION PLC", [{"about_this_company": "yes", "entity_named": "Richard Howson", **FINE}],
+                           group=False)
+    assert items[0].about_this_company == "yes"
+
+
+@pytest.mark.parametrize("title,kept", [
+    ("Revolut wins Gibraltar DLT licence via new subsidiary", False),
+    ("Revolut receives crypto licence authorisation in Gibraltar", False),
+    ("Monzo banking licence granted in Ireland", False),
+    ("Regulator revokes Revolut's licence in Gibraltar", True),
+])
+def test_licence_granted_is_routine(title, kept):
+    row = {"about_this_company": "yes", "entity_named": "", "category": "regulatory_action", "severity": "medium",
+           "reason": "licence"}
+    media, _, items = _run("REVOLUT LTD", [row], group=False, titles={0: title})
+    assert (items[0].severity == "medium") is kept

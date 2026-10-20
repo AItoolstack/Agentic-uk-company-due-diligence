@@ -173,7 +173,7 @@ def demo_client(tmp_path, monkeypatch):
 def test_report_carries_case_fields(demo_client):
     r = demo_client.post("/api/prescreen", json={"company_number": "09446231", "declared_turnover_gbp": "£2.4m",
                                                  "cover_lines": ["management_liability", "cyber"]}).json()
-    assert r["route"] == "refer" and r["rules_version"] == "draft-2026-10-20g"
+    assert r["route"] == "refer" and r["rules_version"] == "draft-2026-10-20h"
     ids = [s["id"] for s in r["sources_read"]]
     assert ids[:2] == ["companies_house", "directors"] and "news" in ids
     labels = " ".join(s["label"] for s in r["sources_read"])

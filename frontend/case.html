@@ -77,7 +77,8 @@ h1,h2,h3{margin:0}
 .titlerow h1{font-size:24px;font-weight:600;letter-spacing:-.015em;outline:none}
 .titlerow .acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 .facts{margin:16px 0 0;display:flex;flex-wrap:wrap;gap:12px 0}
-.facts>div{padding:0 28px;border-left:1px solid var(--line);min-width:0;max-width:300px}
+.facts{display:grid;grid-template-columns:max-content max-content max-content minmax(150px,1.5fr) minmax(150px,1.2fr) minmax(130px,1fr);gap:12px 0}
+.facts>div{padding:0 22px;border-left:1px solid var(--line);min-width:0}
 .facts>div:first-child{padding-left:0;border-left:0}
 .facts dt{font-size:12px;font-weight:500;color:var(--sub)}
 .facts dd{margin:2px 0 0;font-weight:500;overflow-wrap:anywhere}
@@ -175,7 +176,7 @@ details[open]>summary::before{transform:rotate(45deg)}
 .msg.warn{background:var(--refer-bg);border-color:var(--refer-b);color:var(--refer)}
 
 /* summary strip */
-.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.summary{display:grid;grid-template-columns:1.35fr 1fr 1fr 1.2fr}
 .summary>div{padding:18px 20px;border-left:1px solid var(--rule);min-width:0}
 .summary>div:first-child{border-left:0}
 .summary .big{font-size:22px;font-weight:600;letter-spacing:-.01em;margin-top:6px;display:flex;align-items:center;gap:8px}
@@ -263,6 +264,10 @@ details[open]>summary::before{transform:rotate(45deg)}
 .tl{list-style:none;margin:0;padding:0 16px 8px}
 .tl li{display:grid;grid-template-columns:110px 90px 1fr;gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--rule)}
 .tl li.mat .t{font-weight:600}
+.tl li.mat{background:var(--refer-tint);margin:0 -20px;padding-left:20px;padding-right:20px}
+.tl li.serious{background:var(--out-tint)}
+.tl li.mat .g{color:var(--refer-bar)}.tl li.serious .g{color:var(--out-bar)}
+.tl{padding:0 20px 8px}
 .tl li:last-child{border-bottom:0}
 
 /* the sticky decide button on one-column layouts */
@@ -271,6 +276,17 @@ details[open]>summary::before{transform:rotate(45deg)}
 /* ---- responsive ---- */
 @media (max-width:1279px){
   .aside{flex-basis:320px}
+  .tbl.fixed{table-layout:auto;min-width:0}
+  .tbl.fixed col{width:auto!important}
+  .tbl.fixed td.mono,.tbl.fixed td[data-l=Area]{white-space:nowrap}
+  .tbl.fixed td[data-l=Source]{min-width:120px}
+  .qrow2{grid-template-columns:minmax(0,1fr) auto;gap:8px 16px}
+  .qrow2>div:nth-child(2){grid-column:1/-1;grid-row:2}
+  .facts{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .facts>div:nth-child(4){border-left:0;padding-left:0}
+  .summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .summary>div:nth-child(3){border-left:0}
+  .summary>div:nth-child(n+3){border-top:1px solid var(--rule)}
 }
 @media (max-width:1023px){
   .app{flex-direction:column}
@@ -288,9 +304,7 @@ details[open]>summary::before{transform:rotate(45deg)}
   .scrim.open{display:block;position:fixed;inset:0;background:rgba(16,24,40,.4);z-index:25}
   .cols{flex-direction:column}
   .aside,.aside.stick{position:static;flex-basis:auto;width:100%}
-  .summary{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .summary>div:nth-child(3){border-left:0}
-  .summary>div:nth-child(n+3){border-top:1px solid var(--rule)}
+
   .decidebar{display:block;position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 16px;z-index:20}
   .decidebar a{display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:6px;background:var(--act);color:#fff;font-weight:600;font-size:15px}
   .deskl{max-width:none}
@@ -1096,7 +1110,7 @@ function outcomePanel(r) {
   const ver = String(r.rules_version || "").match(/(\d{2})([a-z])$/);
   const areas = [...new Set(reasons.map(f => shortTitle(f.check)))];
   const ticks = Array.from({length: cov.completed}, () => `<span></span>`).join("") + Array.from({length: cov.couldnt_check}, () => `<span class="gap"></span>`).join("") + Array.from({length: cov.not_covered}, () => `<span class="nc"></span>`).join("");
-  const gaps = [...(cov.couldnt_check_titles || []).map(t => `couldn't check ${t.toLowerCase()}`), ...(cov.not_covered_titles || []).map(t => `${t.replace(/^County court judgments$/i, "CCJs")} not covered`)];
+  const gaps = [...(cov.couldnt_check_titles || []).map(t => `Couldn't check: ${t}`), ...(cov.not_covered_titles || []).map(t => `${t.replace(/^County court judgments$/i, "CCJs")} not covered`)];
   const read = (r.sources_read || []).filter(x => x.state === "done").map(x => x.read_at).sort().slice(-1)[0] || r.created_at;
   return `${endedLine}<section class="panel summary" aria-labelledby="h-out">
     <div><div class="k" id="h-out">Recommendation</div><div class="big ${wcls}">${r.route === "note" ? "" : glyph(GLYPH_OF_ROUTE[r.route], 14)}${esc(word)}</div><div class="sub s13" style="margin-top:4px">${esc(meaning)}</div></div>
@@ -1358,7 +1372,12 @@ function peopleTab(r) {
   const head = `<thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Appointed</th><th scope="col">Resigned</th><th scope="col">Disqualification</th><th scope="col">Sanctions</th><th scope="col">Insolvency links</th></tr></thead>`;
   const notCounted = di ? (di.findings || []).find(f => f.rule_id === "director_link_not_counted") : null;
   const owners = c.owners_detail || (c.owners || []).map(n => ({name: n}));
-  return `<section class="panel" aria-labelledby="h-ppl"><div class="ph"><h2 id="h-ppl">${who}</h2><span class="pill p-note">${current.length}</span><span class="sub small right">Names open their appointments on Companies House</span></div>
+  const joined = current.filter(p => p.appointed && new Date(p.appointed) >= yearAgo).length;
+  const counted = di ? (di.findings || []).filter(f => f.rule_id === "director_insolvent_links").reduce((n, f) => n + Number((f.detail || {}).count || 1), 0) : 0;
+  const tiles = [[who, current.length, "checked by name and date of birth"], ["Joined, last 12 months", joined, joined ? "see the board-change note" : "none"],
+    ["Left, last 12 months", former.length, former.length ? "listed below" : "none"], ["Insolvency links counted", counted, "in the 5-year lookback"]];
+  return `<section class="panel summary" aria-label="People in numbers">${tiles.map(([k, v, sub], i) => `<div><div class="k">${esc(k)}</div><div class="big ${i === 3 && counted ? (RANK[(di.findings.find(f => f.rule_id === "director_insolvent_links") || {}).route] >= 2 ? "w-out" : "w-refer") : ""}">${v}</div><div class="sub small" style="margin-top:4px">${esc(sub)}</div></div>`).join("")}</section>
+    <section class="panel" aria-labelledby="h-ppl"><div class="ph"><h2 id="h-ppl">${who}</h2><span class="pill p-note">${current.length}</span><span class="sub small right">Names open their appointments on Companies House</span></div>
       ${current.length ? `<div class="tw"><table class="tbl stack">${head}<tbody>${current.map(row).join("")}</tbody></table></div>` : `<div class="empty">${c.officers_read === false ? "Couldn't read the officers." : "None listed."}</div>`}</section>
     <section class="panel" aria-labelledby="h-former"><div class="ph"><h2 id="h-former">Former ${who.toLowerCase()} (last 12 months)</h2><span class="pill p-note">${former.length}</span></div>
       ${former.length ? `<div class="tw"><table class="tbl stack">${head}<tbody>${former.map(row).join("")}</tbody></table></div>` : `<div class="empty">None in the last 12 months.</div>`}</section>
@@ -1370,11 +1389,15 @@ function peopleTab(r) {
 const KINDS = [["", "All kinds"], ["people", "People"], ["filings", "Filings"], ["owners", "Owners"], ["money", "Money"], ["legal", "Insolvency and legal"], ["company", "Company"]];
 function historyTab(r) {
   const f = S.histFilter, all = r.timeline || [];
-  const list = all.filter(e => (!f.kind || e.kind === f.kind) && (!f.material || e.tone !== "neutral" || e.kind === "legal"));
+  const byKind = all.filter(e => !f.kind || e.kind === f.kind);
+  const material = byKind.filter(e => e.tone !== "neutral" || e.kind === "legal");
+  const fellBack = f.material && !material.length && byKind.length;
+  const list = f.material && !fellBack ? material : byKind;
   return `<section class="panel" aria-labelledby="h-hist"><div class="ph"><h2 id="h-hist">History</h2><span class="sub small">${plural(all.length, "event")} from the registers, newest first</span>
     <div class="right" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><label class="sr" for="hist-kind">Kind</label><select id="hist-kind" style="width:auto">${KINDS.map(([v, n]) => `<option value="${v}" ${f.kind === v ? "selected" : ""}>${n}</option>`).join("")}</select>
       <label class="cb"><input type="checkbox" id="hist-mat" ${f.material ? "checked" : ""}> Material only</label></div></div>
-    ${list.length ? `<ol class="tl">${list.map(e => `<li class="${e.tone !== "neutral" ? "mat" : ""}"><span class="mono sub">${esc(fmtDate(e.date))}</span><span class="kind sub s13">${esc(e.kind)}</span><span class="t">${esc(e.text)}</span></li>`).join("")}</ol>`
+    ${fellBack ? `<div class="pb sub s13" style="padding-bottom:0">Nothing material on record, so every event is shown.</div>` : ""}
+    ${list.length ? `<ol class="tl">${list.map(e => `<li class="${e.tone !== "neutral" ? "mat" : ""} ${e.tone === "serious" ? "serious" : ""}"><span class="mono sub">${esc(fmtDate(e.date))}</span><span class="kind"><span class="pill p-note">${esc(e.kind)}</span></span><span class="t">${e.tone !== "neutral" ? glyph(e.tone === "serious" ? "stop" : "tri") + " " : ""}${esc(e.text)}</span></li>`).join("")}</ol>`
       : `<div class="empty">${f.material && all.length ? `Nothing material. <button class="btn" type="button" id="hist-all" style="min-height:28px">Show all ${all.length}</button>` : "Nothing on record."}</div>`}</section>`;
 }
 const AGENT_NAME = {director_history: "Directors' other companies", news: "News", broker_email: "Email to the broker"};
@@ -1411,11 +1434,15 @@ function prescreenHow(r) {
 function proposalTab(r) {
   const rows = r.proposal_vs_record || [], pr = r.proposal_read || {};
   const V = {matches: ["p-clear", "tick", "Matches"], differs: ["p-refer", "tri", "Differs"], not_given: ["p-na", "dash", "Not given"], unknown: ["p-gap", "hatch", "Unknown"]};
-  return `<section class="panel" aria-labelledby="h-prop"><div class="ph"><h2 id="h-prop">Proposal vs public record</h2><button class="btn right" type="button" id="edit-prop">Edit proposal and re-run</button></div>
+  const nDiff = rows.filter(x => x.verdict === "differs").length, nGiven = rows.filter(x => x.verdict !== "not_given").length;
+  return `<section class="panel summary" aria-label="Proposal in numbers" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <div><div class="k">Items given</div><div class="big">${nGiven} <small>of ${rows.length}</small></div></div>
+      <div><div class="k">Differ from the record</div><div class="big ${nDiff ? "w-refer" : ""}">${nDiff}</div></div>
+      <div><div class="k">Turnover read as</div><div class="big" style="font-size:18px">${esc(pr.turnover || "—")}</div></div></section>
+    <section class="panel" aria-labelledby="h-prop"><div class="ph"><h2 id="h-prop">Proposal vs public record</h2><button class="btn right" type="button" id="edit-prop">Edit proposal and re-run</button></div>
     ${pr.given === "no" ? `<div class="pb s13" style="padding-bottom:0">No proposal details were entered, so nothing was compared.</div>` : ""}
-    ${pr.turnover ? `<div class="pb s13" style="padding-bottom:0">Turnover read as <b class="mono">${esc(pr.turnover)}</b>.</div>` : ""}
     <div class="tw"><table class="tbl stack"><thead><tr><th scope="col">Item</th><th scope="col">Proposal</th><th scope="col">Record</th><th scope="col">Verdict</th></tr></thead><tbody>
-    ${rows.map(x => { const v = V[x.verdict] || V.unknown; return `<tr><td data-l="Item"><b style="font-weight:600">${esc(x.item)}</b></td><td data-l="Proposal">${esc(x.proposal)}</td><td data-l="Record">${esc(x.record)}${x.note ? `<div class="sub s13">${esc(x.note)}</div>` : ""}</td><td data-l="Verdict"><span class="pill ${v[0]}">${glyph(v[1])}${v[2]}</span></td></tr>`; }).join("")}
+    ${rows.map(x => { const v = V[x.verdict] || V.unknown; return `<tr ${x.verdict === "differs" ? 'style="background:var(--refer-tint)"' : ""}><td data-l="Item"><b style="font-weight:600">${esc(x.item)}</b></td><td data-l="Proposal">${esc(x.proposal)}</td><td data-l="Record">${esc(x.record)}${x.note ? `<div class="sub s13">${esc(x.note)}</div>` : ""}</td><td data-l="Verdict"><span class="pill ${v[0]}">${glyph(v[1])}${v[2]}</span></td></tr>`; }).join("")}
     </tbody></table></div><div class="pb hint">Editing makes a new case linked to this one; this case and its decisions stay as they are.</div></section>`;
 }
 </script>

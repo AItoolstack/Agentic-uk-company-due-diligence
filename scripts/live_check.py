@@ -22,7 +22,7 @@ import httpx
 SPACE = os.environ.get("SPACE_URL", "https://aitoolstack-agentic-uk-company-due-diligence.hf.space").rstrip("/")
 HF = os.environ.get("HF_TOKEN", "")
 CODE = os.environ.get("PRESCREEN_ACCESS_TOKEN", "")
-EXPECTED_RULES = "draft-2026-10-20g"
+EXPECTED_RULES = "draft-2026-10-20h"
 
 # Same proposals as the last live runs (Supabase reports, 19 Oct), and the route each got.
 COMPANIES = [

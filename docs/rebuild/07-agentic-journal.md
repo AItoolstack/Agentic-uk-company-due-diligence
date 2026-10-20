@@ -606,3 +606,24 @@ now requires `identity_confirmed` on every decision (it was optional so the old 
 override needs 20 characters from any client. Tej kept rules 20g strict: a UK regulator's action named only by
 brand in a group (e.g. "Ofwat fines Thames Water") stays "may be about this company", since it doesn't change any
 route.
+
+## Rules 20h and the remaining tabs (20 Oct, 10:00–11:10)
+
+**Three wrong readings from the rescoring and the live runs, fixed (rules draft-2026-10-20h):**
+- *Linklaters' tribunal claim never reached the model.* Not a model miss: the news search took ten routine news items
+  first and cut the list at 12, so the adverse-terms web results (where the claim was) were dropped. Now the two
+  result lists are interleaved, 16 results go to the model, and the adverse terms add tribunal, court, penalty and
+  "data breach".
+- *KPMG's £21m audit fine counted as Carillion's news.* The model named "Carillion plc" as the fined entity. Two code
+  guards: a big-audit-firm name before "fined/penalty" in the headline sets the fined entity to that firm; and when the
+  named entity is a firm (legal form, bank, group, an audit firm) with no brand word in common with this company, the
+  article is about that firm ("no"). A person named stays with the model's reading (the director checks cover people).
+- *Licence granted rated medium.* A headline saying a licence, authorisation or approval was won, received or granted
+  is routine (low, neutral), unless it says revoked, suspended, refused or withdrawn.
+Tests 320 → 327. Carillion stays outside appetite (liquidation); no route on the nine is expected to move.
+
+**Tabs.** People gets four headline numbers (directors, joined, left, insolvency links counted, the last in the
+route colour when counted); History marks material events with a tint and glyph and, when nothing is material, shows
+everything with a line saying so instead of an empty panel; Proposal gets given / differ / turnover-read-as numbers and
+an amber row where the proposal differs. Header facts are a grid (no second-line wrap); at 1024–1279 px the summary
+and facts go to two/three columns and the reasons table lays out automatically. 50 of 50 offline checks.

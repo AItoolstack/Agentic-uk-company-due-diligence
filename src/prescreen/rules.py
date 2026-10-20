@@ -12,7 +12,9 @@ from src.prescreen.models import CheckResult, CheckStatus, Route
 
 # 20g: in a group, a regulator's action counts only when the named entity (with its legal form) is in the text
 # the model was shown (media.entity_in_text).
-RULES_VERSION = "draft-2026-10-20g"
+# 20h: a fine on another firm (auditor, adviser) named by the model isn't this company's; licence/authorisation granted
+# is routine; news search interleaves adverse web results with news (16 results, not 12).
+RULES_VERSION = "draft-2026-10-20h"
 
 THRESHOLDS = {
     # Company age

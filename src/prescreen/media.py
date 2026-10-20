@@ -40,7 +40,9 @@ For each result decide:
   brand family: a parent, subsidiary or sister company, including an overseas one (for Revolut Ltd, a
   fine on Revolut Bank UAB is "related"; for Monzo Bank Limited, Monzo Bank Europe DAC is "related").
   "no" if it is about another company, a predecessor that used the same brand, a namesake, or a person
-  with no link. "unsure" otherwise.
+  with no link. "unsure" otherwise. When a regulator acts against an auditor, adviser, lender or supplier over
+  its work for this company (KPMG fined over its Carillion audits), the article is "no": the other firm was
+  acted against, and entity_named is that firm.
 - entity_named: the legal entity the article names as the subject (e.g. "Revolut Bank UAB"), exactly as
   written; "" if the article only uses the brand. For a fine, penalty or enforcement action, name the
   entity that was fined or acted against.
@@ -111,6 +113,26 @@ def entity_in_text(entity_named: str, text: str) -> bool:
     €3.5 Million for AML Failures" came back as naming "Revolut Ltd"; the fine was on Revolut Bank UAB)."""
     named = _with_forms(entity_named).strip()
     return bool(named) and f" {named} " in _with_forms(text)
+
+
+_LICENCE_GRANTED = re.compile(r"\b(wins?|won|receives?|received|granted|secures?|secured|gets|awarded|obtains?|"
+                              r"obtained|approved for)\b.{0,60}\b(licen[cs]e|authori[sz]ation|approval|permission|"
+                              r"registration|charter)\b|\b(licen[cs]e|authori[sz]ation|approval)\b.{0,30}\b(granted|"
+                              r"approved)\b", re.I)
+_FIRM_WORDS = re.compile(r"\b(ltd|limited|plc|llp|llc|inc|corp|gmbh|ag|sa|nv|bv|uab|dac|bank|group|holdings|partners|"
+                         r"kpmg|deloitte|pwc|pricewaterhousecoopers|ernst|ey|grant thornton|bdo|mazars|forvis)\b|&", re.I)
+
+
+_AUDITOR_FINED = re.compile(r"\b(KPMG|Deloitte|PwC|PricewaterhouseCoopers|EY|Ernst & Young|Grant Thornton|BDO|Mazars|"
+                            r"Forvis Mazars)\b(?=.{0,80}\b(fine|fined|fines|penalty|sanction|sanctioned)\b)", re.I)
+
+
+def _looks_like_a_firm(name: str) -> bool:
+    """An organisation, not a person: a person named in news (a former director fined) stays with the director checks."""
+    return bool(name) and _FIRM_WORDS.search(name) is not None
+
+
+_LICENCE_LOST = re.compile(r"\b(revok|suspend|refus|withdr|cancel|lose|lost|strip|den(y|ied))", re.I)
 
 
 def in_group(data: CompanyData) -> bool:
@@ -229,6 +251,24 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
         it.category = row.get("category", "") if row.get("category") in CATEGORIES else "neutral"
         it.severity = row.get("severity", "low") if row.get("severity") in ("low", "medium", "high") else "low"
         it.reason = str(row.get("reason", ""))[:300]
+
+    # Guard (rules 20h; Carillion, live): "KPMG ... is fined record £21m" over its Carillion audits was read as a fine
+    # on Carillion. When the model names a different firm as the one acted against (no brand word in it), the article
+    # is about that firm. And a licence or authorisation being granted is routine, whatever severity came back.
+    prev_names_all = [p.get("name", "") for p in data.profile.get("previous_company_names") or []]
+    brand_words = set(_norm_entity(short_name(data.name)).split()) - {"group", "holdings", "uk", "bank", "plc"}
+    for i, it in enumerate(items):
+        auditor = _AUDITOR_FINED.search(it.title or "")
+        if auditor and it.category == "regulatory_action" and not brand_words & set(_norm_entity(auditor.group(1)).split()):
+            it.entity_named = auditor.group(1)  # the headline says who was fined, whatever the model read
+        if it.about_this_company in ("yes", "unsure") and _looks_like_a_firm(it.entity_named) and brand_words \
+                and not (brand_words & set(_norm_entity(it.entity_named).split())) \
+                and not entity_relation(it.entity_named, data.name, prev_names_all):
+            it.about_this_company = "no"
+            it.reason = (f"About {it.entity_named}, not this company. " + it.reason)[:300]
+        if it.severity != "low" and _LICENCE_GRANTED.search(it.title) and not _LICENCE_LOST.search(it.title):
+            it.severity, it.category = "low", "neutral"
+            it.reason = ("A licence or authorisation being granted is routine. " + it.reason)[:300]
 
     # Guard (the Wilko trap, seen live): news of a collapse can't be about this legal entity when Companies
     # House shows it active with no insolvency record. It's usually a predecessor that used the brand.
