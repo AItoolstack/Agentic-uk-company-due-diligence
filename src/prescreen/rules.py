@@ -15,7 +15,8 @@ from src.prescreen.models import CheckResult, CheckStatus, Route
 # 20h: a fine on another firm (auditor, adviser) named by the model isn't this company's; licence/authorisation granted
 # is routine; an undated item takes the latest year it names; a retrospective is dated by its event year.
 # 20i: news search back to 20g (news first, 12 results). Interleaving web results (20h) let old stories in with
-# page-update dates (Tesco 2017 DPA dated 2025-12-05 live) and still missed the Linklaters tribunal claim.\n# An operational incident (job cuts, closures, outage) is at most medium, a note (Greggs, live).
+# page-update dates (Tesco 2017 DPA dated 2025-12-05 live) and still missed the Linklaters tribunal claim.
+# An operational incident (job cuts, closures, outage) is at most medium, a note (Greggs, live).
 RULES_VERSION = "draft-2026-10-20i"
 
 THRESHOLDS = {
