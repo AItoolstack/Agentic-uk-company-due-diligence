@@ -142,8 +142,32 @@ def company_card(data: C.CompanyData) -> dict[str, Any]:
         "officer_names": sorted(o.get("name", "") for o in C.active_officers(data)),
         "owner_names": sorted(p2.get("name", "") for p2 in C.active_pscs(data)),
         "officers_read": isinstance(data.officers, dict),
+        # For the case page's People tab: everyone checked (current, and those who left in the last 12 months),
+        # and the owners, with dates. No dates of birth.
+        "people": [{"name": o.get("name", ""), "role": (o.get("officer_role") or "").replace("-", " "),
+                    "appointed": o.get("appointed_on", ""), "resigned": o.get("resigned_on", ""),
+                    "officer_id": C.officer_id(o) or ""} for o in _people(data)],
+        "owners_detail": [{"name": x.get("name", ""), "kind": _psc_kind(x.get("kind", "")),
+                           "notified": x.get("notified_on", ""),
+                           "control": [n.replace("-", " ") for n in (x.get("natures_of_control") or [])][:3]}
+                          for x in C.active_pscs(data)][:10],
         "owners_read": isinstance(data.pscs, dict),
     }
+
+
+def _people(data: C.CompanyData) -> list[dict[str, Any]]:
+    try:
+        return C.officers_in_scope(data)[:60]
+    except Exception:  # noqa: BLE001 - display only
+        return []
+
+
+def _psc_kind(kind: str) -> str:
+    if "corporate" in kind or "legal-person" in kind:
+        return "company"
+    if "individual" in kind:
+        return "person"
+    return kind.replace("-", " ")
 
 
 async def run_prescreen(req: PreScreenRequest, services: Services, progress: Progress | None = None,

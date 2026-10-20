@@ -1,0 +1,252 @@
+[
+  {
+    "check": "all 7 demo cases open as cases",
+    "ok": true,
+    "detail": "{\"09446231\": \"7c9c56a630ea4a4c\", \"09563205\": \"1b350d98d182417b\", \"ZZ000001\": \"68c4e1fd98ac4753\", \"ZZ000002\": \"f0ee8e2217ab40f9\", \"ZZ000003\": \"93088fd5dca64a86\", \"ZZ000004\": \"60b1c3f5d3ed4084\", \"OC000005\": \"0641ec6c0e64403c\"}"
+  },
+  {
+    "check": "demo routes as before",
+    "ok": true,
+    "detail": "{\"09446231\": \"refer\", \"09563205\": \"note\", \"ZZ000001\": \"outside_appetite\", \"ZZ000002\": \"outside_appetite\", \"ZZ000003\": \"refer\", \"ZZ000004\": \"compliance_hold\", \"OC000005\": \"note\"}"
+  },
+  {
+    "check": "a name with several matches shows candidates, nothing auto-picked",
+    "ok": true,
+    "detail": "4 candidates"
+  },
+  {
+    "check": "candidate opens with the keyboard; live region announces the result",
+    "ok": true,
+    "detail": "Pre-screen ready: Outside appetite. 11 of 12 checks completed. Not covered by this tool: County court judgments."
+  },
+  {
+    "check": "JS money parsing matches the server's table",
+    "ok": true,
+    "detail": "ok 11/11, refused 9/9"
+  },
+  {
+    "check": "\u00a32.4m reads as \u00a32,400,000; 1.5 years and 'two million' refused inline, run disabled",
+    "ok": true,
+    "detail": "Read as \u00a32,400,000 | Whole years only, for example 2. | Enter an amount in pounds, for example \u00a32.4m, 750k or 2,400,000."
+  },
+  {
+    "check": "one coverage count on Overview, Checks, Analysis, file note and MCP",
+    "ok": true,
+    "detail": "11 of 13: 11 of 13 | 11 of 13 checks completed. Cou | Route unchanged: Refer. 11 of 13 checks  | MCP 11 of 13 checks completed. Cou"
+  },
+  {
+    "check": "each referral reason links to its primary source from the Overview",
+    "ok": true,
+    "detail": "1 of 1"
+  },
+  {
+    "check": "evidence drawer opens in place, one at a time, Esc closes it",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Record decision disabled until identity is confirmed; outcome preselected to the route",
+    "ok": true,
+    "detail": "preselected refer"
+  },
+  {
+    "check": "an override is labelled and needs a 20-character reason",
+    "ok": true,
+    "detail": "This overrides the recommended route: give a reason of at least 20 characters."
+  },
+  {
+    "check": "decisions are added, never overwritten (history shows both)",
+    "ok": true,
+    "detail": "2 in history"
+  },
+  {
+    "check": "Copy says Copied only on success; a failed copy selects the text with a hint",
+    "ok": true,
+    "detail": "Copied / Copy email / selected 307"
+  },
+  {
+    "check": "broker email built in code: subject, cover, numbered questions",
+    "ok": true,
+    "detail": "Subject: Monzo Bank Limited (09446231): information needed"
+  },
+  {
+    "check": "compliance hold: no broker text, no sanctions detail, only a referral to compliance",
+    "ok": true,
+    "detail": "clean"
+  },
+  {
+    "check": "a case over 24 h old shows the stale line with Re-run",
+    "ok": true,
+    "detail": "Data is 3 days old. Re-run before deciding. Re-run"
+  },
+  {
+    "check": "ended company: the ended line comes first",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "run limit reached: says when the next slot is; live region announces the error",
+    "ok": true,
+    "detail": "Pre-screen failed: 30 pre-screens an hour on this demo; next slot in 12 min."
+  },
+  {
+    "check": "whole run failed: error panel with Try again and Back to Desk",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "running: stage list, elapsed seconds, the 2-minute note after 20 s",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "a source failed: the case opens; Outstanding offers Re-run",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "390px 09446231: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 390 vs 390"
+  },
+  {
+    "check": "390px ZZ000004: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 390 vs 390"
+  },
+  {
+    "check": "390px OC000005: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 390 vs 390"
+  },
+  {
+    "check": "390px ZZ000001: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 390 vs 390"
+  },
+  {
+    "check": "390px: open a case, back to the Desk, start another without a reload",
+    "ok": true,
+    "detail": "scrollWidth 390 vs 390"
+  },
+  {
+    "check": "390px: sticky 'Review and decide' button",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "563px 09446231: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 563 vs 563"
+  },
+  {
+    "check": "563px ZZ000004: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 563 vs 563"
+  },
+  {
+    "check": "563px OC000005: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 563 vs 563"
+  },
+  {
+    "check": "563px ZZ000001: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 563 vs 563"
+  },
+  {
+    "check": "563px: open a case, back to the Desk, start another without a reload",
+    "ok": true,
+    "detail": "scrollWidth 563 vs 563"
+  },
+  {
+    "check": "563px: sticky 'Review and decide' button",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "768px 09446231: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 768 vs 768"
+  },
+  {
+    "check": "768px ZZ000004: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 768 vs 768"
+  },
+  {
+    "check": "768px OC000005: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 768 vs 768"
+  },
+  {
+    "check": "768px ZZ000001: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 768 vs 768"
+  },
+  {
+    "check": "768px: open a case, back to the Desk, start another without a reload",
+    "ok": true,
+    "detail": "scrollWidth 768 vs 768"
+  },
+  {
+    "check": "768px: sticky 'Review and decide' button",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "1024px 09446231: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 1024 vs 1024"
+  },
+  {
+    "check": "1024px ZZ000004: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 1024 vs 1024"
+  },
+  {
+    "check": "1024px OC000005: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 1024 vs 1024"
+  },
+  {
+    "check": "1024px ZZ000001: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 1024 vs 1024"
+  },
+  {
+    "check": "1024px: open a case, back to the Desk, start another without a reload",
+    "ok": true,
+    "detail": "scrollWidth 1024 vs 1024"
+  },
+  {
+    "check": "1440px 09446231: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 1440 vs 1440"
+  },
+  {
+    "check": "1440px ZZ000004: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 1440 vs 1440"
+  },
+  {
+    "check": "1440px OC000005: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 1440 vs 1440"
+  },
+  {
+    "check": "1440px ZZ000001: route, coverage and reasons before the decision; no sideways scroll",
+    "ok": true,
+    "detail": "scrollWidth 1440 vs 1440"
+  },
+  {
+    "check": "1440px: open a case, back to the Desk, start another without a reload",
+    "ok": true,
+    "detail": "scrollWidth 1440 vs 1440"
+  },
+  {
+    "check": "no script errors on any page",
+    "ok": true,
+    "detail": ""
+  }
+]

@@ -61,8 +61,8 @@ def _limit() -> None:
     while _recent and now - _recent[0] > 3600:
         _recent.popleft()
     if len(_recent) >= _RUNS_PER_HOUR:
-        raise HTTPException(429, f"The service limit of {_RUNS_PER_HOUR} pre-screens an hour has been reached. "
-                                 "Try again later.")
+        wait = max(1, int((3600 - (now - _recent[0])) // 60) + 1)
+        raise HTTPException(429, f"{_RUNS_PER_HOUR} pre-screens an hour on this demo; next slot in {wait} min.")
     _recent.append(now)
 
 

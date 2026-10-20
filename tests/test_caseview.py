@@ -102,6 +102,13 @@ def test_news_groups_articles_backing_a_finding_into_one_event():
     assert v["summary"].startswith("7 read · 2 events")
 
 
+def test_unclassified_news_is_not_reviewed_never_background():
+    media = [{"title": "t", "url": "u", "published": "2025-01-01", "source": "s", "about_this_company": "unsure",
+              "entity_named": "", "category": "", "severity": "low", "reason": ""}]
+    v = V.news_view(_report_with_news(media))
+    assert v["counts"]["background"] == 0 and v["counts"]["not_reviewed"] == 1
+
+
 def test_news_with_no_items_is_empty_not_clear():
     v = V.news_view(_report_with_news([]))
     assert v["events"] == [] and v["read"] == 0 and v["summary"].startswith("0 read")

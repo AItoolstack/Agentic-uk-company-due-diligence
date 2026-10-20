@@ -66,6 +66,11 @@ def news_view(report: dict[str, Any]) -> dict[str, Any]:
     event per category. Only articles read as about this company (or brand-only, inside a finding's event) go
     into events; a group company's news is never there."""
     items = [dict(it, i=i) for i, it in enumerate(report.get("media") or [])]
+    # An article the model never classified (no model, or the review failed) has no category: it wasn't read,
+    # so it can't be "background" (Monzo, demo: two unread results showed as background).
+    for it in items:
+        if not it.get("category") and it.get("about_this_company") not in ("no",):
+            it["about_this_company"] = "not_reviewed"
     name = report.get("company_name", "")
     reasons = report.get("route_reasons") or []
     used: set[int] = set()
