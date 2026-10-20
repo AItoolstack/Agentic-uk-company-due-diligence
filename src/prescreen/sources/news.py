@@ -8,8 +8,6 @@ date, outlet and a short snippet are kept: never page text.
 
 from __future__ import annotations
 
-from itertools import zip_longest
-
 import re
 from typing import Any
 
@@ -23,8 +21,7 @@ GDELT = "https://api.gdeltproject.org/api/v2/doc/doc"
 
 ADVERSE_TERMS = (
     "fraud OR investigation OR fined OR prosecuted OR prosecution OR insolvency OR "
-    "administration OR liquidation OR \"winding up\" OR lawsuit OR sanctions OR fire OR recall OR tribunal OR "
-    "court OR penalty OR \"data breach\""
+    "administration OR liquidation OR \"winding up\" OR lawsuit OR sanctions OR fire OR recall"
 )
 
 
@@ -49,7 +46,7 @@ class NewsSearch:
         self.fallback_reason = ""
         self.queries: list[str] = []
 
-    async def search(self, registered_name: str, limit: int = 16,
+    async def search(self, registered_name: str, limit: int = 12,
                      previous_names: list[str] | None = None) -> list[dict[str, str]]:
         if self.fixtures is not None:
             if isinstance(self.fixtures, SourceError):
@@ -79,26 +76,19 @@ class NewsSearch:
                               params={"q": q_news, "count": 10, "country": "GB", "search_lang": "en"})
         web = await get_json(self.client, "Brave Search", BRAVE_WEB, headers=headers,
                              params={"q": q_web, "count": 10, "country": "GB", "search_lang": "en"})
-        # Interleave news and the adverse-terms web search: taking news first let ten routine news items fill the
-        # list before any adverse web result (Linklaters, 20 Oct: an employment tribunal claim never reached the model).
-        lists: list[list[dict[str, str]]] = []
+        items: list[dict[str, str]] = []
         for raw in (news, web):
-            batch: list[dict[str, str]] = []
-            lists.append(batch)
             if raw is NOT_FOUND or not isinstance(raw, dict):
                 continue
             results = raw.get("results") or (raw.get("web") or {}).get("results") or []
             for r in results:
-                batch.append({
+                items.append({
                     "title": _strip_tags(r.get("title", "")),
                     "url": r.get("url", ""),
                     "published": r.get("page_age") or r.get("age") or "",
                     "source": (r.get("meta_url") or {}).get("hostname", ""),
                     "snippet": _strip_tags(r.get("description", ""))[:300],
                 })
-        items: list[dict[str, str]] = []
-        for pair in zip_longest(*lists):
-            items += [x for x in pair if x]
         return items
 
     async def _gdelt(self, name: str) -> list[dict[str, str]]:
