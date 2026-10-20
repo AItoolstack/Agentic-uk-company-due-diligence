@@ -591,4 +591,4 @@ AML Failures" (the fine was on Revolut Bank UAB) as serious news about Revolut L
 entity, with its legal form, appears in the headline or snippet the model was shown (`media.entity_in_text`).
 Otherwise it's "may be about this company": shown, never a reason. The FCA's own action on a firm still reaches the
 route through the FCA check. Expected effect on the nine live companies: no route change (Revolut stays refer on its
-overdue confirmation statement; Monzo stays refer on the FCA Register's final notice). Tests 318 → 321.
+overdue confirmation statement; Monzo stays refer on the FCA Register's final notice). Tests 318 → 320.
