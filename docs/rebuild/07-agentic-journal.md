@@ -599,3 +599,10 @@ Greggs note. Every live report carries the case-page fields. Revolut (0ca070eddd
 "unsure: names only the brand", and the reasons are the overdue confirmation statement and the trade/SIC mismatch.
 Seen, not yet looked into: Thames Water's trade check was "couldn't check" this run (it ran on 19 Oct).
 Linklaters still takes 155 s and can't finish its 336 members' checks.
+
+**`/case` becomes the main page (20 Oct, 09:00, approved by Tej).** `/` serves the case page (it redirects to `/case`
+in the browser, so links and Back behave the same); the previous page moves to `/old` for comparison. The server
+now requires `identity_confirmed` on every decision (it was optional so the old page kept working), and an
+override needs 20 characters from any client. Tej kept rules 20g strict: a UK regulator's action named only by
+brand in a group (e.g. "Ofwat fines Thames Water") stays "may be about this company", since it doesn't change any
+route.

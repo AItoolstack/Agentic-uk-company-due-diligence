@@ -74,9 +74,12 @@ def main() -> int:
             time.sleep(15)
         h = c.get(f"{SPACE}/health")
         check("Space is up (/health)", h.status_code == 200, str(h.status_code))
-        old = c.get(f"{SPACE}/")
-        check("/ still serves the current page", old.status_code == 200 and "ai·toolstack</title>" in old.text
-              and "parseMoney" not in old.text, f"{old.status_code}, {len(old.text)} bytes")
+        home = c.get(f"{SPACE}/")
+        check("/ serves the case page", home.status_code == 200 and "parseMoney" in home.text,
+              f"{home.status_code}, {len(home.text)} bytes")
+        old = c.get(f"{SPACE}/old")
+        check("/old serves the previous page", old.status_code == 200 and "parseMoney" not in old.text,
+              f"{old.status_code}, {len(old.text)} bytes")
         new = c.get(f"{SPACE}/case")
         check("/case serves the case page", new.status_code == 200 and "Read as" in new.text and "parseMoney" in new.text,
               f"{new.status_code}, {len(new.text)} bytes")

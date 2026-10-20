@@ -62,8 +62,14 @@ async def health() -> HealthResponse:
 
 
 @router.get("/", response_class=HTMLResponse, tags=["meta"])
+async def serve_home() -> HTMLResponse:
+    """The case page is the main page (approved 20 Oct 2026). /case and /case/<id> serve the same file."""
+    return _case_html()
+
+
+@router.get("/old", response_class=HTMLResponse, tags=["meta"])
 async def serve_prescreen() -> HTMLResponse:
-    """The underwriter pre-screen (current app)."""
+    """The previous pre-screen page, kept for comparison (read it; decisions are recorded on the case page)."""
     if _PRESCREEN_HTML.exists():
         return HTMLResponse(_PRESCREEN_HTML.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>frontend/prescreen.html not found</h1>", status_code=404)

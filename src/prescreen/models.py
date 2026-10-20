@@ -213,5 +213,5 @@ class DecisionRequest(BaseModel):
     underwriter: str = Field(default="", max_length=120)
     # Ignored: the server works out whether a decision overrides the route (caseview.check_decision).
     overrides_route: bool = False
-    # The case page sends it and can't record without it. None = an older client (the page at /).
+    # Required: the underwriter matched the company number and registered address to the proposal.
     identity_confirmed: bool | None = None

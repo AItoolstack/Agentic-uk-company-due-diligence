@@ -348,7 +348,7 @@ details[open]>summary::before{transform:rotate(45deg)}
       <span class="lbl">Screening policy</span>
       <a class="mono" id="policy" href="/api/prescreen/config" title="Screening policy version">…</a>
       <span class="pill p-demo" id="rail-demo" hidden>Demo</span>
-      <a class="lbl" href="/" style="color:#98A2B3">Current page</a>
+      <a class="lbl" href="/old" style="color:#98A2B3">Previous page</a>
     </div>
   </div></nav>
   <div class="scrim" id="scrim"></div>
@@ -544,6 +544,7 @@ document.addEventListener("click", e => {
 window.addEventListener("popstate", route);
 
 async function route() {
+  if (location.pathname === "/") { history.replaceState(null, "", "/case" + location.search + location.hash); }
   const m = location.pathname.match(/^\/case\/([0-9a-f]{16})\/?$/);
   setNav(m ? "cases" : (location.hash.slice(1) || "new"));
   if (m) {

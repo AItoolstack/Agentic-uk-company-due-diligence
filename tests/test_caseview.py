@@ -146,11 +146,11 @@ def test_decision_rules():
     assert V.check_decision("refer", "proceed", "short", True)[1]  # override needs 20 characters
     assert V.check_decision("refer", "proceed", ok, True) == (True, "")
     assert V.check_decision("refer", "refer", ok, False)[1]  # identity not confirmed
-    assert V.check_decision("note", "proceed", "fine", None) == (False, "")  # older client
-    assert V.check_decision("refer", "decline", "short", None) == (True, "")  # older client: not enforced
+    assert V.check_decision("note", "proceed", "fine", None)[1]  # identity is required from every client
+    assert V.check_decision("refer", "decline", "short", True)[1]  # an override needs 20 characters
     assert V.check_decision("compliance_hold", "proceed", ok, True)[1]
     assert V.check_decision("compliance_hold", "compliance", "ref C-1", True) == (False, "")
-    assert V.check_decision("compliance_hold", "refer", "ref C-1", None) == (False, "")  # the page at /
+    assert V.check_decision("compliance_hold", "refer", "ref C-1", True) == (False, "")  # the previous page's word
     assert V.check_decision("note", "compliance", ok, True)[1]
     assert V.expected_decision("outside_appetite") == "decline"
 
@@ -252,4 +252,7 @@ def test_case_deep_links_serve_the_page(demo_client):
     for path in ("/case", "/case/0123456789abcdef"):
         res = demo_client.get(path)
         assert res.status_code == 200 and "Company Pre-Screen" in res.text
-    assert demo_client.get("/").status_code == 200  # the current page is untouched
+    home = demo_client.get("/")
+    assert home.status_code == 200 and "parseMoney" in home.text  # the case page is the main page now
+    old = demo_client.get("/old")
+    assert old.status_code == 200 and "parseMoney" not in old.text  # the previous page, kept for comparison

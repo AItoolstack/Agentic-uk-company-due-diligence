@@ -289,17 +289,18 @@ def expected_decision(route: str) -> str:
 def check_decision(route: str, decision: str, reason: str, identity_confirmed: bool | None) -> tuple[bool, str]:
     """Returns (overrides_route, error). Error is "" when the decision can be recorded.
     identity_confirmed None = an older client that doesn't send it (the page at /): not enforced there."""
-    if identity_confirmed is False:
+    # Required since /case became the main page (20 Oct): no decision without the identity match.
+    if not identity_confirmed:
         return False, "Confirm the company number and registered address match the proposal first."
     if route == "compliance_hold":
-        # The page at / records a hold as "refer"; both mean referred to compliance.
+        # The previous page recorded a hold as "refer"; both mean referred to compliance.
         if decision not in ("compliance", "refer"):
             return False, "This case is held for compliance: only a referral to compliance can be recorded."
         return False, ""
     if decision == "compliance":
         return False, "Referred to compliance is only for a case on compliance hold."
     overrides = decision != expected_decision(route)
-    if overrides and identity_confirmed is not None and len((reason or "").strip()) < OVERRIDE_MIN_REASON:
+    if overrides and len((reason or "").strip()) < OVERRIDE_MIN_REASON:
         return True, (f"This overrides the recommended route, so give a reason of at least "
                       f"{OVERRIDE_MIN_REASON} characters.")
     return overrides, ""
