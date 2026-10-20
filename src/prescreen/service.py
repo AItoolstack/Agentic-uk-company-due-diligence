@@ -54,9 +54,10 @@ def demo_mode() -> bool:
 
 
 def build_services(client: httpx.AsyncClient, company_number: str = "",
-                   demo_day: int = 1) -> tuple[Services, dict[str, Any]]:
+                   demo_day: int = 1, free_only: bool = False) -> tuple[Services, dict[str, Any]]:
     """Return services plus metadata shown on the report ("data": "live" | "demo").
-    demo_day=2 applies the demo cases' "next day" changes, so monitoring can be shown offline."""
+    demo_day=2 applies the demo cases' "next day" changes, so monitoring can be shown offline.
+    free_only=True (guests) keeps the one model call on a free provider (access.guest_news_model)."""
     if demo_mode():
         all_cases = demo_cases.cases(day=demo_day)
         ch_data: dict[str, Any] = {}
@@ -69,7 +70,7 @@ def build_services(client: httpx.AsyncClient, company_number: str = "",
             fca=FCARegister(None, "", "", "", fixtures=fca_fx),
             news=NewsSearch(None, fixtures=case.get("news", [])),
             gazette=Gazette(None, fixtures=case.get("gazette", [])),
-            llm=_llm(client),
+            llm=_llm(client, free_only),
             sanctions=parse_csv(demo_cases.FICTIONAL_SANCTIONS_CSV, "18 Oct 2026 (fictional demo list)",
                                 "demo"),
             today=demo_cases.TODAY,
@@ -82,17 +83,20 @@ def build_services(client: httpx.AsyncClient, company_number: str = "",
         fca=FCARegister(client, settings.fca_api_key, settings.fca_api_email, settings.fca_base_url),
         news=NewsSearch(client, brave_key=settings.brave_search_api_key),
         gazette=Gazette(client),
-        llm=_llm(client),
+        llm=_llm(client, free_only),
         sanctions=lambda: load_list(client, CACHE),
         today=date.today(),
     )
     return services, {"data": "live"}
 
 
-def _llm(client: httpx.AsyncClient) -> JSONChat:
+def _llm(client: httpx.AsyncClient, free_only: bool = False) -> JSONChat:
     provider = settings.chat_model_provider
-    key = settings.groq_api_key if provider == "groq" else settings.openai_api_key
     model = settings.chat_model_fast or settings.chat_model
+    if free_only:
+        from src.prescreen.access import guest_news_model
+        provider, model = guest_news_model(provider, model)
+    key = settings.groq_api_key if provider == "groq" else settings.openai_api_key
     return JSONChat(client, provider, model, key)
 
 
@@ -140,9 +144,13 @@ async def list_recent(limit: int = 12) -> list[dict[str, Any]]:
     return await get_store().recent(limit)
 
 
-async def list_cases(filter_: str = "all", page: int = 1, per_page: int = 25) -> dict[str, Any]:
-    """The Desk's recent cases: newest first, filtered, 25 a page, with counts per filter."""
+async def list_cases(filter_: str = "all", page: int = 1, per_page: int = 25,
+                     keep: Any = None) -> dict[str, Any]:
+    """The Desk's recent cases: newest first, filtered, 25 a page, with counts per filter.
+    `keep` narrows the rows to what this caller may see (access.visible_rows) before anything is counted."""
     rows = await get_store().case_rows(limit=500)
+    if keep is not None:
+        rows = keep(rows)
     counts = {k: sum(1 for r in rows if f(r)) for k, f in FILTERS.items()}
     keep = [r for r in rows if FILTERS.get(filter_, FILTERS["all"])(r)]
     page = max(1, page)

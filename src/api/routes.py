@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 from src.api.schemas import (
@@ -26,6 +26,18 @@ from src.llm import get_llm
 from src.tracing import langsmith_tracing_context
 
 router = APIRouter()
+
+
+def owner_only(request: Request) -> None:
+    """The legacy research graph calls the server's model (which may be paid), so only the owner may run it once a
+    deployment has any access settings. With none (a local run) it stays open, as before."""
+    from src.prescreen import access
+    try:
+        who = access.resolve(request.headers.get("x-access-token", ""))
+    except access.AccessDenied as err:
+        raise HTTPException(err.status, str(err)) from err
+    if not who.is_owner:
+        raise HTTPException(403, "The research graph is owner-only on this deployment.")
 _FRONTEND_HTML = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
 _PRESCREEN_HTML = Path(__file__).resolve().parents[2] / "frontend" / "prescreen.html"
 
@@ -114,7 +126,7 @@ async def serve_frontend() -> HTMLResponse:
 # Sync research endpoint
 # ---------------------------------------------------------------------------
 
-@router.post("/research/sync", response_model=ResearchResponse, tags=["research"])
+@router.post("/research/sync", response_model=ResearchResponse, tags=["research"], dependencies=[Depends(owner_only)])
 async def research_sync(req: ResearchRequest) -> ResearchResponse:
     """Run the full agent graph synchronously and return the complete brief."""
     t0 = time.perf_counter()
@@ -142,7 +154,7 @@ async def research_sync(req: ResearchRequest) -> ResearchResponse:
 # Streaming SSE endpoint
 # ---------------------------------------------------------------------------
 
-@router.post("/research/stream", tags=["research"])
+@router.post("/research/stream", tags=["research"], dependencies=[Depends(owner_only)])
 async def research_stream(req: ResearchRequest) -> StreamingResponse:
     """Stream agent progress as Server-Sent Events, then emit the final brief."""
     return StreamingResponse(
@@ -356,7 +368,7 @@ _CHAT_SYSTEM = (
 )
 
 
-@router.post("/research/chat", response_model=ChatResponse, tags=["research"])
+@router.post("/research/chat", response_model=ChatResponse, tags=["research"], dependencies=[Depends(owner_only)])
 async def research_chat(req: ChatRequest) -> ChatResponse:
     """Answer a follow-up question about an existing brief with one LLM call.
 

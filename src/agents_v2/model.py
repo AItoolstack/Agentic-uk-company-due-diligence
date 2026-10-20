@@ -82,7 +82,8 @@ class AgentModel:
         raise ModelError(last)
 
     async def _call(self, agent: str, messages: list[dict[str, str]], purpose: str, max_out: int) -> str:
-        p_in, p_out = price_per_million(self.model)
+        # Groq runs on its free tier here (guests), so the trace shows $0 rather than another model's list price.
+        p_in, p_out = (0.0, 0.0) if self.provider == "groq" else price_per_million(self.model)
         with self.trace.timed("model", purpose, agent, model=self.model) as span:
             if self.scripted is not None:
                 text = self.scripted(agent, messages[0]["content"], messages[-1]["content"])

@@ -1,7 +1,10 @@
 """
 API for the underwriter pre-screen.
 
-  GET  /api/prescreen/config            what's connected, demo or live, rules version
+  GET  /api/prescreen/config            what's connected, demo or live, rules version, who you are
+
+Access (src/prescreen/access.py): the owner code sees everything; a guest demo code runs on free models within
+daily allowances and sees its own cases plus the examples; with no code, only the public examples, read-only.
   GET  /api/prescreen/search?q=         resolve a name or number (identity gate)
   POST /api/prescreen                   run a pre-screen for one company number
   GET  /api/prescreen/{report_id}       fetch a saved report
@@ -24,7 +27,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from src.config import settings
-from src.prescreen import demo_cases
+from src.prescreen import access, demo_cases
+from src.prescreen.access import AccessDenied, AllowanceUsed, Caller
 from src.prescreen.casefile import GROUPS, file_note
 from src.prescreen.engine import CompanyNotFound, SourceDown, run_prescreen
 from src.prescreen.identity import resolve
@@ -35,15 +39,41 @@ from src.prescreen.service import (DecisionRefused, build_services, demo_mode, l
                                    record_decision, save_report, watch_from_report)
 from src.prescreen.store import get_store, store_status
 
-def require_access(request: Request) -> None:
-    """If PRESCREEN_ACCESS_TOKEN is set, every pre-screen API call needs it (header X-Access-Token).
-    Reports hold directors' names and birth month/year, so a live deployment should set it."""
-    token = os.environ.get("PRESCREEN_ACCESS_TOKEN", "")
-    if not token:
-        return
-    given = request.headers.get("x-access-token", "")
-    if not hmac.compare_digest(given, token):
-        raise HTTPException(401, "Access code needed.")
+def require_access(request: Request) -> Caller:
+    """Who is calling (header X-Access-Token). Reports hold directors' names and birth month/year, so a live
+    deployment should set PRESCREEN_ACCESS_TOKEN; guests and the public get narrower views (access.py)."""
+    try:
+        return access.resolve(request.headers.get("x-access-token", ""))
+    except AccessDenied as err:
+        raise HTTPException(err.status, str(err)) from err
+
+
+def _check(fn, *args) -> None:
+    try:
+        fn(*args)
+    except AccessDenied as err:
+        raise HTTPException(err.status, str(err)) from err
+
+
+def _spend(who: Caller, kind: str) -> None:
+    try:
+        access.spend(who, kind)
+    except AllowanceUsed as err:
+        raise HTTPException(429, str(err)) from err
+
+
+async def _readable(who: Caller, report_id: str) -> dict:
+    payload = await load_report(report_id)
+    if payload is None or not access.can_read(who, payload):
+        raise HTTPException(404, "Report not found.")
+    return payload
+
+
+def _run_meta(who: Caller, meta: dict) -> dict:
+    meta["run_by"] = who.run_by
+    if who.role == "guest" and meta.get("data") == "live":
+        meta["demonstration"] = True
+    return meta
 
 
 router = APIRouter(prefix="/api/prescreen", tags=["prescreen"], dependencies=[Depends(require_access)])
@@ -71,9 +101,20 @@ def _client() -> httpx.AsyncClient:
 
 
 @router.get("/config")
-async def config() -> dict:
+async def config(who: Caller = Depends(require_access)) -> dict:
     live = not demo_mode()
+    examples = []
+    if not who.is_owner:
+        for rid in access.public_examples():
+            p = await load_report(rid)
+            if p:
+                examples.append({"report_id": rid, "company_name": p.get("company_name"),
+                                 "company_number": p.get("company_number"), "route": p.get("route"),
+                                 "created_at": p.get("created_at"), "rules_version": p.get("rules_version")})
     return {
+        "caller": {"role": who.role, "label": who.label, "expires": who.expires,
+                   "allowance": access.allowance(who), "request_url": access.request_url()},
+        "examples": examples,
         "data": "live" if live else "demo",
         "rules_version": RULES_VERSION,
         "access_required": bool(os.environ.get("PRESCREEN_ACCESS_TOKEN")),
@@ -96,31 +137,38 @@ async def config() -> dict:
 
 
 @router.get("/search", response_model=IdentityResult)
-async def search(q: str) -> IdentityResult:
+async def search(q: str, who: Caller = Depends(require_access)) -> IdentityResult:
+    _check(access.require_runner, who)
     async with _client() as client:
         services, _ = build_services(client)
         return await resolve(services.ch, q)
 
 
 @router.post("")
-async def prescreen(req: PreScreenRequest) -> dict:
+async def prescreen(req: PreScreenRequest, who: Caller = Depends(require_access)) -> dict:
+    _check(access.require_runner, who)
     _limit()
+    _spend(who, "prescreen")
     async with _client() as client:
-        services, meta = build_services(client, req.company_number)
+        services, meta = build_services(client, req.company_number, free_only=not who.is_owner)
         try:
             report = await run_prescreen(req, services)
         except CompanyNotFound as err:
+            access.refund(who, "prescreen")
             raise HTTPException(404, str(err)) from err
         except SourceDown as err:
+            access.refund(who, "prescreen")
             raise HTTPException(503, f"Couldn't start the pre-screen: {err}") from err
     meta["news_queries"] = services.news.queries
-    return await save_report(report, meta)
+    return await save_report(report, _run_meta(who, meta))
 
 
 @router.post("/stream")
-async def prescreen_stream(req: PreScreenRequest) -> StreamingResponse:
+async def prescreen_stream(req: PreScreenRequest, who: Caller = Depends(require_access)) -> StreamingResponse:
     """Same as POST /api/prescreen, but streams one JSON line per progress event, then the report."""
+    _check(access.require_runner, who)
     _limit()
+    _spend(who, "prescreen")
     queue: asyncio.Queue = asyncio.Queue()
 
     def progress(stage: str, state: str, detail: str) -> None:
@@ -128,19 +176,22 @@ async def prescreen_stream(req: PreScreenRequest) -> StreamingResponse:
 
     async def run() -> None:
         async with _client() as client:
-            services, meta = build_services(client, req.company_number)
+            services, meta = build_services(client, req.company_number, free_only=not who.is_owner)
             try:
                 report = await run_prescreen(req, services, progress=progress)
             except CompanyNotFound as err:
+                access.refund(who, "prescreen")
                 await queue.put({"type": "error", "status": 404, "detail": str(err)})
                 return
             except SourceDown as err:
+                access.refund(who, "prescreen")
                 await queue.put({"type": "error", "status": 503, "detail": f"Couldn't start the pre-screen: {err}"})
                 return
             except Exception as err:  # noqa: BLE001
                 await queue.put({"type": "error", "status": 500, "detail": f"Unexpected error ({type(err).__name__})."})
                 return
         meta["news_queries"] = services.news.queries
+        _run_meta(who, meta)
         try:
             payload = await save_report(report, meta)
         except Exception as err:  # noqa: BLE001 - a storage outage shouldn't lose the screen itself
@@ -163,14 +214,15 @@ async def prescreen_stream(req: PreScreenRequest) -> StreamingResponse:
 
 
 @router.get("/recent")
-async def recent() -> list[dict]:
-    return await list_recent()
+async def recent(who: Caller = Depends(require_access)) -> list[dict]:
+    return access.visible_rows(who, await list_recent(200 if not who.is_owner else 12))[:12]
 
 
 @router.get("/cases")
-async def cases(filter: str = "all", page: int = 1) -> dict:
-    """Recent cases for the Desk: route, coverage, latest decision, cover, run time, stale. 25 a page."""
-    return await list_cases(filter, page)
+async def cases(filter: str = "all", page: int = 1, who: Caller = Depends(require_access)) -> dict:
+    """Recent cases for the Desk: route, coverage, latest decision, cover, run time, stale. 25 a page.
+    Guests see their own cases and the examples; the public sees the examples."""
+    return await list_cases(filter, page, keep=None if who.is_owner else lambda rows: access.visible_rows(who, rows))
 
 
 @router.get("/parse")
@@ -195,7 +247,8 @@ async def parse(turnover: str = "", years: str = "") -> dict:
 # ---------------------------------------------------------------------------
 
 @router.get("/watch")
-async def watch_list() -> list[dict]:
+async def watch_list(who: Caller = Depends(require_access)) -> list[dict]:
+    _check(access.require_owner, who)
     store = get_store()
     rows = await store.list_watch()
     changes = await store.list_changes(limit=500)
@@ -208,7 +261,8 @@ async def watch_list() -> list[dict]:
 
 
 @router.post("/watch")
-async def watch_add(body: dict) -> dict:
+async def watch_add(body: dict, who: Caller = Depends(require_access)) -> dict:
+    _check(access.require_owner, who)
     report_id = str(body.get("report_id", ""))
     row = await watch_from_report(report_id)
     if row is None:
@@ -217,19 +271,24 @@ async def watch_add(body: dict) -> dict:
 
 
 @router.delete("/watch/{company_number}")
-async def watch_remove(company_number: str) -> dict:
+async def watch_remove(company_number: str, who: Caller = Depends(require_access)) -> dict:
+    _check(access.require_owner, who)
     await get_store().unwatch(company_number.upper())
     return {"ok": True}
 
 
 @router.get("/changes")
-async def changes(company_number: str | None = None, limit: int = 30) -> list[dict]:
+async def changes(company_number: str | None = None, limit: int = 30,
+                  who: Caller = Depends(require_access)) -> list[dict]:
+    if not who.is_owner:
+        return []
     return await get_store().list_changes(limit=max(1, min(limit, 200)),
                                           number=company_number.upper() if company_number else None)
 
 
 @router.post("/changes/{company_number}/seen")
-async def changes_seen(company_number: str) -> dict:
+async def changes_seen(company_number: str, who: Caller = Depends(require_access)) -> dict:
+    _check(access.require_owner, who)
     await get_store().mark_seen(company_number.upper())
     return {"ok": True}
 
@@ -239,7 +298,8 @@ async def changes_seen(company_number: str) -> dict:
 # ---------------------------------------------------------------------------
 
 @router.post("/eval/legacy")
-async def eval_legacy(body: dict) -> dict:
+async def eval_legacy(body: dict, who: Caller = Depends(require_access)) -> dict:
+    _check(access.require_owner, who)
     """Three-way evaluation only: run the old research graph (src/graph.py) on one query with a chosen model and
     return its brief with every model call metered. Same access token and hourly cap as agent reviews."""
     from src.agents_v2.service import AgentLimit, agent_limit
@@ -263,29 +323,54 @@ async def eval_legacy(body: dict) -> dict:
 
 
 @router.get("/agents/config")
-async def agents_config() -> dict:
+async def agents_config(who: Caller = Depends(require_access)) -> dict:
     from src.agents_v2.service import config as agent_config
-    return agent_config()
+    cfg = agent_config()
+    if not who.is_owner:
+        from src.agents_v2.model import provider_key
+        try:
+            g = access.guest_agent_model()
+            cfg.update(model=g["model"], provider=g["provider"], judge=g["judge"] and cfg["judge"],
+                       judge_model=g["model"], available=bool(provider_key(g["provider"])) and who.role == "guest")
+        except access.PaidModelRefused:
+            cfg.update(available=False)
+        cfg["allowance"] = access.allowance(who)
+    return cfg
 
 
 @router.post("/{report_id}/agent-review")
-async def agent_review(report_id: str) -> dict:
-    """Run the agent layer on a saved report. Takes 20-90 seconds. Returns the review and its trace."""
+async def agent_review(report_id: str, model: str = "", who: Caller = Depends(require_access)) -> dict:
+    """Run the agent layer on a saved report. Takes 20-90 seconds. Returns the review and its trace.
+    Guests: their own cases only, on a free model (never a paid one), within their daily allowance.
+    The owner can pass ?model=guest to run on the guests' free model (scripts/guest_model_check.py)."""
     from src.agents_v2.model import default_model, provider_key
     from src.agents_v2.service import AgentLimit, agent_limit, run_agent_review
-    if await load_report(report_id) is None:
-        raise HTTPException(404, "Report not found.")
-    if not provider_key(os.environ.get("AGENT_PROVIDER", "openai")):
+    _check(access.require_runner, who)
+    payload = await _readable(who, report_id)
+    if not access.can_change(who, payload):
+        raise HTTPException(403, "Example cases are read-only. Run your own pre-screen to try an agent review.")
+    choice: dict = {}
+    if not who.is_owner or model == "guest":
+        try:
+            g = access.guest_agent_model()
+        except access.PaidModelRefused as err:
+            raise HTTPException(503, "Agent reviews aren't available on the demo right now.") from err
+        choice = {"provider": g["provider"], "model_name": g["model"], "judge": g["judge"]}
+        if not provider_key(g["provider"]):
+            raise HTTPException(503, "Agent reviews aren't available on the demo right now.")
+    elif not provider_key(os.environ.get("AGENT_PROVIDER", "openai")):
         raise HTTPException(503, f"The agent model ({default_model()}) has no API key on this server.")
     try:
         agent_limit()
     except AgentLimit as err:
         raise HTTPException(429, str(err)) from err
-    return await run_agent_review(report_id=report_id, mcp_url=_agent_mcp_url())
+    _spend(who, "agent_review")
+    return await run_agent_review(report_id=report_id, mcp_url=_agent_mcp_url(), run_by=who.run_by, **choice)
 
 
 @router.get("/{report_id}/agent-runs")
-async def agent_runs(report_id: str, limit: int = 5) -> list[dict]:
+async def agent_runs(report_id: str, limit: int = 5, who: Caller = Depends(require_access)) -> list[dict]:
+    await _readable(who, report_id)
     return await get_store().list_agent_runs(report_id, limit=max(1, min(limit, 20)))
 
 
@@ -299,24 +384,24 @@ def _agent_mcp_url() -> str:
 
 
 @router.get("/{report_id}")
-async def get_report(report_id: str) -> dict:
-    payload = await load_report(report_id)
-    if payload is None:
-        raise HTTPException(404, "Report not found.")
+async def get_report(report_id: str, who: Caller = Depends(require_access)) -> dict:
+    payload = await _readable(who, report_id)
+    payload["read_only"] = not access.can_change(who, payload)
     return payload
 
 
 @router.get("/{report_id}/note")
-async def file_note_text(report_id: str) -> dict:
+async def file_note_text(report_id: str, who: Caller = Depends(require_access)) -> dict:
     """Plain-text file note for the underwriting system, including the latest decision."""
-    payload = await load_report(report_id)
-    if payload is None:
-        raise HTTPException(404, "Report not found.")
+    payload = await _readable(who, report_id)
     return {"report_id": report_id, "text": file_note(payload)}
 
 
 @router.post("/{report_id}/decision")
-async def decision(report_id: str, req: DecisionRequest) -> dict:
+async def decision(report_id: str, req: DecisionRequest, who: Caller = Depends(require_access)) -> dict:
+    payload = await _readable(who, report_id)
+    if not access.can_change(who, payload):
+        raise HTTPException(403, "Example cases are read-only.")
     try:
         entry = await record_decision(report_id, req)
     except DecisionRefused as err:

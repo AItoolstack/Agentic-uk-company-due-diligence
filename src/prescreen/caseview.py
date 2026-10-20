@@ -353,6 +353,7 @@ def case_row(payload: dict[str, Any], decisions: list[dict[str, Any]] | None = N
         "stale": is_stale(payload.get("created_at"), now),
         "data": (payload.get("meta") or {}).get("data", payload.get("data", "")),
         "rerun_of": payload.get("rerun_of", ""),
+        "run_by": (payload.get("meta") or {}).get("run_by", "owner"),
     }
 
 
