@@ -13,32 +13,41 @@
 -->
 <style>
 :root{
-  --ink:#101828;--ink2:#344054;--sub:#5B6576;--line:#DCDFE4;--rule:#EEF0F3;--rule2:#E6E8EC;
-  --page:#F3F4F6;--panel:#FFFFFF;--head:#F9FAFB;--rail:#101828;--rail2:#1D2939;
-  --act:#1D4ED8;--act2:#1E40AF;--actbg:#EFF4FF;
-  --refer-bg:#FEF0C7;--refer:#93370D;--refer-b:#FEC84B;--refer-bar:#DC6803;
-  --out-bg:#FEE4E2;--out:#B42318;--out-b:#FDA29B;
-  --note-bg:#F2F4F7;--note-b:#D0D5DD;
+  --ink:#101828;--ink2:#344054;--ink3:#475467;--sub:#667085;--faint:#98A2B3;--line:#E4E7EC;--rule:#F1F3F6;--rule2:#F1F3F6;
+  --page:#F6F7F9;--panel:#FFFFFF;--head:#F8F9FB;--rail:#101828;--rail2:#1D2939;
+  --act:#2D4BD6;--act2:#1E3AA8;--actbg:#F5F7FF;
+  --refer-bg:#FFFAEB;--refer:#B54708;--refer-b:#FEDF89;--refer-bar:#F79009;--refer-tint:#FFFCF5;
+  --out-bg:#FEF3F2;--out:#B42318;--out-b:#FECDCA;--out-bar:#F04438;--out-tint:#FFFBFA;
+  --note-bg:#F1F3F6;--note-b:#E4E7EC;
+  --shadow:0 1px 2px rgba(16,24,40,.04);
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--page);color:var(--ink);font:400 14px/1.45 var(--sans);font-variant-numeric:tabular-nums}
+body{margin:0;background:var(--page);color:var(--ink);font:400 14px/1.5 var(--sans);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
 a{color:var(--act);text-decoration:none}a:hover{color:var(--act2);text-decoration:underline}
 :focus-visible{outline:2px solid var(--act);outline-offset:2px}
 button,input,textarea,select{font:inherit;color:inherit}
 h1,h2,h3{margin:0}
 .mono{font-family:var(--mono)}
 .sub{color:var(--sub)}
-.k{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--sub)}
+.k{font-size:12px;font-weight:500;color:var(--sub)}
 .sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 [hidden]{display:none!important}
 .small{font-size:12px}.s13{font-size:13px}
 
 /* shell */
 .app{display:flex;min-height:100vh}
-.rail{flex:0 0 216px;background:var(--rail);color:#fff;z-index:30}
-.railin{position:sticky;top:0;height:100vh;padding:16px 12px;display:flex;flex-direction:column;gap:4px}
+.rail{flex:0 0 64px;background:var(--rail);color:#fff;z-index:30}
+.railin{position:sticky;top:0;height:100vh;padding:14px 12px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.rail .brand{padding:0 0 12px;align-items:center}
+.rail .brand .short{display:flex;width:34px;height:34px;border-radius:8px;background:#fff;color:var(--ink);align-items:center;justify-content:center;font-size:13px}
+.rail .brand>span,.rail .brand b .long,.rail .nav .lbl,.rail .railfoot .lbl{display:none}
+.rail .nav a{width:40px;height:40px;min-height:40px;justify-content:center;padding:0;border-radius:8px;color:var(--faint);position:relative}
+.rail .nav .badge{position:absolute;margin:0;top:2px;right:0;transform:none;padding:0 5px;font-size:11px;background:var(--refer-bar)}
+.rail .railfoot{border-top:0;padding:8px 0;align-items:center}
+.rail #policy{display:none}
+.rail #rail-demo{font-size:10px;padding:0 5px}
 .brand{padding:4px 12px 18px;display:flex;flex-direction:column}
 .brand b{font-weight:700;font-size:15px}.brand>span{font-size:12px;color:#98A2B3}.brand .short{display:none}
 .nav{display:flex;flex-direction:column;gap:2px}
@@ -56,88 +65,96 @@ h1,h2,h3{margin:0}
 .iconbtn{width:44px;height:44px;border:0;background:none;color:#fff;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer}
 .body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
 #screen{flex:1 1 auto;min-width:0}
-.statusbar{border-top:1px solid var(--line);background:#fff;padding:8px 28px;display:flex;flex-wrap:wrap;gap:4px 20px;font-size:12px;color:var(--sub);min-height:32px}
+.statusbar{border-top:1px solid var(--line);background:#fff;padding:10px 32px;display:flex;flex-wrap:wrap;gap:4px 20px;font-size:12px;color:var(--sub);min-height:32px}
 .scrim{display:none}
 
 /* screen header */
-.shead{background:#fff;border-bottom:1px solid var(--line);padding:16px 28px 0}
+.shead{background:#fff;border-bottom:1px solid var(--line);padding:16px 32px 0}
 .shead.plain{padding-bottom:16px}
 .crumb{font-size:13px;color:var(--sub)}
 .titlerow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:6px}
-.titlerow h1{font-size:22px;font-weight:600;letter-spacing:-.01em;outline:none}
+.titlerow h1{font-size:24px;font-weight:600;letter-spacing:-.015em;outline:none}
 .titlerow .acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-.facts{margin:14px 0 0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px 20px}
-.facts dt{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--sub)}
-.facts dd{margin:2px 0 0;overflow-wrap:anywhere}
+.facts{margin:16px 0 0;display:flex;flex-wrap:wrap;gap:12px 0}
+.facts>div{padding:0 28px;border-left:1px solid var(--line);min-width:0;max-width:300px}
+.facts>div:first-child{padding-left:0;border-left:0}
+.facts dt{font-size:12px;font-weight:500;color:var(--sub)}
+.facts dd{margin:2px 0 0;font-weight:500;overflow-wrap:anywhere}
 .meta{font-size:13px;color:var(--sub);margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 16px}
 .staleline{margin-top:8px;padding:8px 12px;border-radius:6px;background:var(--refer-bg);color:var(--refer);border:1px solid var(--refer-b);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .tabs{display:flex;margin-top:8px;overflow-x:auto;scrollbar-width:thin}
-.tab{flex:none;min-height:44px;padding:0 2px;margin-right:22px;border:0;background:none;font:500 14px var(--sans);color:var(--sub);border-bottom:2px solid transparent;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--act)}
-.cnt{font-size:12px;color:var(--sub)}
-.cnt.a{background:var(--refer-bg);color:var(--refer);border-radius:9px;padding:0 6px;font-weight:600}
-.cnt.r{background:var(--out-bg);color:var(--out);border-radius:9px;padding:0 6px;font-weight:600}
+.tab{flex:none;min-height:44px;padding:0;margin-right:24px;border:0;background:none;font:500 14px var(--sans);color:var(--sub);border-bottom:2px solid transparent;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--ink)}
+.cnt{font-size:12px;color:var(--faint)}
+.cnt.a,.cnt.r{width:6px;height:6px;border-radius:50%;background:var(--refer-bar);font-size:0;padding:0;overflow:hidden;display:inline-block}
+.cnt.r{background:var(--out-bar)}
 
 /* layout */
-.wrap{padding:20px 28px 28px}
-.cols{display:flex;gap:20px;align-items:flex-start}
-.maincol{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:16px}
-.aside{flex:0 0 360px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.wrap{padding:24px 32px 32px}
+.cols{display:flex;gap:24px;align-items:flex-start}
+.maincol{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:20px}
+.aside{flex:0 0 360px;min-width:0;display:flex;flex-direction:column;gap:20px}
 .aside.stick{position:sticky;top:12px}
 .desk{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
 .deskl{flex:1 1 340px;max-width:420px;min-width:0;display:flex;flex-direction:column;gap:16px}
 .deskr{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px}
 
 /* panels */
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0}
-.ph{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule2);min-height:44px;flex-wrap:wrap}
-.ph h2{font-size:14px;font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:0;box-shadow:var(--shadow)}
+.ph{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--rule);min-height:48px;flex-wrap:wrap}
+.ph h2{font-size:14px;font-weight:600;letter-spacing:-.005em}
+.pb{padding:16px 20px}
 .ph .right{margin-left:auto}
 .pb{padding:14px 16px}
 .tw{overflow-x:auto}
 .tbl{width:100%;border-collapse:collapse}
-.tbl th{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--sub);text-align:left;padding:8px 12px;background:var(--head);border-bottom:1px solid var(--rule2);white-space:nowrap}
-.tbl td{padding:10px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+.tbl th{font-size:12px;font-weight:500;color:var(--sub);text-align:left;padding:9px 12px;background:#fff;border-bottom:1px solid var(--rule);white-space:nowrap}
+.tbl th:first-child,.tbl td:first-child{padding-left:20px}.tbl th:last-child,.tbl td:last-child{padding-right:20px}
+.tbl td{padding:12px;border-bottom:1px solid var(--rule);vertical-align:top}
+.tbl td.mono{white-space:nowrap}
+.tbl tr.grp>td{background:var(--head);font-weight:600;font-size:13px}
 .tbl tr:last-child>td{border-bottom:0}
 .tbl tr.grp>td{background:var(--head);font-weight:600;padding:8px 12px}
 .tbl tr.dim td,.tbl tr.dim a{color:var(--sub)}
-.empty{padding:14px 16px;color:var(--sub)}
+.empty{padding:16px 20px;color:var(--sub)}
 .tbl.fixed{table-layout:fixed;min-width:560px}.tbl.fixed td{overflow-wrap:anywhere}
 
 /* pills and glyphs */
-.pill{display:inline-flex;align-items:center;gap:5px;min-height:22px;padding:0 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent;line-height:1.2}
+.pill{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 9px;border-radius:12px;font-size:12px;font-weight:500;white-space:nowrap;border:1px solid transparent;line-height:1.2}
 a.pill:hover{text-decoration:none;filter:brightness(.97)}
 .p-hold{background:#101828;color:#fff;border-color:#101828}
 .p-out{background:var(--out-bg);color:var(--out);border-color:var(--out-b)}
 .p-refer{background:var(--refer-bg);color:var(--refer);border-color:var(--refer-b)}
-.p-note{background:var(--note-bg);color:var(--ink2);border-color:var(--note-b)}
-.p-clear{background:#fff;color:var(--ink2);border-color:var(--note-b);font-weight:500}
+.p-refer .g,.ck.refer .g{color:var(--refer-bar)}.p-out .g,.ck.out .g{color:var(--out-bar)}
+.p-note{background:var(--note-bg);color:var(--ink3);border-color:transparent}
+.p-clear{background:#fff;color:var(--ink3);border-color:var(--line);font-weight:500}
 .p-gap{background:#fff repeating-linear-gradient(135deg,transparent 0 3px,#EAECF0 3px 5px);color:var(--ink2);border-color:#98A2B3;font-weight:500}
 .p-nc{background:#fff;color:var(--ink2);border:1px dashed #98A2B3;font-weight:500}
 .p-na{background:none;color:var(--sub);border-color:transparent;font-weight:500}
 .p-pend{background:#fff;color:var(--ink2);border-color:var(--note-b);font-weight:500}
-.p-exact{background:var(--actbg);color:var(--act2);border-color:#C7D7FE;font-weight:500}
+.p-exact{background:#fff;color:var(--ink3);border-color:var(--line);font-weight:500}
 .p-demo{background:#344054;color:#fff;border-color:#344054}
 .g{flex:none;display:inline-block}
 
 /* buttons and forms */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:6px;border:1px solid #D0D5DD;background:#fff;color:var(--ink);font:500 13px var(--sans);cursor:pointer;white-space:nowrap;text-decoration:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:0 14px;border-radius:8px;border:1px solid #D0D5DD;background:#fff;color:var(--ink2);font:500 13px var(--sans);cursor:pointer;white-space:nowrap;text-decoration:none;box-shadow:0 1px 2px rgba(16,24,40,.05)}
 .btn:hover{background:#F9FAFB;text-decoration:none}
 .btn.pri{background:var(--act);border-color:var(--act);color:#fff}
 .btn.pri:hover{background:var(--act2)}
-.btn:disabled,.btn[aria-disabled=true]{background:#F2F4F7;border-color:#E4E7EC;color:#98A2B3;cursor:not-allowed}
+.btn:disabled,.btn[aria-disabled=true]{background:#F1F3F6;border-color:#E4E7EC;color:#98A2B3;cursor:not-allowed;box-shadow:none}
 .btn.wide{width:100%}
 .btn[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{min-height:30px;padding:0 12px;border:1px solid #D0D5DD;border-radius:15px;background:#fff;font:500 12px var(--sans);color:var(--ink2);cursor:pointer}
+.chip{border-color:var(--line);color:var(--ink3)}
 .chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
 .seg{display:flex}
-.seg button{min-height:30px;padding:0 10px;border:1px solid #D0D5DD;background:#fff;font:500 12px var(--sans);color:var(--ink2);cursor:pointer;margin-left:-1px}
-.seg button:first-child{border-radius:6px 0 0 6px;margin-left:0}.seg button:last-child{border-radius:0 6px 6px 0}
-.seg button[aria-selected=true]{background:var(--ink);border-color:var(--ink);color:#fff;position:relative}
+.seg{padding:2px;background:var(--note-bg);border-radius:8px}
+.seg button{min-height:28px;padding:0 10px;border:0;border-radius:6px;background:none;font:500 12px var(--sans);color:var(--ink3);cursor:pointer}
+.seg button[aria-selected=true]{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.08)}
 label{font-size:13px;font-weight:500;color:var(--ink2)}
 .field{display:flex;flex-direction:column;gap:6px}
-input[type=text],input[type=search],textarea,select{border:1px solid #D0D5DD;border-radius:6px;padding:8px 10px;width:100%;color:var(--ink);background:#fff;font-size:14px}
+input[type=text],input[type=search],textarea,select{border:1px solid #D0D5DD;border-radius:8px;padding:8px 10px;width:100%;color:var(--ink);background:#fff;font-size:14px}
 input[type=text],input[type=search],select{min-height:38px}
 input[aria-invalid=true],textarea[aria-invalid=true]{border-color:#D92D20}
 .hint{font-size:12px;color:var(--sub)}
@@ -156,6 +173,26 @@ details[open]>summary::before{transform:rotate(45deg)}
 .msg.bad{background:var(--out-bg);border-color:var(--out-b);color:var(--out)}
 .msg.warn{background:var(--refer-bg);border-color:var(--refer-b);color:var(--refer)}
 
+/* summary strip */
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.summary>div{padding:18px 20px;border-left:1px solid var(--rule);min-width:0}
+.summary>div:first-child{border-left:0}
+.summary .big{font-size:22px;font-weight:600;letter-spacing:-.01em;margin-top:6px;display:flex;align-items:center;gap:8px}
+.summary .big small{font-size:14px;font-weight:500;color:var(--sub)}
+.ticks{display:flex;gap:3px;margin-top:8px}
+.ticks span{flex:1;height:6px;border-radius:2px;background:var(--ink3);min-width:2px}
+.ticks .gap{background:repeating-linear-gradient(90deg,#fff 0 2px,#D0D5DD 2px 4px);box-shadow:inset 0 0 0 1px var(--faint)}
+.ticks .nc{background:#fff;box-shadow:inset 0 0 0 1px var(--faint)}
+.w-refer{color:var(--refer)}.w-out{color:var(--out)}.w-note{color:var(--ink2)}
+.w-refer .g{color:var(--refer-bar)}.w-out .g{color:var(--out-bar)}
+/* checks by question */
+.qrow2{display:grid;grid-template-columns:220px minmax(0,1fr) 130px;gap:16px;align-items:center;padding:12px 20px;border-top:1px solid var(--rule)}
+.qrow2:first-child{border-top:0}
+.qrow2.review{background:var(--refer-tint)}.qrow2.review.out{background:var(--out-tint)}
+.ck{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink3);text-decoration:none}
+.ck:hover{color:var(--ink);text-decoration:underline}
+.ck .g{color:var(--faint)}
+.ck.refer{color:var(--refer);font-weight:500}.ck.out{color:var(--out);font-weight:500}.ck.dim{color:var(--faint)}
 /* outcome */
 .outcome{overflow:hidden;border-top-width:3px}
 .outcome .in{display:flex;flex-wrap:wrap}
@@ -232,14 +269,6 @@ details[open]>summary::before{transform:rotate(45deg)}
 
 /* ---- responsive ---- */
 @media (max-width:1279px){
-  .rail{flex-basis:64px}.railin{padding:16px 8px}
-  .brand>span,.brand b .long,.nav .lbl,.railfoot .lbl{display:none}
-  .brand .short{display:inline}
-  .brand{padding:4px 4px 18px;align-items:center}
-  .nav a{justify-content:center;padding:0}
-  .nav .badge{position:absolute;margin:0;transform:translate(14px,-10px);padding:0 5px}
-  .nav a{position:relative}
-  .railfoot{padding:8px 0;align-items:center;text-align:center}
   .aside{flex-basis:320px}
 }
 @media (max-width:1023px){
@@ -248,16 +277,20 @@ details[open]>summary::before{transform:rotate(45deg)}
   .rail{position:fixed;left:0;top:0;bottom:0;height:auto;flex-basis:auto;width:260px;transform:translateX(-100%);transition:transform .15s;visibility:hidden;overflow:auto}
   .rail .railin{padding:16px 12px;height:auto;min-height:100%;position:static}
   .rail.open{transform:none;visibility:visible}
+  .rail .railin{align-items:stretch}
   .rail .brand>span,.rail .brand b .long,.rail .nav .lbl,.rail .railfoot .lbl{display:initial}
   .rail .brand .short{display:none}
   .rail .brand{align-items:flex-start;padding:4px 12px 18px}
-  .rail .nav a{justify-content:flex-start;padding:0 12px}
+  .rail .nav a{width:auto;justify-content:flex-start;padding:0 12px;color:#C9D1DD}
   .rail .nav .badge{position:static;transform:none;margin-left:auto;padding:0 7px}
-  .rail .railfoot{align-items:flex-start;text-align:left;padding:12px}
+  .rail .railfoot{align-items:flex-start;text-align:left;padding:12px;border-top:1px solid var(--rail2)}
+  .rail #policy{display:initial}
   .scrim.open{display:block;position:fixed;inset:0;background:rgba(16,24,40,.4);z-index:25}
   .cols{flex-direction:column}
   .aside,.aside.stick{position:static;flex-basis:auto;width:100%}
-  .facts{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .summary>div:nth-child(3){border-left:0}
+  .summary>div:nth-child(n+3){border-top:1px solid var(--rule)}
   .decidebar{display:block;position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 16px;z-index:20}
   .decidebar a{display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:6px;background:var(--act);color:#fff;font-weight:600;font-size:15px}
   .deskl{max-width:none}
@@ -270,7 +303,9 @@ details[open]>summary::before{transform:rotate(45deg)}
   .titlerow h1{font-size:20px}
   .titlerow .acts{margin-left:0;width:100%}
   .titlerow .acts .btn{flex:1 1 auto}
-  .facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}
+  .facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}
+  .facts>div{padding:0;border-left:0}
+  .qrow2{grid-template-columns:1fr;gap:6px}
   .kv{grid-template-columns:1fr}
   .outcome .r{border-left:0;border-top:1px solid var(--rule2)}
   .qrow td:first-child{width:auto}
@@ -284,7 +319,7 @@ details[open]>summary::before{transform:rotate(45deg)}
   .tbl.stack tr{border-bottom:1px solid var(--rule);padding:6px 0}
   .tbl.stack td{border:0;padding:3px 16px}
   .tbl.stack td.num{display:none}
-  .tbl.stack td[data-l]:not([data-l=""])::before{content:attr(data-l);display:inline-block;min-width:96px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--sub)}
+  .tbl.stack td[data-l]:not([data-l=""])::before{content:attr(data-l);display:inline-block;min-width:96px;font-size:12px;font-weight:500;color:var(--sub)}
   .tbl.stack tr.drawer td{padding:12px 16px!important}
   .tbl.stack tr.drawer td:first-child{display:none}
 }
@@ -312,7 +347,7 @@ details[open]>summary::before{transform:rotate(45deg)}
     <div class="railfoot">
       <span class="lbl">Screening policy</span>
       <a class="mono" id="policy" href="/api/prescreen/config" title="Screening policy version">…</a>
-      <span class="pill p-demo" id="rail-demo" hidden>Demo data</span>
+      <span class="pill p-demo" id="rail-demo" hidden>Demo</span>
       <a class="lbl" href="/" style="color:#98A2B3">Current page</a>
     </div>
   </div></nav>
@@ -334,14 +369,23 @@ const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 const safeUrl = u => /^https?:\/\//i.test(String(u || "")) ? esc(u) : "#";
 const TZ = "Europe/London";
+// "13 Sep 2026", always: Chrome's en-GB short month is "Sept", which the copy rules don't use.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function dateParts(d) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {day: "numeric", month: "numeric", year: "numeric", timeZone: TZ}).formatToParts(d).map(x => [x.type, x.value]));
+  return {day: String(Number(p.day)), mon: MONTHS[Number(p.month) - 1], year: p.year};
+}
 function fmtDate(s) {
   if (!s) return "";
   const d = new Date(String(s).length === 10 ? s + "T12:00:00Z" : s);
-  return isNaN(d) ? esc(s) : d.toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric", timeZone: TZ});
+  if (isNaN(d)) return esc(s);
+  const p = dateParts(d);
+  return `${p.day} ${p.mon} ${p.year}`;
 }
+function fmtDayMon(s) { const d = new Date(s); if (isNaN(d)) return ""; const p = dateParts(d); return `${p.day} ${p.mon}`; }
 function fmtTime(s) { const d = new Date(s); return isNaN(d) ? "" : d.toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit", timeZone: TZ}); }
 function fmtWhen(s) { const d = new Date(s); return isNaN(d) ? "" : `${fmtDate(s)}, ${fmtTime(s)}`; }
-function fmtShort(s) { const d = new Date(s); return isNaN(d) ? "" : d.toLocaleDateString("en-GB", {day: "numeric", month: "short", timeZone: TZ}) + " " + fmtTime(s); }
+function fmtShort(s) { const d = new Date(s); return isNaN(d) ? "" : fmtDayMon(s) + " " + fmtTime(s); }
 function yearsSince(s) { const d = new Date(s); if (isNaN(d)) return ""; const y = Math.floor((Date.now() - d) / 31557600000); return y < 1 ? "under a year" : `${y} year${y === 1 ? "" : "s"}`; }
 const plural = (n, w, many) => `${n} ${n === 1 ? w : (many || w + "s")}`;
 const isStale = r => r && (r.stale || (Date.now() - new Date(r.created_at)) > 24 * 3600e3);
@@ -554,7 +598,7 @@ function statusBar(r) {
   const el = $("#statusbar");
   if (!r) { el.innerHTML = `<span>${S.config ? `Up to 30 pre-screens an hour on this service · reports kept 90 days unless decided or watched` : ""}</span>`; return; }
   const srcs = (r.sources_read || []).map(s => `${esc(s.label)} ${s.state === "skip" ? "not needed" : s.state === "error" ? "incomplete " + fmtTime(s.read_at) : fmtTime(s.read_at)}`);
-  el.innerHTML = `<span class="mono">${esc(r.report_id)}</span><span>Run ${esc(fmtWhen(r.created_at))} · ${Number(r.elapsed_seconds || 0).toFixed(1)} s</span>
+  el.innerHTML = `<span class="mono">${esc(r.report_id)}</span><span>Run ${esc(fmtWhen(r.created_at))} · ${Number(r.elapsed_seconds || 0).toFixed(1)} s</span><span>Policy <a class="mono" href="/api/prescreen/config">${esc(r.rules_version)}</a></span>
     ${srcs.length ? `<span>Registers read: ${srcs.join(" · ")}</span>` : `<span>Registers read at the run time</span>`}`;
 }
 
@@ -972,7 +1016,7 @@ function caseHeader(r) {
   const c = r.company || {}, hold = isHold(r), last = (r.decisions || []).slice(-1)[0];
   const sic = c.sic || [], demo = (r.meta || {}).data === "demo";
   const scope = (r.request.cover_lines || []).length ? r.request.cover_lines.map(x => COVER_NAME[x] || x).join(" · ") : "General pre-screen";
-  const decPill = last ? `<span class="pill ${DECISION_PILL[last.decision] || "p-note"}">${esc(DECIDED[last.decision] || last.decision)}${last.underwriter ? ` by ${esc(last.underwriter)}` : ""}, ${esc(new Date(last.recorded_at).toLocaleDateString("en-GB", {day: "numeric", month: "short", timeZone: TZ}))}</span>` : `<span class="pill p-pend">Decision pending</span>`;
+  const decPill = last ? `<span class="pill ${DECISION_PILL[last.decision] || "p-note"}">${esc(DECIDED[last.decision] || last.decision)}${last.underwriter ? ` by ${esc(last.underwriter)}` : ""}, ${esc(fmtDayMon(last.recorded_at))}</span>` : `<span class="pill p-pend">Decision pending</span>`;
   const owners = (c.owners || []).length ? c.owners.join("; ") : (c.owners_read === false ? "Couldn't read" : "None registered");
   const watched = S.watched.has(r.company_number);
   const counts = tabCounts(r);
@@ -1032,11 +1076,8 @@ function selectTab(id, focus) {
 function outcomePanel(r) {
   const cov = coverageOf(r), reasons = reasonsOf(r), hold = isHold(r), ended = endedInfo(r);
   const n = reasons.length;
-  const covBlock = `<div class="k">Coverage</div>
-    <div style="margin-top:4px"><b style="font-size:20px">${cov.completed} of ${cov.applies}</b> <span class="sub">checks completed</span></div>
-    <div class="bar" role="img" aria-label="${cov.completed} completed, ${cov.couldnt_check} couldn't check, ${cov.not_covered} not covered">
-      ${cov.completed ? `<span class="done" style="flex:${cov.completed}"></span>` : ""}${cov.couldnt_check ? `<span class="gap" style="flex:${cov.couldnt_check}"></span>` : ""}${cov.not_covered ? `<span class="nc" style="flex:${cov.not_covered}"></span>` : ""}</div>
-    <div class="sub small" style="margin-top:6px">${(cov.not_covered_titles || []).length ? `Not covered: ${esc(cov.not_covered_titles.join(", ").toLowerCase())}. ${/court/i.test(cov.not_covered_titles.join()) ? "Use your credit reference service." : ""} ` : ""}Couldn't check: ${(cov.couldnt_check_titles || []).length ? esc(cov.couldnt_check_titles.join(", ")) + ". Re-run, or check those sources by hand." : "none."}</div>`;
+  const covBlock = `<div class="k">Coverage</div><div class="big" id="cov-count" style="font-size:22px;font-weight:600;margin-top:6px">${cov.completed} <small class="sub" style="font-size:14px;font-weight:500">of ${cov.applies} checks completed</small></div>
+    <div class="ticks" role="img" aria-label="${cov.completed} completed, ${cov.couldnt_check} couldn't check, ${cov.not_covered} not covered">${"<span></span>".repeat(cov.completed)}${'<span class="gap"></span>'.repeat(cov.couldnt_check)}${'<span class="nc"></span>'.repeat(cov.not_covered)}</div>`;
   const endedLine = ended ? `<div class="ended" role="note">${esc(ended.text)}</div>` : "";
   if (hold) {
     return `${endedLine}<section class="holdpanel" aria-labelledby="h-out"><div class="k" id="h-out">Screening outcome</div>
@@ -1045,16 +1086,23 @@ function outcomePanel(r) {
       <p style="margin:8px 0 0;font-size:13px;color:#C9D1DD">Match details are available to compliance only. This page doesn't say which name matched or which list entry.</p></section>
       <section class="panel"><div class="pb">${covBlock}</div></section>`;
   }
-  const cls = {note: "o-note", refer: "o-refer", outside_appetite: "o-out"}[r.route] || "o-note";
-  const word = {note: "No referral triggered", refer: "Refer", outside_appetite: "Outside appetite"}[r.route];
-  const meaning = {note: "by completed checks", refer: "to a senior underwriter before quoting", outside_appetite: n ? reasons[0].text.split(/[.:;]/)[0] : ""}[r.route];
+  const word = {note: "No referral", refer: "Refer", outside_appetite: "Outside appetite"}[r.route];
+  const wcls = {note: "w-note", refer: "w-refer", outside_appetite: "w-out"}[r.route] || "w-note";
+  const meaning = {note: "No referral triggered by completed checks", refer: "Senior underwriter before quoting",
+    outside_appetite: "Decline unless a senior underwriter overrides with a reason"}[r.route];
   const ver = String(r.rules_version || "").match(/(\d{2})([a-z])$/);
-  return `${endedLine}<section class="panel outcome ${cls}" aria-labelledby="h-out"><div class="in">
-    <div class="l"><div class="k" id="h-out">Screening outcome</div>
-      <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;flex-wrap:wrap"><span class="word">${esc(word)}</span><span style="font-size:15px">${esc(meaning)}</span></div>
-      ${r.route === "outside_appetite" ? `<div class="s13" style="margin-top:4px">A senior underwriter can override with a reason.</div>` : ""}
-      <div class="sub s13" style="margin-top:4px">${r.route === "note" ? "Not approval to quote" : plural(n, "referral reason")} · ${ver ? `draft policy ${esc(ver[1] + ver[2])}` : esc(r.rules_version)} · from public records only${r.route === "note" ? "" : " · not approval to quote"}</div></div>
-    <div class="r">${covBlock}</div></div></section>`;
+  const areas = [...new Set(reasons.map(f => shortTitle(f.check)))];
+  const ticks = Array.from({length: cov.completed}, () => `<span></span>`).join("") + Array.from({length: cov.couldnt_check}, () => `<span class="gap"></span>`).join("") + Array.from({length: cov.not_covered}, () => `<span class="nc"></span>`).join("");
+  const gaps = [...(cov.couldnt_check_titles || []).map(t => `couldn't check ${t.toLowerCase()}`), ...(cov.not_covered_titles || []).map(t => `${t.replace(/^County court judgments$/i, "CCJs")} not covered`)];
+  const read = (r.sources_read || []).filter(x => x.state === "done").map(x => x.read_at).sort().slice(-1)[0] || r.created_at;
+  return `${endedLine}<section class="panel summary" aria-labelledby="h-out">
+    <div><div class="k" id="h-out">Recommendation</div><div class="big ${wcls}">${r.route === "note" ? "" : glyph(GLYPH_OF_ROUTE[r.route], 14)}${esc(word)}</div><div class="sub s13" style="margin-top:4px">${esc(meaning)}</div></div>
+    <div><div class="k">Referral reasons</div><div class="big">${n}</div><div class="sub s13" style="margin-top:4px">${n ? esc(areas.join(" · ")) : "None from completed checks"}</div></div>
+    <div><div class="k">Coverage</div><div class="big" id="cov-count">${cov.completed} <small>of ${cov.applies}</small></div>
+      <div class="ticks" role="img" aria-label="${cov.completed} completed, ${cov.couldnt_check} couldn't check, ${cov.not_covered} not covered">${ticks}</div>
+      <div class="sub small" style="margin-top:6px">${gaps.length ? esc(gaps.join(" · ")) : "Every check completed"}</div></div>
+    <div><div class="k">Basis</div><div style="font-size:15px;font-weight:600;margin-top:9px">Public records</div><div class="sub s13" style="margin-top:4px">${ver ? `Policy ${esc(ver[1] + ver[2])}` : esc(r.rules_version)} · read ${esc(fmtTime(read))} · not approval to quote</div></div>
+  </section>`;
 }
 function drawerHtml(r, f) {
   const d = f.detail || {}, q = questionFor(r, f), src = (f.sources || []).filter(s => s.url);
@@ -1082,7 +1130,7 @@ function findingsTable(r, list, kind) {
     ${list.map((f, i) => { const src = primarySource(f), open = S.openDrawer === f.key, did = `dr-${f.key}`;
       return `<tr id="row-${f.key}"><td class="mono sub num" data-l="#">${i + 1}</td>
         <td data-l=""><button class="rowbtn" type="button" aria-expanded="${open}" aria-controls="${did}" data-drawer="${f.key}"><span class="chev" aria-hidden="true"></span><span>${kind === "notes" ? `<span class="pill p-note" style="margin-right:6px">${glyph("ring")}Note</span>` : ""}<b style="font-weight:600">${esc(plain(headline(f)))}</b>${f.why_for_cover && kind !== "notes" ? `<span class="sub s13" style="display:block;margin-top:2px">${esc(f.why_for_cover)}</span>` : ""}</span></button></td>
-        <td data-l="Area">${esc(AREA[f.check.group] || f.check.group)}</td><td class="mono" data-l="Event date">${esc(fmtDate(f.event_date)) || "—"}</td>
+        <td data-l="Area"><span class="pill p-note">${esc(AREA[f.check.group] || f.check.group)}</span></td><td class="mono" data-l="Event date">${esc(fmtDate(f.event_date)) || "—"}</td>
         <td data-l="Source">${src ? `<a href="${safeUrl(src.url)}" target="_blank" rel="noopener noreferrer">${esc(plain(src.label))}</a>` : `<span class="sub">${esc(plain((f.check.sources || [])[0] ? f.check.sources[0].label : "—"))}</span>`}</td></tr>
         ${open ? `<tr class="drawer" id="${did}"><td></td><td colspan="4">${drawerHtml(r, f)}</td></tr>` : ""}`; }).join("")}
   </tbody></table></div>`;
@@ -1095,12 +1143,24 @@ function headline(f) {
 }
 function checksByQuestion(r) {
   const cs = r.checks || [];
-  return `<section class="panel" aria-labelledby="h-led"><div class="ph"><h2 id="h-led">Checks by underwriting question</h2>
-    <div class="chips right sub small" aria-label="Key"><span class="pill p-refer">${glyph("tri")}Refer</span><span class="pill p-note">${glyph("ring")}Note</span><span class="pill p-clear">${glyph("tick")}Nothing found</span><span class="pill p-gap">${glyph("hatch")}Couldn't check</span><span class="pill p-nc">${glyph("dashed")}Not covered</span></div></div>
-    <div class="tw"><table class="tbl stack"><tbody>${GROUPS.map(g => { const list = cs.filter(c => (c.group || "identity") === g.id); if (!list.length) return "";
-      return `<tr class="qrow"><td data-l=""><b style="font-weight:600">${esc(g.title)}</b><div class="sub small">${esc(g.q)}</div></td><td><div class="pills">${list.map(c => { const st = checkState(c);
-        return `<a href="/case/${esc(r.report_id)}#checks" class="pill ${st.cls}" data-check="${esc(c.check_id)}" title="${esc(checkSummary(c, r))}">${glyph(st.g)}${esc(shortTitle(c))} · ${esc(shortResult(c, r))}<span class="sr">. ${esc(st.word)}. Open in the Checks tab.</span></a>`; }).join("")}</div></td></tr>`; }).join("")}
-    </tbody></table></div></section>`;
+  const rows = GROUPS.map(g => {
+    const list = cs.filter(c => (c.group || "identity") === g.id); if (!list.length) return null;
+    const flagged = list.filter(c => c.status === "flag" && !(c.check_id === "sanctions" && isHold(r)));
+    const worst = flagged.reduce((w, c) => RANK[worstRoute(c)] > RANK[w] ? worstRoute(c) : w, "note");
+    const items = list.map(c => {
+      const st = checkState(c);
+      const cls = c.status === "flag" ? (worstRoute(c) === "note" ? "" : (RANK[worstRoute(c)] >= 2 ? "out" : "refer")) : (st.key === "nc" || st.key === "na" || st.key === "gap" ? "dim" : "");
+      return `<a href="/case/${esc(r.report_id)}#checks" class="ck ${cls}" data-check="${esc(c.check_id)}" title="${esc(checkSummary(c, r))}">${glyph(st.g)}${esc(shortTitle(c))}: ${esc(shortResult(c, r))}<span class="sr">. ${esc(st.word)}. Open in the Checks tab.</span></a>`;
+    }).join("");
+    const gaps = list.filter(c => c.status === "couldnt_check" && !notCovered(c)).length;
+    const right = flagged.length ? `<span class="pill ${RANK[worst] >= 2 ? "p-out" : "p-refer"}">${flagged.length} to review</span>`
+      : gaps ? `<span class="pill p-gap">${glyph("hatch")}${gaps} couldn't check</span>` : `<span class="sub small">Nothing to review</span>`;
+    return {html: `<div class="qrow2 ${flagged.length ? "review" + (RANK[worst] >= 2 ? " out" : "") : ""}"><div><div style="font-weight:600;font-size:13px">${esc(g.title)}</div><div class="sub small">${esc(g.q)}</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 18px">${items}</div><div style="text-align:right">${right}</div></div>`, review: flagged.length > 0};
+  }).filter(Boolean);
+  const nrev = rows.filter(x => x.review).length;
+  return `<section class="panel" aria-labelledby="h-led"><div class="ph"><h2 id="h-led">Checks by underwriting question</h2><span class="sub small right">${rows.length - nrev} of ${rows.length} questions with nothing to review${nrev ? ` · ${nrev} to review` : ""}</span></div>
+    <div>${rows.map(x => x.html).join("")}</div></section>`;
 }
 function shortTitle(c) {
   return ({status: "Status", age: "Age", filings: "Filings", insolvency: "Insolvency", charges: "Charges", ccj: "CCJs", directors_disqualified: "Disqualification",

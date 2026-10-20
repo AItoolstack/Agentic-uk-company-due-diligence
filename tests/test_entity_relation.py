@@ -34,12 +34,12 @@ def test_previous_name_counts_as_exact():
 GROUP_PSC = {"items": [{"kind": "corporate-entity-person-with-significant-control", "name": "PARENT HOLDINGS LTD"}]}
 
 
-def _run(name, rows, status="active", group=True):
+def _run(name, rows, status="active", group=True, titles=None):
     profile = {"company_number": "08804411", "company_name": name, "company_status": status,
                "date_of_creation": "2013-12-06", "has_insolvency_history": False, "links": {}}
     data = CompanyData(number="08804411", profile=profile, today=date(2026, 10, 19),
                        pscs=GROUP_PSC if group else {"items": []})
-    results = [{"title": f"Story {i}", "url": f"https://news.example/{i}", "published": "2026-05-01",
+    results = [{"title": (titles or {}).get(i, f"Story {i}"), "url": f"https://news.example/{i}", "published": "2026-05-01",
                 "source": "news.example", "snippet": "fine"} for i in range(len(rows))]
     answer = {"items": [{"i": i, **r} for i, r in enumerate(rows)],
               "trade_consistency": {"verdict": "not_asked", "reason": ""}}
@@ -68,7 +68,8 @@ def test_model_answer_related_is_kept():
 
 
 def test_own_fine_still_refers():
-    media, _, items = _run("MONZO BANK LIMITED", [{"about_this_company": "yes", "entity_named": "Monzo Bank Ltd", **FINE}])
+    media, _, items = _run("MONZO BANK LIMITED", [{"about_this_company": "yes", "entity_named": "Monzo Bank Ltd", **FINE}],
+                           titles={0: "FCA fines Monzo Bank Ltd £21m for financial crime failings"})
     assert items[0].about_this_company == "yes"
     assert [f.rule_id for f in media.findings] == ["media_high"]
     assert media.status == CheckStatus.FLAG
@@ -103,8 +104,26 @@ def test_brand_only_regulator_news_still_counts_for_a_standalone_company():
 
 
 def test_regulator_action_naming_the_entity_with_its_legal_form_counts_in_a_group():
-    media, _, items = _run("REVOLUT LTD", [{"about_this_company": "yes", "entity_named": "Revolut Ltd", **FINE}])
+    media, _, items = _run("REVOLUT LTD", [{"about_this_company": "yes", "entity_named": "Revolut Ltd", **FINE}],
+                           titles={0: "FCA fines Revolut Ltd over payment controls"})
     assert items[0].about_this_company == "yes"
+
+
+def test_model_claiming_the_legal_entity_must_be_backed_by_the_text_in_a_group():
+    # Live, 20 Oct (rules 20g): the €3.5m Lithuanian fine on Revolut Bank UAB came back as naming "Revolut Ltd".
+    media, _, items = _run("REVOLUT LTD", [{"about_this_company": "yes", "entity_named": "Revolut Ltd", **FINE}],
+                           titles={0: "Revolut Fined €3.5 Million for AML Failures: What It Means for Digital Banks"})
+    assert items[0].about_this_company == "unsure"
+    assert "name only the brand" in items[0].reason
+    assert not [f for f in media.findings if f.route == Route.REFER]
+
+
+def test_entity_in_text_treats_limited_and_ltd_alike():
+    from src.prescreen.media import entity_in_text
+    assert entity_in_text("Monzo Bank Ltd", "FCA fines Monzo Bank Limited £21m")
+    assert entity_in_text("Revolut Ltd", "Revolut Ltd's new licence")
+    assert not entity_in_text("Revolut Ltd", "Revolut fined €3.5m")
+    assert not entity_in_text("", "anything")
 
 
 def test_related_note_doesnt_repeat_a_bare_brand_as_the_entity():

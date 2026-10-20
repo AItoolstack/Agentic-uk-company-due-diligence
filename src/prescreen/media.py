@@ -97,6 +97,22 @@ def names_this_entity(entity_named: str, registered_name: str, previous_names: l
             and re.search(_UK_FORMS.replace("|the", ""), (entity_named or "").lower()) is not None)
 
 
+def _with_forms(text: str) -> str:
+    s = re.sub(r"['\u2019]s\b", "", (text or "").lower())
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    s = re.sub(r"\bpublic limited company\b", "plc", s)
+    s = re.sub(r"\blimited\b", "ltd", s)
+    return " " + re.sub(r"\s+", " ", s).strip() + " "
+
+
+def entity_in_text(entity_named: str, text: str) -> bool:
+    """Rules 20g. The model's claim that an article names this exact entity has to be checkable: the entity, with
+    its legal form, must appear in the title or snippet the model was shown (Revolut, live 20 Oct: "Revolut Fined
+    €3.5 Million for AML Failures" came back as naming "Revolut Ltd"; the fine was on Revolut Bank UAB)."""
+    named = _with_forms(entity_named).strip()
+    return bool(named) and f" {named} " in _with_forms(text)
+
+
 def in_group(data: CompanyData) -> bool:
     """A corporate owner on the PSC register means other companies share the brand."""
     items = data.pscs.get("items") if isinstance(data.pscs, dict) else []
@@ -239,11 +255,20 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
     # company is part of a group (a corporate owner on its PSC register) and the article doesn't name this exact
     # entity with its legal form, it's "may be about this company": shown, never a reason. A UK regulator's
     # action on this firm still reaches the route through the FCA check, from the Register itself.
+    # Rules 20g: the model's "names this entity" must be visible in the text it was shown, else it counts as brand only.
     if in_group(data):
-        for it in items:
-            if (it.about_this_company == "yes" and it.category == "regulatory_action"
-                    and not names_this_entity(it.entity_named, data.name, prev)):
-                it.about_this_company = "unsure"
+        for i, it in enumerate(items):
+            if it.about_this_company != "yes" or it.category != "regulatory_action":
+                continue
+            shown = f"{it.title} {results[i].get('snippet', '')}"
+            named = names_this_entity(it.entity_named, data.name, prev)
+            if named and entity_in_text(it.entity_named, shown):
+                continue
+            it.about_this_company = "unsure"
+            if named:
+                it.reason = (f"The reading said it names {it.entity_named}, but the headline and snippet name only the "
+                             "brand, so it can't be pinned on this company in the group. " + it.reason)[:300]
+            else:
                 it.reason = ("Names only the brand"
                              + (f" ({it.entity_named})" if it.entity_named else "")
                              + ", not which company in the group was acted against. " + it.reason)[:300]

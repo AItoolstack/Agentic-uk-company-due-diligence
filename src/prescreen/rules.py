@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from src.prescreen.models import CheckResult, CheckStatus, Route
 
-RULES_VERSION = "draft-2026-10-19f"
+# 20g: in a group, a regulator's action counts only when the named entity (with its legal form) is in the text
+# the model was shown (media.entity_in_text).
+RULES_VERSION = "draft-2026-10-20g"
 
 THRESHOLDS = {
     # Company age

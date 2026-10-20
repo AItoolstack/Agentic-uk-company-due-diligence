@@ -569,3 +569,26 @@ companies. Those wait for the morning.
 
 **Blog angles from tonight.** (13) "Unread is not background": the same coverage bug, one layer up, in the UI.
 (14) "The server decides whether you overrode it": why `overrides_route` moved off the client.
+
+## Direction D and rules 20g (20 Oct, morning)
+
+**Design.** Tej's review of the live `/case` page: the layout was right, the look too plain in places and too busy in
+others (the outcome block cramped, every check group drawn the same way whether or not anything was wrong). Two canvas
+rounds: C (a colour per underwriting question, charts) was rejected as one-off; D was approved: quiet by default,
+colour only where something needs review. Built into `frontend/case.html`:
+- cool grey ramp, one blue for actions, amber/red only on findings, rows and tabs that need the underwriter;
+- a four-cell summary strip (recommendation, referral reasons, coverage as one segment per check, basis) in place
+  of the outcome and coverage panels;
+- checks by question as neutral rows; a row with a flagged check gets an amber tint and "N to review";
+- key facts as one divided line; tabs with a small amber dot instead of count pills; a 64 px icon rail
+  (labels in the phone drawer); policy version moved to the status bar;
+- dates always "13 Sep 2026" (Chrome's en-GB short month is "Sept").
+Offline checks: 50 of 50 still pass; screenshots in `docs/rebuild/ui/` replaced.
+
+**Rules 20g (route-affecting, so a new version).** Today's live Revolut run counted "Revolut Fined €3.5 Million for
+AML Failures" (the fine was on Revolut Bank UAB) as serious news about Revolut Ltd: the model said the article named
+"Revolut Ltd". 19f trusted that claim. 20g checks it: in a group, a regulator's action counts only when the named
+entity, with its legal form, appears in the headline or snippet the model was shown (`media.entity_in_text`).
+Otherwise it's "may be about this company": shown, never a reason. The FCA's own action on a firm still reaches the
+route through the FCA check. Expected effect on the nine live companies: no route change (Revolut stays refer on its
+overdue confirmation statement; Monzo stays refer on the FCA Register's final notice). Tests 318 → 321.

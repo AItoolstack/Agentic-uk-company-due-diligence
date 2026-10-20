@@ -126,7 +126,7 @@ async def main() -> int:
         rid = ids["09446231"]
         await page.goto(f"{BASE}/case/{rid}")
         await page.wait_for_selector("#h-out")
-        ov = await page.locator(".outcome .r b").first.text_content()
+        ov = await page.locator("#cov-count").first.text_content()
         await page.click("#tab-checks")
         ck = await page.locator("#h-checks + span").text_content()
         await page.click("#tab-analysis")
