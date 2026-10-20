@@ -91,7 +91,7 @@ def main() -> int:
             cfg = c.get(f"{SPACE}/api/prescreen/config")
             ok = cfg.status_code == 200
             data = cfg.json() if ok else {}
-            check("API answers with the access code; live data; rules 19f",
+            check(f"API answers with the access code; live data; rules {EXPECTED_RULES}",
                   ok and data.get("data") == "live" and data.get("rules_version") == EXPECTED_RULES,
                   f"{cfg.status_code} {data.get('data')} {data.get('rules_version')}")
             cases = c.get(f"{SPACE}/api/prescreen/cases")

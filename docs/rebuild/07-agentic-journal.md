@@ -592,3 +592,10 @@ entity, with its legal form, appears in the headline or snippet the model was sh
 Otherwise it's "may be about this company": shown, never a reason. The FCA's own action on a firm still reaches the
 route through the FCA check. Expected effect on the nine live companies: no route change (Revolut stays refer on its
 overdue confirmation statement; Monzo stays refer on the FCA Register's final notice). Tests 318 → 320.
+
+**Live check, rules 20g (20 Oct, 08:40–08:45, GitHub `live-check.yml`, same proposals as 19 Oct):** 9 of 9
+routes unchanged: Monzo, Wilko, Thames Water, Revolut, Linklaters refer; Carillion, BrewDog outside appetite; Tesco,
+Greggs note. Every live report carries the case-page fields. Revolut (0ca070edddf54d9a): the €3.5m fine is now
+"unsure: names only the brand", and the reasons are the overdue confirmation statement and the trade/SIC mismatch.
+Seen, not yet looked into: Thames Water's trade check was "couldn't check" this run (it ran on 19 Oct).
+Linklaters still takes 155 s and can't finish its 336 members' checks.
