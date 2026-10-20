@@ -497,3 +497,75 @@ act on it by design, and its broker email still repeated the mistake. That is a 
 going to write.
 
 **Tests:** 284. Commits d5fc673 and the dormant-wording commit.
+
+## Overnight: the case page at /case (20 Oct, 00:50–03:00)
+
+Spec: `09-ui-blueprint.md` (a markdown copy of the Claude Docs blueprint, rev 14). Design: Direction B boards
+(Pro, ProDesk, ProPhone, ProHold) on the design canvas. Run unattended; no route-affecting change; rules stay
+**draft-2026-10-19f**.
+
+**Backend, blueprint changes 3–9** (`src/prescreen/caseview.py`, commit 7497a0b):
+- *News events.* Articles that back a finding (same kind of event, published within 14 days of the finding's
+  event date, or cited by a media finding) become one event; leftover adverse articles about this company are
+  one event per category; the rest go to sections: may be this company, other group companies, set aside,
+  background, not reviewed. Only "about this company" articles (and brand-only ones inside a finding's own
+  event) can be in an event, so a group company's news can't reach "Events about this company". Tested.
+- *Sources read.* `sources_read` on the report: each register with its state and the time it returned
+  (taken from the engine's progress ticks). The news source is labelled "web news search"; the provider name
+  stays in the Analysis tab.
+- *Decisions.* `identity_confirmed`, a new outcome `compliance` (the only one on a hold), and `overrides_route`
+  worked out on the server from the route instead of trusted from the client. From the case page an override
+  needs 20 characters. The page at / doesn't send `identity_confirmed`, so for it the old behaviour holds
+  (decision allowed, recorded as not confirmed). That's deliberate, so the old page keeps working; when /case
+  replaces /, make the field required (one line in `caseview.check_decision`). Supabase migration
+  `20261020005756_decisions_identity_and_compliance` applied (additive column, check widened).
+- *Proposal parsing on the server.* `parse_money` / `parse_years`, the same rules as the page: 2400000,
+  2,400,000, £2.4m, 750k, 1.2bn; "1.5" years, "two million", "£2,40,000" and "12 34" refused with an example.
+  The request validators use them, so the API reads "£2.4m" the same way the field does. `proposal_read` echoes
+  what was read.
+- *Broker email* (`broker_email`) built from the broker questions: subject "<Company> (<number>): information
+  needed", the cover in scope, the numbered questions, "[Your name]" for the page to fill. None at all on a
+  compliance hold.
+- *Cases API.* `GET /api/prescreen/cases?filter=&page=`: route, coverage, latest decision, cover, run time,
+  stale (>24 h), 25 a page, counts per filter. Postgres reads it with one query (checked against the live
+  database read-only before use).
+- *Deep links.* `/case` and `/case/<report id>` serve the page; a re-run carries `rerun_of` and links back.
+
+**The page** (`frontend/case.html`, one file, vanilla JS, about 1506 lines; commit dbb712b). Desk, case header,
+Overview, evidence drawer, right rail, six tabs, five route variants, seven system states, as the blueprint
+lists them. Two small backend additions it needed: the company card now carries people with appointed/resigned
+dates and owner detail (People tab), and the run-limit 429 says when the next slot is.
+
+**What broke on the way (all fixed before the commit):**
+- *Unread news showed as "background".* In demo mode there's no model, so articles keep the default
+  `unsure` with no category; the grouping read "unsure + not adverse" as background. Unclassified now means
+  not reviewed. Same lesson as the coverage contract: something nobody read is never a result.
+- *Provider names leaked through check summaries* ("12 results reviewed (Brave Search)"). The page rewrites
+  them to "web news search" outside the Analysis tab. The summaries themselves are unchanged for the old page.
+- *The hold panel said "nothing on this page names the person".* The Owner key fact (public PSC data) does name
+  the PSC who matched. Reworded to what's true: the page doesn't say *which* name matched or which list entry.
+- *A sticky rail with its own scroll box* hid the Watch panel below the fold. Now the rail is sticky only when
+  it fits the window.
+- *Findings table squeezed to one word a line* at 1024 px. Fixed column widths, finding column takes the rest;
+  the director-link row's primary source is now the linked company's insolvency record, as on the design board.
+
+**Verification** (`tests/ui/verify_case_ui.py`, Playwright, demo data): 50 acceptance checks over the 7 demo
+cases at 390, 563, 768, 1024 and 1440 px, **50 of 50 pass**. They include: evidence before the decision at
+every width; no sideways scroll; Desk → case → Back → new run with one page load; "£2.4m" → £2,400,000 and the JS
+parser agreeing with the Python table case for case; one coverage count on Overview, Checks, Analysis, file
+note and MCP; each referral reason's primary source one click away; identity blocks recording; an override is
+labelled and needs 20 characters; two decisions both kept; Copy honest both ways (granted and blocked
+clipboard); hold case with no broker text and no list detail on any tab; stale, ended, run-limit, run-failed,
+running and source-failed states. Stale and ended were produced by patching the API response in the browser
+(no demo case is three days old or in liquidation). The Analysis tab with a run was shown with a *scripted*
+agent run (`tests/ui/seed_scripted_analysis.py`: real MCP tools, guardrail and trace; the agents' replies come
+from the test script). Screenshots: `docs/rebuild/ui/` (53 PNGs, quantised to 128 colours).
+
+**Deploy.** `deploy-space.yml` dispatched on main at dbb712b: success (the snapshot reached the Space). The
+sandbox's proxy refuses `*.hf.space`, so I couldn't load the Space to confirm the build or re-run the nine live
+companies. Those wait for the morning.
+
+**Numbers.** Tests 284 → 318. Rules version unchanged. No route changed on any demo case.
+
+**Blog angles from tonight.** (13) "Unread is not background": the same coverage bug, one layer up, in the UI.
+(14) "The server decides whether you overrode it": why `overrides_route` moved off the client.

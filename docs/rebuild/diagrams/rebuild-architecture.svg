@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="820" viewBox="0 0 1000 820" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <!-- The rebuild: rules decide, agents explain. Components named as in src/prescreen and src/agents_v2. -->
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#333"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="820" fill="#fff"/>
+  <text x="30" y="34" font-size="16" font-weight="bold" fill="#111">After: rules decide, agents explain</text>
+  <text x="30" y="54" fill="#555">The route is written once, by code. Everything downstream reads it.</text>
+
+  <!-- 1. registers -->
+  <text x="30" y="88" fill="#555" font-size="11">REGISTERS (src/prescreen/sources)</text>
+  <g fill="#fff" stroke="#999" stroke-dasharray="4 3">
+    <rect x="30"  y="96" width="170" height="36"/>
+    <rect x="215" y="96" width="120" height="36"/>
+    <rect x="350" y="96" width="190" height="36"/>
+    <rect x="555" y="96" width="120" height="36"/>
+    <rect x="690" y="96" width="150" height="36"/>
+  </g>
+  <g fill="#333" text-anchor="middle" font-size="12">
+    <text x="115" y="118">Companies House</text>
+    <text x="275" y="118">The Gazette</text>
+    <text x="445" y="118">UK Sanctions List (FCDO)</text>
+    <text x="615" y="118">FCA Register</text>
+    <text x="765" y="118">web news search</text>
+  </g>
+  <g stroke="#999" fill="none">
+    <path d="M115 132 V150"/><path d="M275 132 V150"/><path d="M445 132 V150"/><path d="M615 132 V150"/><path d="M765 132 V150"/>
+    <path d="M115 150 H765"/>
+  </g>
+  <line x1="440" y1="150" x2="440" y2="174" stroke="#333" marker-end="url(#a)"/>
+
+  <!-- 2. rule-based pre-screen -->
+  <rect x="30" y="176" width="810" height="168" fill="#fff" stroke="#111" stroke-width="2"/>
+  <text x="46" y="198" font-weight="bold" fill="#111">Rule-based pre-screen (src/prescreen/engine.py)</text>
+  <g fill="#fff" stroke="#333">
+    <rect x="46"  y="212" width="230" height="116"/>
+    <rect x="296" y="212" width="250" height="116"/>
+    <rect x="566" y="212" width="258" height="116"/>
+  </g>
+  <g fill="#111" font-size="12">
+    <text x="58" y="232" font-weight="bold">checks.py: up to 14 checks</text>
+    <text x="58" y="250">status, filings, insolvency, charges,</text>
+    <text x="58" y="266">directors, ownership, sanctions, FCA ...</text>
+    <text x="58" y="284">media.py: the one model call</text>
+    <text x="58" y="300" fill="#555">(is this article about this entity?)</text>
+    <text x="58" y="318" fill="#555" font-size="11">result: clear / info / flag / couldn't check</text>
+
+    <text x="308" y="232" font-weight="bold">Coverage contract (casefile.coverage)</text>
+    <text x="308" y="250">"11 of 13 checks completed"</text>
+    <text x="308" y="266">couldn't check ≠ clear, ever</text>
+    <text x="308" y="284">not covered by this tool (CCJs)</text>
+    <text x="308" y="300">counted separately</text>
+    <text x="308" y="318" fill="#555">one count used everywhere</text>
+
+    <text x="578" y="232" font-weight="bold">rules.py: decide() → route</text>
+    <text x="578" y="250">note · refer · outside appetite</text>
+    <text x="578" y="266">· compliance hold</text>
+    <text x="578" y="284">written thresholds, versioned</text>
+    <text x="578" y="300" font-family="Courier New, monospace">draft-2026-10-19f</text>
+    <text x="578" y="318" fill="#555">a model never sets the route</text>
+  </g>
+  <g stroke="#333" fill="none" marker-end="url(#a)">
+    <line x1="276" y1="270" x2="294" y2="270"/>
+    <line x1="546" y1="270" x2="564" y2="270"/>
+  </g>
+
+  <!-- report store -->
+  <rect x="860" y="232" width="120" height="76" fill="#fff" stroke="#333"/>
+  <text x="920" y="256" text-anchor="middle" fill="#111">report</text>
+  <text x="920" y="272" text-anchor="middle" fill="#555" font-size="11">Supabase /</text>
+  <text x="920" y="286" text-anchor="middle" fill="#555" font-size="11">JSON files</text>
+  <text x="920" y="300" text-anchor="middle" fill="#555" font-size="11">(store.py)</text>
+  <line x1="840" y1="270" x2="858" y2="270" stroke="#333" marker-end="url(#a)"/>
+
+  <!-- 3. MCP server -->
+  <rect x="30" y="384" width="440" height="150" fill="#fff" stroke="#333"/>
+  <text x="46" y="406" font-weight="bold" fill="#111">MCP server (src/prescreen/mcp_server.py), 9 tools</text>
+  <g font-family="Courier New, monospace" font-size="12" fill="#222">
+    <text x="46" y="430">find_company</text><text x="250" y="430">sanctions_screen</text>
+    <text x="46" y="450">prescreen_company</text><text x="250" y="450">fca_firm_search</text>
+    <text x="46" y="470">get_report_section</text><text x="250" y="470">watch_company</text>
+    <text x="46" y="490">company_record</text><text x="250" y="490">list_changes</text>
+    <text x="46" y="510">gazette_notices</text>
+  </g>
+  <text x="250" y="514" fill="#555" font-size="11">streamable HTTP at /mcp, token-gated</text>
+  <path d="M890 308 V354 H250 V382" fill="none" stroke="#333" marker-end="url(#a)"/>
+
+  <!-- 4. agent layer -->
+  <rect x="510" y="384" width="470" height="250" fill="#fff" stroke="#333"/>
+  <text x="526" y="406" font-weight="bold" fill="#111">Agent layer (src/agents_v2)</text>
+  <rect x="526" y="418" width="438" height="40" fill="#fff" stroke="#333"/>
+  <text x="745" y="436" text-anchor="middle" fill="#111">supervisor.py: plans which specialists run</text>
+  <text x="745" y="451" text-anchor="middle" fill="#555" font-size="11">can drop a specialist with a reason; can't add one</text>
+  <g fill="#fff" stroke="#333">
+    <rect x="526" y="480" width="140" height="44"/>
+    <rect x="675" y="480" width="140" height="44"/>
+    <rect x="824" y="480" width="140" height="44"/>
+  </g>
+  <g fill="#111" text-anchor="middle" font-size="12">
+    <text x="596" y="499">director history</text><text x="596" y="514" fill="#555" font-size="11">specialist</text>
+    <text x="745" y="499">news</text><text x="745" y="514" fill="#555" font-size="11">specialist</text>
+    <text x="894" y="499">broker email</text><text x="894" y="514" fill="#555" font-size="11">specialist</text>
+  </g>
+  <g stroke="#333" fill="none" marker-end="url(#a)">
+    <line x1="596" y1="458" x2="596" y2="478"/><line x1="745" y1="458" x2="745" y2="478"/><line x1="894" y1="458" x2="894" y2="478"/>
+    <line x1="596" y1="524" x2="596" y2="562"/><line x1="745" y1="524" x2="745" y2="562"/><line x1="894" y1="524" x2="894" y2="562"/>
+  </g>
+  <rect x="526" y="564" width="438" height="56" fill="#fff" stroke="#111" stroke-width="2"/>
+  <text x="745" y="584" text-anchor="middle" fill="#111" font-weight="bold">guardrail.py</text>
+  <text x="745" y="600" text-anchor="middle" fill="#333" font-size="12">code rules: gap-as-clear, route changed, sanctions leak, unsupported fact</text>
+  <text x="745" y="614" text-anchor="middle" fill="#333" font-size="12">+ model judge (shown as "rules only" if it can't run)</text>
+  <!-- agents read through MCP -->
+  <g stroke="#333" fill="none">
+    <line x1="508" y1="470" x2="472" y2="470" marker-end="url(#a)"/>
+  </g>
+  <text x="474" y="560" fill="#555" font-size="11" text-anchor="end">tool calls, per-agent allowlist</text>
+  <path d="M490 470 V548" fill="none" stroke="#999" stroke-dasharray="3 3"/>
+
+  <!-- route copied, never written -->
+  <path d="M950 308 V382" fill="none" stroke="#111" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="942" y="376" fill="#111" font-size="12" font-weight="bold" text-anchor="end">route copied, never written</text>
+
+  <!-- 5. case UI -->
+  <rect x="30" y="680" width="950" height="110" fill="#fff" stroke="#333"/>
+  <text x="46" y="702" font-weight="bold" fill="#111">Case UI (frontend/case.html at /case, REST /api/prescreen)</text>
+  <g font-size="12" fill="#222">
+    <text x="46" y="724">Overview: route, coverage, referral reasons with their sources · Checks · News · People · History · Proposal</text>
+    <text x="46" y="744">Decision rail: identity confirmed first; an outcome other than the route is labelled an override and needs a reason</text>
+    <text x="46" y="764">Analysis tab: agents' sections, each with its guardrail result; model names, calls, tokens and cost only here</text>
+  </g>
+  <text x="46" y="782" fill="#555" font-size="11">The underwriter decides. Decisions are added, never overwritten.</text>
+  <g stroke="#333" fill="none" marker-end="url(#a)">
+    <path d="M980 270 H992 V735 H982"/>
+    <path d="M745 634 V678"/>
+  </g>
+  <text x="986" y="650" fill="#555" font-size="11" text-anchor="end">report via REST</text>
+  <text x="753" y="660" fill="#555" font-size="11">checked sections</text>
+</svg>
