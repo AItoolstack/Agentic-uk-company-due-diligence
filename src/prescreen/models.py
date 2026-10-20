@@ -141,6 +141,21 @@ class PreScreenRequest(BaseModel):
     declared_turnover_gbp: int | None = Field(default=None, ge=0, le=10**12)
     declared_years_trading: int | None = Field(default=None, ge=0, le=300)
     declared_directors: str = Field(default="", max_length=600)  # names from the proposal, comma separated
+    # A re-run from a case ("Re-run with this proposal"): the report it was made from. A new case, linked.
+    rerun_of: str = Field(default="", pattern=r"^([0-9a-f]{16})?$")
+
+    @field_validator("declared_turnover_gbp", mode="before")
+    @classmethod
+    def _turnover(cls, v: Any) -> Any:
+        # Same rules as the page's "Read as £2,400,000": £2.4m, 750k, 2,400,000; anything else is refused.
+        from src.prescreen.caseview import parse_money
+        return parse_money(v)
+
+    @field_validator("declared_years_trading", mode="before")
+    @classmethod
+    def _years(cls, v: Any) -> Any:
+        from src.prescreen.caseview import parse_years
+        return parse_years(v)
 
     @field_validator("company_number")
     @classmethod
@@ -183,10 +198,20 @@ class PreScreenReport(BaseModel):
     proposal_vs_record: list[dict[str, Any]] = Field(default_factory=list)
     timeline: list[dict[str, Any]] = Field(default_factory=list)
     coverage: dict[str, Any] = Field(default_factory=dict)  # casefile.coverage: one count used everywhere
+    # For the case page (caseview.py). None of these change the route.
+    sources_read: list[dict[str, Any]] = Field(default_factory=list)  # each register read, with when and how
+    news_view: dict[str, Any] = Field(default_factory=dict)           # news grouped into events and sections
+    broker_email: dict[str, Any] = Field(default_factory=dict)        # built from broker_questions
+    proposal_read: dict[str, Any] = Field(default_factory=dict)       # how the proposal fields were read
+    rerun_of: str = ""
 
 
 class DecisionRequest(BaseModel):
-    decision: str = Field(..., pattern="^(proceed|refer|decline)$")
+    # "compliance": referred to compliance, the only decision on a compliance hold.
+    decision: str = Field(..., pattern="^(proceed|refer|decline|compliance)$")
     reason: str = Field(..., min_length=5, max_length=2000)
     underwriter: str = Field(default="", max_length=120)
+    # Ignored: the server works out whether a decision overrides the route (caseview.check_decision).
     overrides_route: bool = False
+    # The case page sends it and can't record without it. None = an older client (the page at /).
+    identity_confirmed: bool | None = None

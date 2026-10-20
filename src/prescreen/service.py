@@ -13,6 +13,7 @@ import httpx
 
 from src.config import settings
 from src.prescreen import demo_cases
+from src.prescreen.caseview import FILTERS, check_decision, decorate
 from src.prescreen.engine import Services, run_prescreen
 from src.prescreen.monitor import diff, snapshot
 from src.prescreen.store import _writable_dir, get_store
@@ -103,20 +104,31 @@ async def save_report(report: PreScreenReport, meta: dict[str, Any]) -> dict[str
     payload = report.model_dump(mode="json")
     payload["meta"] = meta
     await get_store().save_report(payload)
-    return payload
+    return decorate({**payload, "decisions": []})
 
 
 async def load_report(report_id: str) -> dict[str, Any] | None:
-    return await get_store().load_report(report_id)
+    payload = await get_store().load_report(report_id)
+    return decorate(payload) if payload is not None else None
+
+
+class DecisionRefused(ValueError):
+    pass
 
 
 async def record_decision(report_id: str, req: DecisionRequest) -> dict[str, Any] | None:
-    """Append-only: a later decision is added beside the earlier ones, never over them."""
+    """Append-only: a later decision is added beside the earlier ones, never over them.
+    Whether it overrides the route is worked out here, not taken from the client."""
     payload = await get_store().load_report(report_id)
     if payload is None:
         return None
+    overrides, error = check_decision(payload.get("route", ""), req.decision, req.reason, req.identity_confirmed)
+    if error:
+        raise DecisionRefused(error)
     entry = {
         **req.model_dump(),
+        "overrides_route": overrides,
+        "identity_confirmed": bool(req.identity_confirmed),
         "recorded_at": utcnow().isoformat(),
         "recommended_route": payload.get("route"),
         "rules_version": payload.get("rules_version"),
@@ -126,6 +138,17 @@ async def record_decision(report_id: str, req: DecisionRequest) -> dict[str, Any
 
 async def list_recent(limit: int = 12) -> list[dict[str, Any]]:
     return await get_store().recent(limit)
+
+
+async def list_cases(filter_: str = "all", page: int = 1, per_page: int = 25) -> dict[str, Any]:
+    """The Desk's recent cases: newest first, filtered, 25 a page, with counts per filter."""
+    rows = await get_store().case_rows(limit=500)
+    counts = {k: sum(1 for r in rows if f(r)) for k, f in FILTERS.items()}
+    keep = [r for r in rows if FILTERS.get(filter_, FILTERS["all"])(r)]
+    page = max(1, page)
+    start = (page - 1) * per_page
+    return {"filter": filter_ if filter_ in FILTERS else "all", "page": page, "per_page": per_page,
+            "total": len(keep), "counts": counts, "rows": keep[start:start + per_page]}
 
 
 # ---------------------------------------------------------------------------

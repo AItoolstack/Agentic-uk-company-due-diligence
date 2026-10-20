@@ -69,6 +69,26 @@ async def serve_prescreen() -> HTMLResponse:
     return HTMLResponse("<h1>frontend/prescreen.html not found</h1>", status_code=404)
 
 
+@router.get("/case", response_class=HTMLResponse, tags=["meta"])
+@router.get("/case/", response_class=HTMLResponse, tags=["meta"], include_in_schema=False)
+async def serve_case_desk() -> HTMLResponse:
+    """The new case page (blueprint, Direction B): the Desk. Beside the page at / until it's approved."""
+    return _case_html()
+
+
+@router.get("/case/{report_id}", response_class=HTMLResponse, tags=["meta"])
+async def serve_case(report_id: str) -> HTMLResponse:
+    """A deep link to one case. The page loads the report itself (the API needs the access code)."""
+    return _case_html()
+
+
+def _case_html() -> HTMLResponse:
+    path = _PRESCREEN_HTML.with_name("case.html")
+    if not path.exists():
+        return HTMLResponse("<h1>frontend/case.html not found</h1>", status_code=404)
+    return HTMLResponse(path.read_text(encoding="utf-8"), headers={"Cache-Control": "no-cache"})
+
+
 @router.get("/v1", response_class=HTMLResponse, tags=["meta"])
 async def serve_prescreen_v1() -> HTMLResponse:
     """The first pre-screen layout (single column), kept for comparison."""

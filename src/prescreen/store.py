@@ -34,6 +34,7 @@ class Store(Protocol):
     async def load_report(self, report_id: str) -> dict[str, Any] | None: ...
     async def add_decision(self, report_id: str, entry: dict[str, Any]) -> dict[str, Any] | None: ...
     async def recent(self, limit: int = 12) -> list[dict[str, Any]]: ...
+    async def case_rows(self, limit: int = 200) -> list[dict[str, Any]]: ...
     async def watch(self, number: str, name: str, report_id: str | None, snapshot: dict, route: str) -> None: ...
     async def unwatch(self, number: str) -> None: ...
     async def get_watch(self, number: str) -> dict[str, Any] | None: ...
@@ -121,6 +122,19 @@ class FileStore:
             if d:
                 out.append(_summary(d, d.get("decisions") or []))
         return out
+
+    async def case_rows(self, limit: int = 200) -> list[dict[str, Any]]:
+        """Recent cases for the case page: route, coverage, latest decision, cover, stale. Newest first."""
+        from src.prescreen.caseview import case_row
+        if not self.reports.exists():
+            return []
+        rows = []
+        for f in self.reports.glob("*.json"):
+            d = self._read(f, None)
+            if d and d.get("report_id"):
+                rows.append(case_row(d))
+        rows.sort(key=lambda r: r["created_at"], reverse=True)
+        return rows[:limit]
 
     async def watch(self, number, name, report_id, snapshot, route) -> None:
         w = self._read(self.watch_file, {})
@@ -242,8 +256,8 @@ class PgStore:
         if not row:
             return None
         decisions = await self._exec(
-            "select decision, reason, underwriter, overrides_route, recommended_route, rules_version, recorded_at "
-            "from decisions where report_id = %s order by recorded_at", (report_id,), "all")
+            "select decision, reason, underwriter, overrides_route, identity_confirmed, recommended_route, "
+            "rules_version, recorded_at from decisions where report_id = %s order by recorded_at", (report_id,), "all")
         payload = row["payload"]
         payload["decisions"] = [{**d, "recorded_at": d["recorded_at"].isoformat()} for d in decisions]
         return payload
@@ -253,10 +267,11 @@ class PgStore:
         if not row:
             return None
         await self._exec(
-            "insert into decisions (report_id, decision, reason, underwriter, overrides_route, recommended_route, "
-            "rules_version, recorded_at) values (%s, %s, %s, %s, %s, %s, %s, %s)",
+            "insert into decisions (report_id, decision, reason, underwriter, overrides_route, identity_confirmed, "
+            "recommended_route, rules_version, recorded_at) values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (report_id, entry["decision"], entry["reason"], entry.get("underwriter", ""), entry["overrides_route"],
-             entry["recommended_route"], entry["rules_version"], entry["recorded_at"]))
+             bool(entry.get("identity_confirmed")), entry["recommended_route"], entry["rules_version"],
+             entry["recorded_at"]))
         return entry
 
     async def recent(self, limit: int = 12) -> list[dict[str, Any]]:
@@ -265,6 +280,29 @@ class PgStore:
             "(select d.decision from decisions d where d.report_id = r.id order by d.recorded_at desc limit 1) as decision "
             "from reports r order by r.created_at desc limit %s", (limit,), "all")
         return [{**r, "created_at": r["created_at"].isoformat()} for r in rows]
+
+    async def case_rows(self, limit: int = 200) -> list[dict[str, Any]]:
+        from src.prescreen.caseview import case_row
+        rows = await self._exec(
+            "select r.id as report_id, r.company_number, r.company_name, r.route, r.created_at, r.data_mode, "
+            "r.payload->'coverage' as coverage, r.payload->'request' as request, r.payload->>'rerun_of' as rerun_of, "
+            "(select to_jsonb(d) from (select decision, underwriter, recorded_at, overrides_route from decisions d "
+            "  where d.report_id = r.id order by recorded_at desc limit 1) d) as last_decision, "
+            "(select count(*) from decisions d where d.report_id = r.id) as decision_count "
+            "from reports r order by r.created_at desc limit %s", (limit,), "all")
+        out = []
+        for r in rows:
+            last = r.get("last_decision")
+            if isinstance(last, str):
+                last = json.loads(last)
+            row = case_row({"report_id": r["report_id"], "company_number": r["company_number"],
+                            "company_name": r["company_name"], "route": r["route"],
+                            "created_at": r["created_at"].isoformat(), "coverage": r.get("coverage") or {},
+                            "request": r.get("request") or {}, "meta": {"data": r.get("data_mode", "")},
+                            "rerun_of": r.get("rerun_of") or ""}, [last] if last else [])
+            row["decision_count"] = int(r.get("decision_count") or 0)
+            out.append(row)
+        return out
 
     async def watch(self, number, name, report_id, snapshot, route) -> None:
         await self._exec(

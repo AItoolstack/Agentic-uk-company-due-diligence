@@ -404,10 +404,15 @@ def file_note(report: dict[str, Any]) -> str:
     decisions = r.get("decisions") or []
     if decisions:
         d = decisions[-1]
-        lines += ["", f"Decision: {d.get('decision')}" + (f" by {d.get('underwriter')}" if d.get("underwriter") else "")
+        words = {"compliance": "referred to compliance"}.get(d.get("decision"), d.get("decision"))
+        lines += ["", f"Decision: {words}" + (f" by {d.get('underwriter')}" if d.get("underwriter") else "")
                   + f", {str(d.get('recorded_at', ''))[:16].replace('T', ' ')}"
-                  + (" (differs from the recommendation)" if d.get("overrides_route") else ""),
+                  + (" (overrides the recommended route)" if d.get("overrides_route") else ""),
                   f"Reason: {d.get('reason')}"]
+        if d.get("identity_confirmed"):
+            lines.append("Identity: company number and registered address matched to the proposal by the underwriter.")
+        if len(decisions) > 1:
+            lines.append(f"Earlier decisions on this case: {len(decisions) - 1} (kept in the decision history).")
     lines += ["", "A recommendation from public records only. The underwriter decides."]
     return "\n".join(lines)
 

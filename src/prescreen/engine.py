@@ -25,7 +25,8 @@ from src.prescreen import casefile
 from src.prescreen import checks as C
 from src.prescreen.llm import JSONChat
 from src.prescreen.media import check_media
-from src.prescreen.models import CheckResult, CheckStatus, PreScreenReport, PreScreenRequest, Route
+from src.prescreen import caseview
+from src.prescreen.models import CheckResult, CheckStatus, PreScreenReport, PreScreenRequest, Route, utcnow
 from src.prescreen.rules import RULES_VERSION, decide
 from src.prescreen.sources.companies_house import CompaniesHouse
 from src.prescreen.sources.fca import FCARegister
@@ -148,7 +149,11 @@ def company_card(data: C.CompanyData) -> dict[str, Any]:
 async def run_prescreen(req: PreScreenRequest, services: Services, progress: Progress | None = None,
                         skip_media: bool = False) -> PreScreenReport:
     """skip_media: the daily re-check doesn't re-read news (it would cost a model call per company)."""
+    read_at: dict[str, dict[str, str]] = {}
+
     def tick(stage: str, state: str, detail: str = "") -> None:
+        if state in ("done", "error", "skip"):
+            read_at[stage] = {"state": state, "at": utcnow().isoformat(), "detail": detail}
         if progress:
             try:
                 progress(stage, state, detail)
@@ -326,7 +331,8 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
     casefile.enrich_findings(results, req.cover_lines)
     card = company_card(data)
     unchecked = [c.title for c in results if c.status == CheckStatus.COULDNT_CHECK]
-    return PreScreenReport(
+    sanctions_note = sanctions_list.fetched_at if isinstance(sanctions_list, SanctionsList) else ""
+    report = PreScreenReport(
         report_id=uuid.uuid4().hex[:16],
         rules_version=RULES_VERSION,
         company_number=number,
@@ -346,7 +352,57 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         proposal_vs_record=casefile.proposal_vs_record(req, card, results, today),
         coverage=casefile.coverage(results),
         timeline=_timeline(data),
+        sources_read=sources_read(read_at, sanctions_note),
+        proposal_read=proposal_read(req),
+        rerun_of=req.rerun_of,
     )
+    # Built from the finished report, so the page, the file note and the API use one text.
+    payload = report.model_dump(mode="json")
+    report.news_view = caseview.news_view(payload)
+    report.broker_email = caseview.broker_email(payload)
+    return report
+
+
+# What the underwriter sees for each source: the register's name, never a provider or model name.
+SOURCE_LABELS = {
+    "companies_house": "Companies House",
+    "directors": "Companies House appointments",
+    "gazette": "The Gazette",
+    "sanctions": "UK Sanctions List",
+    "fca": "FCA Register",
+    "news": "web news search",
+}
+
+
+def sources_read(read_at: dict[str, dict[str, str]], sanctions_note: str = "") -> list[dict[str, str]]:
+    out = []
+    for sid, label in SOURCE_LABELS.items():
+        r = read_at.get(sid)
+        if not r:
+            continue
+        row = {"id": sid, "label": label, "state": r["state"], "read_at": r["at"],
+               "detail": r.get("detail", "") if sid != "news" else ""}
+        if sid == "sanctions" and sanctions_note:
+            row["list_date"] = sanctions_note
+        out.append(row)
+    return out
+
+
+def proposal_read(req: PreScreenRequest) -> dict[str, str]:
+    """How the proposal fields were read, in the words the page shows ("Read as £2,400,000")."""
+    out: dict[str, str] = {}
+    if req.declared_turnover_gbp is not None:
+        out["turnover"] = caseview.money_words(req.declared_turnover_gbp)
+    if req.declared_years_trading is not None:
+        out["years_trading"] = f"{req.declared_years_trading} year{'s' if req.declared_years_trading != 1 else ''}"
+    if req.declared_trade:
+        out["trade"] = req.declared_trade
+    if req.declared_directors:
+        out["directors"] = req.declared_directors
+    if req.expects_fca_authorisation:
+        out["fca"] = "Should be FCA authorised"
+    out["given"] = "yes" if out else "no"
+    return out
 
 
 def _timeline(data: C.CompanyData) -> list[dict[str, Any]]:

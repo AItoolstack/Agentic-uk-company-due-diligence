@@ -31,7 +31,7 @@ from src.prescreen.identity import resolve
 from src.prescreen.models import DecisionRequest, IdentityResult, PreScreenRequest
 from src.prescreen.rules import RULES_VERSION, THRESHOLDS
 from src.prescreen.engine import STAGES
-from src.prescreen.service import (build_services, demo_mode, list_recent, load_report, recheck_all,
+from src.prescreen.service import (DecisionRefused, build_services, demo_mode, list_cases, list_recent, load_report, recheck_all,
                                    record_decision, save_report, watch_from_report)
 from src.prescreen.store import get_store, store_status
 
@@ -167,6 +167,29 @@ async def recent() -> list[dict]:
     return await list_recent()
 
 
+@router.get("/cases")
+async def cases(filter: str = "all", page: int = 1) -> dict:
+    """Recent cases for the Desk: route, coverage, latest decision, cover, run time, stale. 25 a page."""
+    return await list_cases(filter, page)
+
+
+@router.get("/parse")
+async def parse(turnover: str = "", years: str = "") -> dict:
+    """The proposal fields read the way the pre-screen will read them (the page shows "Read as ..." itself,
+    by the same rules; this is for other clients and for checking the two agree)."""
+    from src.prescreen.caseview import ParseError, money_words, parse_money, parse_years
+    out: dict = {}
+    for key, raw, fn in (("turnover", turnover, parse_money), ("years", years, parse_years)):
+        if not raw:
+            continue
+        try:
+            v = fn(raw)
+            out[key] = {"ok": True, "value": v, "read_as": money_words(v) if key == "turnover" else f"{v}"}
+        except ParseError as err:
+            out[key] = {"ok": False, "error": str(err)}
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Watching
 # ---------------------------------------------------------------------------
@@ -294,7 +317,10 @@ async def file_note_text(report_id: str) -> dict:
 
 @router.post("/{report_id}/decision")
 async def decision(report_id: str, req: DecisionRequest) -> dict:
-    entry = await record_decision(report_id, req)
+    try:
+        entry = await record_decision(report_id, req)
+    except DecisionRefused as err:
+        raise HTTPException(422, str(err)) from err
     if entry is None:
         raise HTTPException(404, "Report not found.")
     return entry
