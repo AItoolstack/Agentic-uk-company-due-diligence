@@ -34,12 +34,12 @@ def test_previous_name_counts_as_exact():
 GROUP_PSC = {"items": [{"kind": "corporate-entity-person-with-significant-control", "name": "PARENT HOLDINGS LTD"}]}
 
 
-def _run(name, rows, status="active", group=True, titles=None):
+def _run(name, rows, status="active", group=True, titles=None, published="2026-05-01"):
     profile = {"company_number": "08804411", "company_name": name, "company_status": status,
                "date_of_creation": "2013-12-06", "has_insolvency_history": False, "links": {}}
     data = CompanyData(number="08804411", profile=profile, today=date(2026, 10, 19),
                        pscs=GROUP_PSC if group else {"items": []})
-    results = [{"title": (titles or {}).get(i, f"Story {i}"), "url": f"https://news.example/{i}", "published": "2026-05-01",
+    results = [{"title": (titles or {}).get(i, f"Story {i}"), "url": f"https://news.example/{i}", "published": published,
                 "source": "news.example", "snippet": "fine"} for i in range(len(rows))]
     answer = {"items": [{"i": i, **r} for i, r in enumerate(rows)],
               "trade_consistency": {"verdict": "not_asked", "reason": ""}}
@@ -163,3 +163,12 @@ def test_licence_granted_is_routine(title, kept):
            "reason": "licence"}
     media, _, items = _run("REVOLUT LTD", [row], group=False, titles={0: title})
     assert (items[0].severity == "medium") is kept
+
+
+def test_undated_serious_news_is_dated_by_the_year_in_its_headline():
+    # Live, 20 Oct (rules 20h): "sfo v tesco dpa 2017", undated, referred Tesco as recent serious news.
+    row = {"about_this_company": "yes", "entity_named": "Tesco PLC", **FINE}
+    data_rows = [row]
+    media, _, items = _run("TESCO PLC", data_rows, group=False, titles={0: "sfo v tesco dpa 2017"}, published="")
+    assert not [f for f in media.findings if f.route == Route.REFER]
+    assert [f.rule_id for f in media.findings] == ["media_old"]

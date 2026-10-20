@@ -320,7 +320,16 @@ async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceE
                and it.category not in ("", "neutral") and it.severity != "low"]
     # Serious news older than the look-back is history, not a referral (Tesco's 2017 accounting fine, live).
     old_cut = _years_ago(data.today, T["media_serious_years"]).isoformat()
-    old = {id(it) for it in adverse if it.severity == "high" and it.published and it.published[:10] < old_cut}
+    # An undated result is dated by the latest year its headline or snippet names (Tesco, live 20 Oct, rules 20h:
+    # "sfo v tesco dpa 2017", undated, became a recent serious item and referred the case).
+    snippets = {id(it): results[i].get("snippet", "") for i, it in enumerate(items)}
+
+    def when(it: MediaItem) -> str:
+        if it.published:
+            return it.published[:10]
+        years = [int(y) for y in re.findall(r"\b(19[89]\d|20[0-4]\d)\b", f"{it.title} {snippets.get(id(it), '')}")]
+        return f"{max(years)}-12-31" if years else ""
+    old = {id(it) for it in adverse if it.severity == "high" and when(it) and when(it) < old_cut}
     for severity, route in (("high", Route.REFER), ("medium", Route.NOTE), ("old", Route.NOTE)):
         if severity == "old":
             group = [it for it in adverse if it.about_this_company == "yes" and id(it) in old]
