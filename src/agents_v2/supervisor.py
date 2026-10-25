@@ -5,7 +5,8 @@ The supervisor: a LangGraph graph over the MCP server.
 
 load_case  get_report_section(summary) over MCP, or find_company + prescreen_company for a new case.
 plan       eligibility is code (specialists.eligible); one model call may drop an eligible specialist (with a
-           reason) and give each a focus line. It can't add one. If the model is down, every eligible one runs.
+           reason; a drop without one is ignored) and give each a focus line. It can't add one. If the model is
+           down, every eligible one runs.
 specialist each runs its own tool loop and is checked by the guardrail.
 assemble   code, not a model. The route, its meaning and the gaps are copied from the pre-screen word for word;
            agent text goes underneath, each section labelled with who wrote it and how it was checked.
@@ -93,10 +94,17 @@ def build_graph(toolbox: Toolbox, model: AgentModel, judge_model: AgentModel | N
             result["planned_by"] = f"rules (planner failed: {err}; every eligible specialist runs)"
             return {"plan": result}
         chosen = [n for n in out.get("run") or [] if n in can]
-        dropped = {n: str((out.get("dropped") or {}).get(n) or "no reason given") for n in can if n not in chosen}
+        reasons = out.get("dropped") if isinstance(out.get("dropped"), dict) else {}
+        # A drop needs a stated reason. Without one, the specialist runs: on 25 Oct (Thames Water) a plan that
+        # dropped all three with no reasons produced an empty review reported as "ok".
+        unexplained = [n for n in can if n not in chosen and not str(reasons.get(n) or "").strip()]
+        chosen += unexplained
+        dropped = {n: str(reasons[n]) for n in can if n not in chosen}
         unasked = [n for n in out.get("run") or [] if n not in can]
         result.update(run=chosen, dropped=dropped, planned_by="supervisor model",
                       focus={n: str(v)[:300] for n, v in (out.get("focus") or {}).items() if n in chosen})
+        if unexplained:
+            result["kept_without_a_reason_to_drop"] = unexplained
         if unasked:
             result["refused_additions"] = unasked  # the model tried to add an ineligible specialist
         return {"plan": result}

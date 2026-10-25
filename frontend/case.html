@@ -597,6 +597,7 @@ async function loadConfig() {
   $("#policy").textContent = S.config ? S.config.rules_version : "policy";
   const r = (S.config && S.config.caller && S.config.caller.role) || "owner";
   $('[data-navid="watch"]').hidden = r !== "owner"; $('[data-navid="new"]').hidden = r === "public";
+  const tbNew = $(".topbar a.tbnew"); if (tbNew) tbNew.hidden = r === "public";
 }
 /* Who is looking (access.py): "owner", "guest" (a demo code: never the owner's OpenAI key, daily allowance, own cases plus the
    examples) or "public" (no code: the example cases, read-only). */
@@ -1099,7 +1100,7 @@ function renderCase() {
   $("#screen").innerHTML = caseHeader(r) + `<div class="wrap"><div class="cols">
     <main class="maincol" id="panel-${tab}" role="tabpanel" aria-labelledby="tab-${tab}" tabindex="-1">${panel}</main>
     <aside class="aside" aria-label="Decision and next steps" id="rail-panels">${railPanels(r)}</aside></div></div>
-    <div class="decidebar"><a href="#decision" id="decide-jump">Review and decide</a></div>`;
+    ${r.read_only ? "" : `<div class="decidebar"><a href="#decision" id="decide-jump">Review and decide</a></div>`}`;
   statusBar(r);
   wireCase(r);
   window.scrollTo(0, scrollY);

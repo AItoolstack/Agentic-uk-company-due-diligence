@@ -174,6 +174,22 @@ def test_supervisor_can_drop_a_specialist_with_a_reason():
     assert plan["focus"]["director_history"] == "the phoenix pattern"
 
 
+def test_supervisor_drop_without_a_reason_is_ignored():
+    # 25 Oct, Thames Water: the plan ran nothing and gave no reasons, and the review came back empty but "ok".
+    s = prescreen("ZZ000001", declared_trade="Bakery")
+
+    def lazy(agent, system, user):
+        if agent == "supervisor":
+            return j({"run": [], "focus": {}, "dropped": {"broker_email": "nothing to ask yet"}})
+        return polite(agent, system, user)
+    out = run(report_id=s["report_id"], scripted=lazy)
+    plan = out["review"]["plan"]
+    assert plan["run"] == ["director_history"]
+    assert plan["kept_without_a_reason_to_drop"] == ["director_history"]
+    assert plan["dropped"] == {"broker_email": "nothing to ask yet"}
+    assert any(x["agent"] == "director_history" for x in out["review"]["sections"])
+
+
 def test_gaps_only_case_runs_no_agents_and_says_why():
     s = prescreen("ZZ000003")  # Calder: Companies House down for officers and owners
     out = run(report_id=s["report_id"], scripted=polite)
