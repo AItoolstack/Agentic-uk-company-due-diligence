@@ -20,7 +20,7 @@ import httpx
 import pytest
 
 from src.agents_v2 import guardrail
-from src.agents_v2.model import AgentModel
+from src.agents_v2.model import AgentModel, ModelError
 from src.agents_v2.service import run_agent_review
 from src.agents_v2.trace import Trace
 from src.prescreen import demo_cases
@@ -483,3 +483,42 @@ def test_legacy_run_meters_every_model_call_and_restores_settings(monkeypatch):
     assert built == {"temperature": None, "model": "gpt-6-luna"}
     assert out["totals"]["model_calls"] == 2 and out["errors"] == ["a source failed"]
     assert (settings.chat_model_provider, settings.chat_model, settings.openai_temperature) == before
+
+
+def test_model_client_asks_again_when_groq_rejects_a_generation():
+    # 20 Oct, guest model on Groq: 8 of 9 reviews partial, every failed section a 400 about what gpt-oss
+    # generated ("Tool choice is none, but model called a tool", "Failed to validate JSON").
+    replies = [
+        httpx.Response(400, json={"error": {"message": "Tool choice is none, but model called a tool"}}),
+        httpx.Response(400, json={"error": {"message": "Failed to validate JSON. Please adjust your prompt. "
+                                                       "See 'failed_generation' for more details."}}),
+        httpx.Response(200, json={"model": "openai/gpt-oss-120b", "choices": [
+            {"message": {"content": '{"ok": true}'}, "finish_reason": "stop"}], "usage": {}}),
+    ]
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return replies[len(seen) - 1]
+
+    async def go():
+        trace = Trace()
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            m = AgentModel(trace, model="openai/gpt-oss-120b", provider="groq", api_key="gsk-test", client=client)
+            assert await m.json("news", "sys", "user") == {"ok": True}
+        return trace
+    trace = asyncio.run(go())
+    assert len(seen) == 3 and all(b.get("response_format") == {"type": "json_object"} for b in seen)
+    assert trace.spans[0]["regenerations"] == 2
+
+
+def test_model_client_gives_up_after_two_regenerations():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": "Tool choice is none, but model called a tool"}})
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            m = AgentModel(Trace(), model="openai/gpt-oss-120b", provider="groq", api_key="gsk-test", client=client)
+            with pytest.raises(ModelError, match="called a tool"):
+                await m._call("news", [{"role": "user", "content": "x"}], "call", 100)
+    asyncio.run(go())
