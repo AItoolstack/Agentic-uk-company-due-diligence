@@ -97,8 +97,9 @@ class AgentModel:
             body = self._body(messages, max_out)
             headers = {"Authorization": f"Bearer {self.api_key}"}
             data: dict[str, Any] | None = None
+            regenerations = 0
             async with self._gate:
-                for attempt in range(5):
+                for attempt in range(7):
                     try:
                         resp = await self.client.post(ENDPOINTS[self.provider], json=body, headers=headers, timeout=90)
                     except httpx.HTTPError as err:
@@ -117,6 +118,13 @@ class AgentModel:
                         dropped = self._drop_rejected(body, resp.text[:600])
                         if dropped:
                             span.setdefault("dropped_params", []).append(dropped)
+                            continue
+                        # Groq rejects some gpt-oss generations outright (a tool call nobody offered, or JSON
+                        # that fails its JSON-mode check). The request was fine and the next sample usually
+                        # isn't, so ask again, at most twice, and record it.
+                        if _bad_generation(resp.text[:600]) and regenerations < 2:
+                            regenerations += 1
+                            span["regenerations"] = regenerations
                             continue
                     if resp.status_code >= 400:
                         raise ModelError(f"model returned HTTP {resp.status_code}: {_error_message(resp)}")
@@ -170,6 +178,14 @@ class AgentModel:
             self._dropped.add("max_completion_tokens")
             return "max_completion_tokens"
         return ""
+
+
+_BAD_GENERATION = ("called a tool", "Failed to validate JSON", "failed_generation")
+
+
+def _bad_generation(detail: str) -> bool:
+    """A 400 about what the model generated, not about the request."""
+    return any(marker in detail for marker in _BAD_GENERATION)
 
 
 def _error_message(resp: httpx.Response) -> str:
