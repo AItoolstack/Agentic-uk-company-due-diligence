@@ -57,12 +57,14 @@ from public guidance and need an underwriting authority holder to confirm them.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env          # USE_MOCK_DATA=true runs the offline demo cases
-python api_server.py          # http://localhost:8000
+python api_server.py          # http://localhost:8000 opens the case page (the old page is at /old)
 python -m pytest -q -m "not eval"
 ```
 
-With `USE_MOCK_DATA=true` the app runs on two real Companies House profiles (Wilko, Monzo,
-captured 18 Oct 2026) and five invented companies that show each route and failure mode.
+With `USE_MOCK_DATA=true` the app runs on two real Companies House profiles (Wilko 09563205 and
+Monzo 09446231, captured 18 Oct 2026) and five invented companies that show each route and failure
+mode (ZZ000001 to ZZ000004 and OC000005). Without a model key the news check can't run, so Wilko and
+Monzo show "Couldn't check: Adverse media". That is the app being honest, not a fault.
 For live data set `USE_MOCK_DATA=false` and the keys below.
 
 | Variable | Needed for |
@@ -100,10 +102,14 @@ has a gap says "not checked, which is not a clear result".
 
 ```json
 {"mcpServers": {"uk-company-prescreen": {
-  "command": "python", "args": ["-m", "src.prescreen.mcp_server"],
+  "command": "/path/to/agentic-uk-company-due-diligence/.venv/bin/python",
+  "args": ["-m", "src.prescreen.mcp_server"],
   "cwd": "/path/to/agentic-uk-company-due-diligence",
   "env": {"USE_MOCK_DATA": "true"}}}}
 ```
+
+`command` must be the virtual environment's Python (on Windows `.venv\Scripts\python.exe`); a bare
+`python` is whichever Python Claude Desktop finds first, which usually lacks the packages.
 
 **Remote (streamable HTTP)** at `https://<your-host>/mcp`, served by the same API. Send
 `Authorization: Bearer <PRESCREEN_ACCESS_TOKEN>` when the token is set. On Hugging Face the
@@ -148,7 +154,8 @@ Why it was rebuilt, with the live runs that showed the problems, is in `docs/reb
 
 - CCJs aren't checked (paid data).
 - HSE and Environment Agency enforcement aren't connected yet.
-- Reports are stored as JSON files; on a Hugging Face Space they are lost when it restarts.
+- Reports are stored in Postgres when `SUPABASE_DB_URL` is set (as on the Space), otherwise as JSON
+  files under `output/`, which a Hugging Face Space loses when it restarts.
 - The sanctions screen is a name and date-of-birth match against the UK list only; it is a
   pre-screen, not a substitute for the insurer's own sanctions process.
 - Not a decision: the underwriter decides.
@@ -401,7 +408,7 @@ docs/              Business and operational documentation
 Do not use the output as a binding underwriting, legal, compliance, sanctions,
 credit, or investment decision.
 
-### AI Tool Stack
+### ai·toolstack
 
-This project is part of [AI Tool Stack](https://www.ai-toolstack.com):
+This project is part of [ai·toolstack](https://www.ai-toolstack.com):
 where AI demos become working systems.

@@ -9,6 +9,13 @@ from pathlib import Path
 # Ensure project root (containing src/) is importable
 sys.path.insert(0, str(Path(__file__).parent))
 
+import os
+import tempfile
+
+# Tests that save reports must not write into ./output: a reader who runs the tests before the app would
+# otherwise see the tests' cases in the app. Set before anything imports the store.
+os.environ.setdefault("PRESCREEN_DATA_DIR", tempfile.mkdtemp(prefix="prescreen-tests-"))
+
 import pytest
 
 
