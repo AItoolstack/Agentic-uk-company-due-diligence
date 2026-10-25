@@ -258,3 +258,12 @@ def test_legacy_research_and_mcp_are_owner_only(env):
         assert c.post("/mcp", json={}, headers={"X-Access-Token": GUEST}).status_code == 401
         env.delenv("PRESCREEN_ACCESS_TOKEN")
         assert c.post("/mcp", json={}).status_code == 401  # guests configured, no owner code: closed
+
+
+def test_guest_agent_model_allows_openrouter_never_openai(env):
+    env.setenv("GUEST_AGENT_PROVIDER", "openrouter")
+    assert access.guest_agent_model()["provider"] == "openrouter"
+    for value in ("openai", "off", ""):
+        env.setenv("GUEST_AGENT_PROVIDER", value)
+        with pytest.raises(access.PaidModelRefused):
+            access.guest_agent_model()

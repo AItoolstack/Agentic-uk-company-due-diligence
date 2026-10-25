@@ -598,7 +598,7 @@ async function loadConfig() {
   const r = (S.config && S.config.caller && S.config.caller.role) || "owner";
   $('[data-navid="watch"]').hidden = r !== "owner"; $('[data-navid="new"]').hidden = r === "public";
 }
-/* Who is looking (access.py): "owner", "guest" (a demo code: free models, daily allowance, own cases plus the
+/* Who is looking (access.py): "owner", "guest" (a demo code: never the owner's OpenAI key, daily allowance, own cases plus the
    examples) or "public" (no code: the example cases, read-only). */
 const caller = () => (S.config && S.config.caller) || {role: "owner"};
 const role = () => caller().role;
@@ -1432,7 +1432,7 @@ function analysisTab(r) {
   const run = S.agentRun, cov = coverageOf(r), cfg = S.agentCfg;
   const top = `<section class="panel" aria-labelledby="h-an"><div class="ph"><h2 id="h-an">Analysis</h2><span class="sub small">Agents read this case through the MCP tools. They explain; they can't change the route or record a decision.</span></div>
     <div class="pb" style="display:flex;flex-direction:column;gap:8px"><div class="s13"><b>Route unchanged: ${esc(ROUTE[r.route])}.</b> ${esc(cov.text)}</div>
-    ${isHold(r) ? `<div class="msg">The analysis doesn't run on a compliance hold.</div>` : r.read_only ? `<div class="s13 sub">${run ? "This is the saved analysis for this example case." : "No saved analysis for this example case."} ${role() === "public" ? "With a demo code you can run the analysis on a case of your own." : "Run your own pre-screen to try the analysis."}</div>` : `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ${run ? "" : "pri"}" type="button" id="agent-run" ${cfg && cfg.available === false ? "disabled" : ""}>${run ? "Run the analysis again" : "Run the analysis"}</button><span class="hint" id="agent-msg" role="status">${cfg && cfg.available === false ? "The analysis isn't set up on this server." : cfg && cfg.allowance ? `Usually 20–60 seconds. Runs on ${esc(cfg.model)} (free tier).` : "Usually 20–60 seconds."}</span></div>`}</div></section>`;
+    ${isHold(r) ? `<div class="msg">The analysis doesn't run on a compliance hold.</div>` : r.read_only ? `<div class="s13 sub">${run ? "This is the saved analysis for this example case." : "No saved analysis for this example case."} ${role() === "public" ? "With a demo code you can run the analysis on a case of your own." : "Run your own pre-screen to try the analysis."}</div>` : `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ${run ? "" : "pri"}" type="button" id="agent-run" ${cfg && cfg.available === false ? "disabled" : ""}>${run ? "Run the analysis again" : "Run the analysis"}</button><span class="hint" id="agent-msg" role="status">${cfg && cfg.available === false ? (cfg.allowance ? "Agent reviews aren't available on the demo right now." : "The analysis isn't set up on this server.") : cfg && cfg.allowance ? `Usually 20–60 seconds. Runs on ${esc(cfg.model)}${cfg.provider === "groq" ? " (free tier)" : ""}.` : "Usually 20–60 seconds."}</span></div>`}</div></section>`;
   if (!run) return top + prescreenHow(r);
   const v = run.review || {}, plan = v.plan || {}, t = (run.trace || {}).totals || {};
   if (v.stopped) return top + `<section class="panel"><div class="pb"><div class="msg bad">${esc(v.stopped)}</div></div></section>` + prescreenHow(r);

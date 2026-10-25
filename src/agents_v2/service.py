@@ -64,7 +64,7 @@ async def run_agent_review(report_id: str = "", company_query: str = "", proposa
                            provider: str | None = None, model_name: str | None = None, judge: bool | None = None,
                            run_by: str = "owner") -> dict[str, Any]:
     """provider / model_name / judge override the environment for one run. The API passes them for guests
-    (access.guest_agent_model: free providers only); the judge then uses the same free model."""
+    (access.guest_agent_model: Groq or capped OpenRouter, never OpenAI); the judge then uses the same model."""
     trace = Trace()
     created = datetime.now(timezone.utc).isoformat()
     use_judge = judge_enabled() if judge is None else (judge and judge_enabled())

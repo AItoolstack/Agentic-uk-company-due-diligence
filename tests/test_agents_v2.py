@@ -522,3 +522,35 @@ def test_model_client_gives_up_after_two_regenerations():
             with pytest.raises(ModelError, match="called a tool"):
                 await m._call("news", [{"role": "user", "content": "x"}], "call", 100)
     asyncio.run(go())
+
+
+def test_model_client_on_openrouter_skips_groq_and_stops_at_the_budget():
+    seen: list[dict[str, Any]] = []
+    replies = [
+        httpx.Response(200, json={"model": "openai/gpt-oss-120b", "provider": "DeepInfra", "choices": [
+            {"message": {"content": '{"ok": true}'}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1000, "completion_tokens": 100}}),
+        httpx.Response(402, json={"error": {"message": "Insufficient credits"}}),
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        assert str(request.url).startswith("https://openrouter.ai/")
+        return replies[len(seen) - 1]
+
+    async def go():
+        trace = Trace()
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            m = AgentModel(trace, model="openai/gpt-oss-120b", provider="openrouter", api_key="or-test", client=client)
+            assert await m.json("news", "sys", "user") == {"ok": True}
+            with pytest.raises(ModelError, match="budget"):
+                await m.json("news", "sys", "user")
+        return trace
+    trace = asyncio.run(go())
+    body = seen[0]
+    assert body["provider"] == {"require_parameters": True, "ignore": ["groq"]}
+    assert body["reasoning"] == {"effort": "low"} and "reasoning_effort" not in body
+    assert body["response_format"] == {"type": "json_object"} and body["max_tokens"] == 1800
+    span = trace.spans[0]
+    assert span["served_by"] == "DeepInfra"
+    assert span["cost_usd"] == pytest.approx((1000 * 0.15 + 100 * 0.60) / 1e6)

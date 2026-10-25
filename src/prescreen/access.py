@@ -4,21 +4,23 @@ Who is calling, and what they may do.
 Three kinds of caller on a shared deployment:
 
   owner   sends PRESCREEN_ACCESS_TOKEN. Everything, and agent reviews on AGENT_PROVIDER (which may be paid).
-  guest   sends a demo code listed in PRESCREEN_GUEST_CODES. Runs live pre-screens and agent reviews on free
-          models only, within daily allowances, and sees only their own cases plus the examples.
+  guest   sends a demo code listed in PRESCREEN_GUEST_CODES. Runs live pre-screens and agent reviews within
+          daily allowances, never on the owner's OpenAI key, and sees only their own cases plus the examples.
   public  sends nothing, and only when PRESCREEN_PUBLIC_EXAMPLES is set: reads the saved example cases.
 
 With none of the three configured (a local run) every caller is the owner, as before.
 
-The one rule that matters for cost: a guest is never moved onto a paid model. If the free provider's limit is
-reached, the guest is told to come back tomorrow; nothing falls back to OpenAI.
+The rule that matters for cost: a guest never runs on the owner's OpenAI key, and nothing falls back to it.
+Agent reviews for guests run on Groq's free tier or on OpenRouter through its own key (OPENROUTER_API_KEY).
+OpenRouter is paid, so that key must carry a credit limit set on OpenRouter: the limit is what protects money.
+When it's used up, or the free tier's limit is reached, the guest is told the reviews aren't available.
 
 Guest codes are stored hashed: PRESCREEN_GUEST_CODES="label:sha256-of-code:YYYY-MM-DD,...", where the date is
 the last day the code works. `python scripts/guest_code.py <label> --days 30` makes a code and prints the entry,
 so the code itself is never written into the environment.
 
-Allowances are counted in memory per UTC day, so a restart resets them. That is acceptable because guests only
-ever use free models: the allowances share the free quota fairly, they don't protect money.
+Allowances are counted in memory per UTC day, so a restart resets them. They share the quota fairly between
+guests; they don't protect money (the OpenRouter key's credit limit does).
 """
 
 from __future__ import annotations
@@ -32,6 +34,8 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 FREE_PROVIDERS = {"groq"}
+# Providers a guest's agent review may use. Never "openai": that is the owner's key.
+GUEST_AGENT_PROVIDERS = FREE_PROVIDERS | {"openrouter"}
 
 _DEFAULTS = {
     "GUEST_PRESCREENS_PER_DAY": 5,
@@ -231,7 +235,7 @@ def reset_allowances() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Models: guests on free providers only
+# Models: guests never on the owner's OpenAI key
 # ---------------------------------------------------------------------------
 
 class PaidModelRefused(Exception):
@@ -239,11 +243,12 @@ class PaidModelRefused(Exception):
 
 
 def guest_agent_model() -> dict[str, Any]:
-    """Provider, model and judge setting for a guest's agent review. Refuses any provider not on the free list,
-    so a mistyped setting can't put guests on a paid model."""
+    """Provider, model and judge setting for a guest's agent review. Refuses any provider not on the guest list
+    (GUEST_AGENT_PROVIDERS), so a mistyped setting can't put guests on the owner's OpenAI key. "off" (or any other
+    value) switches guest agent reviews off."""
     provider = os.environ.get("GUEST_AGENT_PROVIDER", "groq").strip().lower()
-    if provider not in FREE_PROVIDERS:
-        raise PaidModelRefused(f"Guest agent reviews must use a free provider ({', '.join(sorted(FREE_PROVIDERS))});"
+    if provider not in GUEST_AGENT_PROVIDERS:
+        raise PaidModelRefused(f"Guest agent reviews must use {' or '.join(sorted(GUEST_AGENT_PROVIDERS))};"
                                f" GUEST_AGENT_PROVIDER is {provider!r}.")
     return {"provider": provider,
             "model": os.environ.get("GUEST_AGENT_MODEL", "openai/gpt-oss-120b"),

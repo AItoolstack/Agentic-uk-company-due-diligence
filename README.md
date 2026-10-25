@@ -123,14 +123,18 @@ A deployment can serve three kinds of visitor (`src/prescreen/access.py`):
 | Visitor | Sends | Can | Models |
 |---|---|---|---|
 | Owner | `PRESCREEN_ACCESS_TOKEN` | everything | `AGENT_PROVIDER` (may be paid) |
-| Guest | a demo code from `PRESCREEN_GUEST_CODES` | run pre-screens and agent reviews on their own cases, within a daily allowance; read the examples | free only (Groq) |
+| Guest | a demo code from `PRESCREEN_GUEST_CODES` | run pre-screens and agent reviews on their own cases, within a daily allowance; read the examples | Groq free tier, or OpenRouter on its own capped key; never OpenAI |
 | Anyone | nothing | open the example cases in `PRESCREEN_PUBLIC_EXAMPLES`, read-only, with their saved agent runs | none |
 
 `python scripts/guest_code.py acme-jo --days 30` makes a code and prints the entry to add to
 `PRESCREEN_GUEST_CODES`. Only the code's hash is stored; delete the entry to end it early.
 
-A guest is never moved onto a paid model. `GUEST_AGENT_PROVIDER` must be a free provider (anything else is
-refused), and when the free tier's limit is reached the guest is told to come back tomorrow. Guest runs on live
+A guest never runs on the owner's OpenAI key, and nothing falls back to it. `GUEST_AGENT_PROVIDER` is `groq`
+(free tier) or `openrouter` (paid, through `OPENROUTER_API_KEY`); anything else, `off` included, switches guest
+agent reviews off. Give the OpenRouter key a credit limit on OpenRouter: that limit is what protects money, since
+the allowances below reset on restart. By default OpenRouter skips Groq as a host (`OPENROUTER_IGNORE`), whose
+validator rejected gpt-oss generations in the guest checks. When the limit or budget is reached, the guest is told
+agent reviews aren't available. Guest runs on live
 data are marked "Demonstration" on the page and in the file note. Allowances (5 pre-screens and 2 agent reviews
 a code a day, 40 and 10 across all guests by default) are counted in memory, so a restart resets them.
 Watching, the watchlist, the old-graph evaluation and the legacy `/research/*` endpoints are owner-only. The MCP

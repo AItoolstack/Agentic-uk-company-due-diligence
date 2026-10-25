@@ -19,6 +19,7 @@ def price_per_million(model: str) -> tuple[float, float]:
     AGENT_PRICES='model=in/out,model2=in/out' for several."""
     table = {
         "gpt-6-luna": (0.10, 0.50),
+        "openai/gpt-oss-120b": (0.15, 0.60),  # OpenRouter, typical host price; the host chosen may differ
     }
     for item in os.environ.get("AGENT_PRICES", "").split(","):
         if "=" in item and "/" in item:

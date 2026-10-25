@@ -27,6 +27,7 @@ from src.agents_v2.trace import Trace, price_per_million
 ENDPOINTS = {
     "openai": "https://api.openai.com/v1/chat/completions",
     "groq": "https://api.groq.com/openai/v1/chat/completions",
+    "openrouter": "https://openrouter.ai/api/v1/chat/completions",
 }
 
 Scripted = Callable[[str, str, str], str]
@@ -41,7 +42,8 @@ def default_model() -> str:
 
 
 def provider_key(provider: str) -> str:
-    return os.environ.get({"openai": "OPENAI_API_KEY", "groq": "GROQ_API_KEY"}.get(provider, ""), "")
+    return os.environ.get({"openai": "OPENAI_API_KEY", "groq": "GROQ_API_KEY",
+                           "openrouter": "OPENROUTER_API_KEY"}.get(provider, ""), "")
 
 
 class AgentModel:
@@ -82,7 +84,7 @@ class AgentModel:
         raise ModelError(last)
 
     async def _call(self, agent: str, messages: list[dict[str, str]], purpose: str, max_out: int) -> str:
-        # Groq runs on its free tier here (guests), so the trace shows $0 rather than another model's list price.
+        # Groq runs on its free tier here, so the trace shows $0 rather than another model's list price.
         p_in, p_out = (0.0, 0.0) if self.provider == "groq" else price_per_million(self.model)
         with self.trace.timed("model", purpose, agent, model=self.model) as span:
             if self.scripted is not None:
@@ -114,6 +116,9 @@ class AgentModel:
                             wait = 5.0
                         await asyncio.sleep(min(wait + 1, 20))
                         continue
+                    if resp.status_code == 402:
+                        # OpenRouter: the key's credit limit is used up. That limit is the demo's spending cap.
+                        raise ModelError("the model budget for the demo is used up for now")
                     if resp.status_code == 400:
                         dropped = self._drop_rejected(body, resp.text[:600])
                         if dropped:
@@ -141,7 +146,7 @@ class AgentModel:
             cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0)
             reasoning = int((usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0)
             span.update(input_tokens=tin, output_tokens=tout, cached_tokens=cached, reasoning_tokens=reasoning,
-                        served_by=data.get("model", ""), cost_usd=round((tin * p_in + tout * p_out) / 1e6, 6))
+                        served_by=data.get("provider") or data.get("model", ""), cost_usd=round((tin * p_in + tout * p_out) / 1e6, 6))
             choice = (data.get("choices") or [{}])[0]
             span["finish_reason"] = choice.get("finish_reason", "")
             if choice.get("finish_reason") == "length":
@@ -156,6 +161,15 @@ class AgentModel:
             effort = os.environ.get("AGENT_REASONING_EFFORT", "low")
             if effort:
                 body["reasoning_effort"] = effort
+        elif self.provider == "openrouter":
+            body["max_tokens"] = max_out
+            body["temperature"] = 0
+            if "gpt-oss" in self.model:
+                body["reasoning"] = {"effort": "low"}
+            # Only hosts that honour every parameter sent (JSON mode above all). Groq is skipped by default: its
+            # validator rejected gpt-oss generations on the 20 and 25 Oct guest checks. OPENROUTER_IGNORE="" keeps it.
+            ignore = [h.strip() for h in os.environ.get("OPENROUTER_IGNORE", "groq").split(",") if h.strip()]
+            body["provider"] = {"require_parameters": True, **({"ignore": ignore} if ignore else {})}
         else:
             body["max_tokens"] = max_out
             body["temperature"] = 0
@@ -168,7 +182,7 @@ class AgentModel:
         return body
 
     def _drop_rejected(self, body: dict[str, Any], detail: str) -> str:
-        for key in ("reasoning_effort", "temperature", "response_format"):
+        for key in ("reasoning_effort", "temperature", "response_format", "reasoning"):
             if key in body and key in detail:
                 body.pop(key)
                 self._dropped.add(key)

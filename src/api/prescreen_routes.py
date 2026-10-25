@@ -3,7 +3,7 @@ API for the underwriter pre-screen.
 
   GET  /api/prescreen/config            what's connected, demo or live, rules version, who you are
 
-Access (src/prescreen/access.py): the owner code sees everything; a guest demo code runs on free models within
+Access (src/prescreen/access.py): the owner code sees everything; a guest demo code runs on guest models (never the owner's OpenAI key) within
 daily allowances and sees its own cases plus the examples; with no code, only the public examples, read-only.
   GET  /api/prescreen/search?q=         resolve a name or number (identity gate)
   POST /api/prescreen                   run a pre-screen for one company number
@@ -341,8 +341,8 @@ async def agents_config(who: Caller = Depends(require_access)) -> dict:
 @router.post("/{report_id}/agent-review")
 async def agent_review(report_id: str, model: str = "", who: Caller = Depends(require_access)) -> dict:
     """Run the agent layer on a saved report. Takes 20-90 seconds. Returns the review and its trace.
-    Guests: their own cases only, on a free model (never a paid one), within their daily allowance.
-    The owner can pass ?model=guest to run on the guests' free model (scripts/guest_model_check.py)."""
+    Guests: their own cases only, on the guest model (Groq, or OpenRouter on its capped key; never OpenAI), within their daily allowance.
+    The owner can pass ?model=guest to run on the guests' model (scripts/guest_model_check.py)."""
     from src.agents_v2.model import default_model, provider_key
     from src.agents_v2.service import AgentLimit, agent_limit, run_agent_review
     _check(access.require_runner, who)
