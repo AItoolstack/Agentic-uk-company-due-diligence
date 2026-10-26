@@ -98,18 +98,22 @@ decision (a named person does that in the UI), or get sanctions-match detail on 
 (it's held for compliance, so nothing an agent drafts can tip off the broker). Every result that
 has a gap says "not checked, which is not a clear result".
 
-**Local (stdio)**, for example in Claude Desktop's `claude_desktop_config.json`:
+**Local (stdio)**, for example in Claude Desktop's `claude_desktop_config.json`
+(on Windows: `%APPDATA%\Claude\claude_desktop_config.json`):
 
 ```json
 {"mcpServers": {"uk-company-prescreen": {
   "command": "/path/to/agentic-uk-company-due-diligence/.venv/bin/python",
   "args": ["-m", "src.prescreen.mcp_server"],
-  "cwd": "/path/to/agentic-uk-company-due-diligence",
-  "env": {"USE_MOCK_DATA": "true"}}}}
+  "env": {"USE_MOCK_DATA": "true",
+          "PYTHONPATH": "/path/to/agentic-uk-company-due-diligence"}}}}
 ```
 
 `command` must be the virtual environment's Python (on Windows `.venv\Scripts\python.exe`); a bare
-`python` is whichever Python Claude Desktop finds first, which usually lacks the packages.
+`python` is whichever Python Claude Desktop finds first, which usually lacks the packages. `PYTHONPATH`
+must be the project folder: Claude Desktop doesn't start the server there (a `cwd` setting didn't help on Windows, 26 Oct), so without it
+the server exits at once with "No module named 'src'" and Claude Desktop shows "Server disconnected".
+On Windows, write both paths with double backslashes.
 
 **Remote (streamable HTTP)** at `https://<your-host>/mcp`, served by the same API. Send
 `Authorization: Bearer <PRESCREEN_ACCESS_TOKEN>` when the token is set. On Hugging Face the
