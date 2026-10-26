@@ -615,3 +615,37 @@ def test_closed_company_reasons_dont_list_its_own_consequences():
     route, reasons = decide(checks)
     assert route == Route.OUTSIDE_APPETITE
     assert reasons == ["Company is in liquidation.", "Insolvency case on record."]
+
+
+def test_empty_fallback_after_brave_failed_is_couldnt_check_not_clear():
+    # 26 Oct, local Tesco run: Brave failed, GDELT returned nothing, and the check said "No news ... clear".
+    from datetime import date
+
+    from src.prescreen.checks import CompanyData
+    from src.prescreen.media import check_media
+    from src.prescreen.models import CheckStatus
+    profile = {"company_number": "00445790", "company_name": "TESCO PLC", "company_status": "active",
+               "date_of_creation": "1947-11-27", "links": {}}
+    data = CompanyData(number="00445790", profile=profile, today=date(2026, 10, 26))
+    llm = JSONChat(None, "groq", "test", "", scripted=[])
+    media, _, items = asyncio.run(check_media(data, [], llm, "", "GDELT (free fallback, ~3 months)",
+                                              "Brave Search rate limit reached; try again in a minute."))
+    assert media.status == CheckStatus.COULDNT_CHECK and items == []
+    assert "Brave Search rate limit" in media.summary and "isn't evidence of no news" in media.summary
+    # Without a failed main search, an empty result is still an answer (a small company with no news).
+    media, _, _ = asyncio.run(check_media(data, [], llm, "", "GDELT (free, ~3 months)"))
+    assert media.status == CheckStatus.CLEAR
+
+
+def test_when_brave_and_gdelt_both_fail_the_reason_names_both():
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, headers={"retry-after": "0"})
+
+    async def go():
+        async with _client(handler) as c:
+            try:
+                await NewsSearch(c, brave_key="k").search("EXAMPLE LTD")
+            except SourceError as err:
+                return err
+    err = asyncio.run(go())
+    assert "Brave Search failed" in err.plain and "GDELT" in err.plain

@@ -185,12 +185,21 @@ def identity_facts(data: CompanyData, declared_trade: str) -> dict[str, Any]:
 
 
 async def check_media(data: CompanyData, results: list[dict[str, str]] | SourceError, llm: JSONChat,
-                      declared_trade: str = "", provider: str = "") -> tuple[CheckResult, CheckResult | None,
-                                                                           list[MediaItem]]:
+                      declared_trade: str = "", provider: str = "", primary_failed: str = ""
+                      ) -> tuple[CheckResult, CheckResult | None, list[MediaItem]]:
+    """primary_failed: why the configured search (Brave) failed, when the results came from the free fallback."""
     title = "Adverse media"
     if isinstance(results, SourceError):
         return (CheckResult(check_id="media", title=title, status=CheckStatus.COULDNT_CHECK,
                             summary=f"Couldn't check: {results.plain}", not_checked_reason=results.plain),
+                await _trade_only(data, llm, declared_trade), [])
+    if not results and primary_failed:
+        # 26 Oct, Tesco: Brave failed, GDELT returned nothing, and the check said "clear". An empty answer from the
+        # fallback after the main search failed isn't evidence that there's no news.
+        reason = f"{primary_failed} The free fallback ({provider}) returned nothing, which isn't evidence of no news."
+        return (CheckResult(check_id="media", title=title, status=CheckStatus.COULDNT_CHECK,
+                            summary=f"Couldn't check: {reason}", not_checked_reason=reason,
+                            sources=[SourceRef(label=provider or "search")]),
                 await _trade_only(data, llm, declared_trade), [])
     if not results:
         return (CheckResult(check_id="media", title=title, status=CheckStatus.CLEAR,

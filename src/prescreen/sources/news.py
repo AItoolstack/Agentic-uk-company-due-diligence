@@ -63,7 +63,13 @@ class NewsSearch:
                 return _dedupe(items)[:limit]
             except SourceError as err:
                 self.fallback_reason = err.plain
-        items = await self._gdelt(name)
+        try:
+            items = await self._gdelt(name)
+        except SourceError as err:
+            if self.fallback_reason:  # say that both failed, not only the fallback
+                raise SourceError("News search", "both_failed",
+                                  f"Brave Search failed ({self.fallback_reason}), then {err.plain}") from err
+            raise
         self.provider_used = "GDELT (free fallback, ~3 months)" if self.brave_key else "GDELT (free, ~3 months)"
         return _dedupe(items)[:limit]
 

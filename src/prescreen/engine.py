@@ -320,7 +320,10 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
             trade, media_items = None, []
         else:
             media, trade, media_items = await check_media(data, news, services.llm, req.declared_trade,
-                                                          services.news.provider_used)
+                                                          services.news.provider_used,
+                                                          getattr(services.news, "fallback_reason", ""))
+            if getattr(services.news, "fallback_reason", "") and media.status != CheckStatus.COULDNT_CHECK:
+                media.summary = f"{media.summary} (Read from the free fallback: {services.news.fallback_reason})"
     except Exception as exc:  # noqa: BLE001
         media = CheckResult(check_id="media", title="Adverse media", status=CheckStatus.COULDNT_CHECK,
                             summary=f"Couldn't check: internal error ({type(exc).__name__}).",
