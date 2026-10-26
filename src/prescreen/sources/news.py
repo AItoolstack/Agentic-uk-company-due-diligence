@@ -96,7 +96,7 @@ class NewsSearch:
         self.queries.append(f"gdelt: {q}")
         raw = await get_json(self.client, "GDELT", GDELT,
                              params={"query": q, "mode": "artlist", "format": "json",
-                                     "maxrecords": 20, "timespan": "3months", "sort": "datedesc"})
+                                     "maxrecords": 20, "timespan": "3months", "sort": "datedesc"}, keyed=False)
         if raw is NOT_FOUND or not isinstance(raw, dict):
             return []
         return [

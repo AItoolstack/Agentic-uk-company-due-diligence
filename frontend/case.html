@@ -607,13 +607,15 @@ function accessPanel() {
   const pub = role() === "public";
   if (!S.needCode && !pub) return "";
   const url = caller().request_url || "";
+  const t = caller().guest_terms;
+  const terms = t ? ` A code gives you ${plural(t.prescreens, "pre-screen")}${t.agent_reviews ? ` and ${plural(t.agent_reviews, "agent review")}` : ""} a day, and ends on a date.` : "";
   const ask = url ? ` <a href="${esc(url)}" rel="noopener noreferrer" target="_blank">Ask for a demo code<span class="sr"> (opens in a new tab)</span></a>.` : "";
   return `<section class="panel" aria-labelledby="h-code"><div class="ph"><h2 id="h-code">${pub ? "Run your own pre-screen" : "Access code"}</h2></div>
     <form class="pb" id="code-form" style="display:flex;gap:8px;flex-wrap:wrap">
       <label class="sr" for="code-in">${pub ? "Demo code" : "Access code"}</label>
       <input type="text" id="code-in" autocomplete="off" style="flex:1 1 200px" placeholder="${pub ? "Demo code" : "Access code"}">
       <button class="btn pri" type="submit">Use code</button>
-      <p class="hint" style="margin:0;width:100%">${pub ? `The cases on this page are saved runs you can open and read. To run a company of your own, enter a demo code.${ask}` : `This service needs an access code. It's kept in this browser tab only.${ask}`}</p>
+      <p class="hint" style="margin:0;width:100%">${pub ? `The cases on this page are saved runs you can open and read. To run a company of your own, enter a demo code.${ask}${terms}` : `This service needs an access code. It's kept in this browser tab only.${ask}`}</p>
     </form></section>`;
 }
 function allowanceText() {

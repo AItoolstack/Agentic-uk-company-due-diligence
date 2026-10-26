@@ -51,7 +51,7 @@ class Gazette:
                 raise self.fixtures
             return list(self.fixtures)
         raw = await get_json(self.client, SOURCE, SEARCH,
-                             params={"text": company_number, "results-page-size": 50})
+                             params={"text": company_number, "results-page-size": 50}, keyed=False)
         if raw is NOT_FOUND or not isinstance(raw, dict):
             return []
         entries = raw.get("entry") or []

@@ -267,3 +267,13 @@ def test_guest_agent_model_allows_openrouter_never_openai(env):
         env.setenv("GUEST_AGENT_PROVIDER", value)
         with pytest.raises(access.PaidModelRefused):
             access.guest_agent_model()
+
+
+def test_public_visitors_see_what_a_demo_code_gives(env):
+    env.setenv("PRESCREEN_PUBLIC_EXAMPLES", "0123456789abcdef")
+    env.setenv("GUEST_PRESCREENS_PER_DAY", "5")
+    env.setenv("GUEST_AGENT_REVIEWS_PER_DAY", "2")
+    with _client() as c:
+        caller = c.get("/api/prescreen/config").json()["caller"]
+    assert caller["role"] == "public"
+    assert caller["guest_terms"] == {"prescreens": 5, "agent_reviews": 2}

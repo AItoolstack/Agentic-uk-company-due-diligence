@@ -37,7 +37,7 @@ from src.prescreen.identity import normalise_name, resolve
 from src.prescreen.models import COVER_LINES, PreScreenRequest
 from src.prescreen.rules import RULES_VERSION, THRESHOLDS
 from src.prescreen.service import build_services, demo_mode, load_report, save_report, watch_from_report
-from src.prescreen.sources.http import NOT_FOUND, SourceError
+from src.prescreen.sources.http import NOT_FOUND, USER_AGENT, SourceError
 from src.prescreen.sources.sanctions import Screened, SanctionsList, screen
 from src.prescreen.store import get_store
 
@@ -83,7 +83,7 @@ IDEMPOTENT_WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False,
 
 
 def _client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=20, headers={"User-Agent": "ai-toolstack-prescreen-mcp/1.0"})
+    return httpx.AsyncClient(timeout=20, headers={"User-Agent": USER_AGENT})
 
 
 def _limit() -> None:

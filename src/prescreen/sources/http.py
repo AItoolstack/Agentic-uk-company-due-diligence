@@ -13,6 +13,9 @@ from typing import Any
 
 import httpx
 
+# Every request says who is asking and how to reach the owner. Some public sources expect it.
+USER_AGENT = "ai-toolstack-prescreen/1.0 (+https://www.ai-toolstack.com; support@ai-toolstack.com)"
+
 
 class SourceError(Exception):
     """The source could not answer. `kind` is shown to the underwriter."""
@@ -20,13 +23,14 @@ class SourceError(Exception):
     def __init__(self, source: str, kind: str, message: str) -> None:
         super().__init__(f"{source}: {kind}: {message}")
         self.source = source
-        self.kind = kind  # no_key | rate_limited | unavailable | bad_response
+        self.kind = kind  # no_key | refused | rate_limited | unavailable | bad_response
         self.message = message
 
     @property
     def plain(self) -> str:
         return {
             "no_key": f"{self.source} isn't configured (no API key).",
+            "refused": f"{self.source} refused the request ({self.message}).",
             "rate_limited": f"{self.source} rate limit reached; try again in a minute.",
             "unavailable": f"{self.source} didn't respond ({self.message}).",
             "bad_response": f"{self.source} returned something unexpected ({self.message}).",
@@ -52,8 +56,10 @@ async def get_json(
     headers: dict[str, str] | None = None,
     auth: tuple[str, str] | None = None,
     retries: int = 2,
+    keyed: bool = True,
 ) -> Any:
-    """GET a JSON resource. 404 -> NOT_FOUND. 429 -> wait and retry, then SourceError."""
+    """GET a JSON resource. 404 -> NOT_FOUND. 429 -> wait and retry, then SourceError.
+    keyed=False for sources that need no key: a 401/403 then means the source refused us, not a missing key."""
     attempt = 0
     while True:
         try:
@@ -75,7 +81,7 @@ async def get_json(
                 continue
             raise SourceError(source, "rate_limited", "HTTP 429")
         if resp.status_code in (401, 403):
-            raise SourceError(source, "no_key", f"HTTP {resp.status_code}")
+            raise SourceError(source, "no_key" if keyed else "refused", f"HTTP {resp.status_code}")
         if resp.status_code >= 500:
             if attempt < retries:
                 attempt += 1

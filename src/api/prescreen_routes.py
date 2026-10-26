@@ -34,6 +34,7 @@ from src.prescreen.engine import CompanyNotFound, SourceDown, run_prescreen
 from src.prescreen.identity import resolve
 from src.prescreen.models import DecisionRequest, IdentityResult, PreScreenRequest
 from src.prescreen.rules import RULES_VERSION, THRESHOLDS
+from src.prescreen.sources.http import USER_AGENT
 from src.prescreen.engine import STAGES
 from src.prescreen.service import (DecisionRefused, build_services, demo_mode, list_cases, list_recent, load_report, recheck_all,
                                    record_decision, save_report, watch_from_report)
@@ -97,7 +98,7 @@ def _limit() -> None:
 
 
 def _client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=20, headers={"User-Agent": "ai-toolstack-prescreen/1.0"})
+    return httpx.AsyncClient(timeout=20, headers={"User-Agent": USER_AGENT})
 
 
 @router.get("/config")
@@ -113,7 +114,8 @@ async def config(who: Caller = Depends(require_access)) -> dict:
                                  "created_at": p.get("created_at"), "rules_version": p.get("rules_version")})
     return {
         "caller": {"role": who.role, "label": who.label, "expires": who.expires,
-                   "allowance": access.allowance(who), "request_url": access.request_url()},
+                   "allowance": access.allowance(who), "request_url": access.request_url(),
+                   "guest_terms": access.guest_terms() if who.role == "public" else None},
         "examples": examples,
         "data": "live" if live else "demo",
         "rules_version": RULES_VERSION,

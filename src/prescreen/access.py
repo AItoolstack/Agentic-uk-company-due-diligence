@@ -230,6 +230,11 @@ def allowance(caller: Caller) -> dict[str, Any] | None:
     return out
 
 
+def guest_terms() -> dict[str, int]:
+    """What a demo code gives, shown to public visitors before they ask for one."""
+    return {"prescreens": _int("GUEST_PRESCREENS_PER_DAY"), "agent_reviews": _int("GUEST_AGENT_REVIEWS_PER_DAY")}
+
+
 def reset_allowances() -> None:
     _DAY.day, _DAY.per_code, _DAY.total = "", {}, {}
 
