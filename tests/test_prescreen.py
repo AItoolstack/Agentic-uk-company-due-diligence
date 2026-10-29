@@ -16,7 +16,7 @@ import httpx
 import pytest
 
 from src.prescreen import demo_cases
-from src.prescreen.engine import CompanyNotFound, Services, run_prescreen
+from src.prescreen.engine import CompanyNotFound, NotCovered, Services, run_prescreen
 from src.prescreen.identity import normalise_name, normalise_number, resolve
 from src.prescreen.llm import JSONChat, LLMError
 from src.prescreen.models import CheckStatus, PreScreenRequest, Route
@@ -649,3 +649,21 @@ def test_when_brave_and_gdelt_both_fail_the_reason_names_both():
                 return err
     err = asyncio.run(go())
     assert "Brave Search failed" in err.plain and "GDELT" in err.plain
+
+
+def test_registered_society_number_is_accepted_and_not_prescreened():
+    # 29 Oct: Co-operative Group Limited (IP00525R) failed with "not a valid company number". It's a registered
+    # society: Companies House has its profile but not its directors, owners or accounts, so a pre-screen would read
+    # the empty registers as findings. The number is accepted, and the run stops with a plain explanation.
+    from src.prescreen.identity import normalise_number
+    from src.prescreen.service import FixtureTransport
+    assert PreScreenRequest(company_number="ip00525r").company_number == "IP00525R"
+    assert normalise_number("IP 00525R") == "IP00525R"
+    profile = {"company_number": "IP00525R", "company_name": "CO-OPERATIVE GROUP LIMITED",
+               "type": "industrial-and-provident-society", "company_status": "active"}
+    services = _services("ZZ000001")
+    services.ch = CompaniesHouse(FixtureTransport({"/company/IP00525R": profile}))
+    with pytest.raises(NotCovered, match="registered society") as err:
+        _run("IP00525R", services)
+    assert "nothing was checked" in str(err.value) and "mutuals.fca.org.uk" in str(err.value)
+    assert isinstance(err.value, CompanyNotFound)  # every caller refunds and shows the message

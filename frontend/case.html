@@ -509,7 +509,7 @@ function parseYears(text) {
   return v > 300 ? {ok: false, error: "Enter whole years between 0 and 300."} : {ok: true, value: v};
 }
 const money = v => v == null ? "" : "£" + Number(v).toLocaleString("en-GB");
-const NUMBER_RE = /^\s*(?:[A-Za-z]{2}\s*\d{6}|\d{6,8})\s*$/;
+const NUMBER_RE = /^\s*(?:[A-Za-z]{2}\s*\d{6}|[A-Za-z]{2}\s*\d{5}\s*[A-Za-z]|\d{6,8})\s*$/;  // IP00525R: a registered society
 const normNumber = s => { const n = s.replace(/\s+/g, "").toUpperCase(); return /^\d+$/.test(n) ? n.padStart(8, "0") : n; };
 
 /* ======================================================================

@@ -74,7 +74,7 @@ SANCTIONS_INTERNAL_DETAIL = re.compile(r"\bregime\b|\bofsi\b|list(ed)? (entry|id
 
 MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
           "november", "december"]
-NUMBER = re.compile(r"\b(?:[A-Z]{2}\d{6}|\d{8})\b")
+NUMBER = re.compile(r"\b(?:[A-Z]{2}\d{6}|[A-Z]{2}\d{5}[A-Z]|\d{8})\b")
 MONEY = re.compile(r"£\s?(\d[\d,]*(?:\.\d+)?)\s?(m|bn|k|million|billion)?\b", re.I)
 PERCENT = re.compile(r"\b(\d+(?:\.\d+)?)\s?%")
 DAY_MONTH_YEAR = re.compile(r"\b(\d{1,2}) (" + "|".join(MONTHS) + r"|" + "|".join(m[:3] for m in MONTHS) +

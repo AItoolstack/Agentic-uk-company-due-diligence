@@ -20,7 +20,7 @@ from src.prescreen.models import Candidate, IdentityResult
 from src.prescreen.sources.companies_house import CompaniesHouse
 from src.prescreen.sources.http import NOT_FOUND, SourceError
 
-_NUMBER = re.compile(r"^(?:[A-Z]{2}\d{6}|\d{8}|\d{6,7})$")
+_NUMBER = re.compile(r"^(?:[A-Z]{2}\d{6}|[A-Z]{2}\d{5}[A-Z]|\d{8}|\d{6,7})$")
 _SUFFIXES = [
     (r"\bPUBLIC LIMITED COMPANY\b", "PLC"),
     (r"\bLIMITED LIABILITY PARTNERSHIP\b", "LLP"),

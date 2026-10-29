@@ -45,6 +45,19 @@ class SourceDown(Exception):
     pass
 
 
+class NotCovered(CompanyNotFound):
+    """The number is on Companies House, but it isn't a company this tool can pre-screen. A subclass of
+    CompanyNotFound so every caller already handles it (no report, the run is refunded)."""
+
+
+# Companies House registers these but doesn't hold their officers, owners or accounts, so a pre-screen built on
+# Companies House would read their empty officer and PSC lists as findings. Say so instead.
+NOT_COVERED_TYPES = {
+    "industrial-and-provident-society": "a registered society",
+    "registered-society-non-jurisdictional": "a registered society",
+}
+
+
 @dataclass
 class Services:
     ch: CompaniesHouse
@@ -194,6 +207,13 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         raise CompanyNotFound(f"Companies House has no company with number {number}.")
     if isinstance(profile, SourceError):
         raise SourceDown(profile.plain)
+    kind = NOT_COVERED_TYPES.get(profile.get("type", ""))
+    if kind:
+        name = profile.get("company_name") or number
+        raise NotCovered(
+            f"{name} ({number}) is {kind}, not a company. Companies House doesn't hold its directors, owners or "
+            "accounts, so this tool can't pre-screen it; nothing was checked. The FCA Mutuals Public Register "
+            "(https://mutuals.fca.org.uk) holds its records.")
 
     tick("companies_house", "start", profile.get("company_name", ""))
     tick("gazette", "start")

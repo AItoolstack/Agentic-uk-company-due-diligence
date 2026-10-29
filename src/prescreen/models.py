@@ -162,7 +162,8 @@ class PreScreenRequest(BaseModel):
     @classmethod
     def _number(cls, v: str) -> str:
         n = re.sub(r"\s+", "", v or "").upper()
-        if not re.fullmatch(r"[A-Z]{2}\d{6}|\d{6,8}", n):
+        # Registered societies are numbered 2 letters, 5 digits, a letter (Co-operative Group is IP00525R).
+        if not re.fullmatch(r"[A-Z]{2}\d{6}|[A-Z]{2}\d{5}[A-Z]|\d{6,8}", n):
             raise ValueError("Enter a Companies House number: 8 digits, or 2 letters and 6 digits (e.g. SC123456).")
         return n.zfill(8) if n.isdigit() else n
 
