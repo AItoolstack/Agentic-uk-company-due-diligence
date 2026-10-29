@@ -272,6 +272,40 @@ def test_gazette_down_makes_insolvency_couldnt_check():
     assert report.route == Route.REFER
 
 
+def test_gazette_switched_off_is_declared_not_covered_not_a_gap():
+    """GAZETTE_ENABLED=false (the public demo, where The Gazette refuses the server since late Oct 2026):
+    the insolvency check still reads Companies House, names The Gazette as out of scope in a note, and isn't
+    "couldn't check", so the case isn't held at Refer by a gap it declares up front."""
+    services = _services("09563205", llm_answers=[_all_reviewed(4)])
+    services.gazette = None
+    services.gazette_not_covered = True
+    report = _run("09563205", services=services)
+    ins = _check(report, "insolvency")
+    assert ins.status != CheckStatus.COULDNT_CHECK
+    assert "not_covered_gazette" in {f.rule_id for f in ins.findings}
+    assert "The Gazette isn't searched" in ins.summary
+    assert not any("Insolvency" in r and "couldn't be checked" in r for r in report.route_reasons)
+    gaz = next(s for s in report.sources_read if s["id"] == "gazette")
+    assert gaz["state"] == "skip" and gaz["detail"]
+
+
+def test_gazette_switched_off_keeps_a_companies_house_insolvency_flagged():
+    from datetime import date
+
+    from src.prescreen.checks import CompanyData, check_insolvency
+    from src.prescreen.sources.gazette import NOT_COVERED
+    profile = {"company_number": "00000001", "company_name": "EXAMPLE PLC", "company_status": "liquidation",
+               "has_insolvency_history": True, "links": {"insolvency": "/x"}}
+    data = CompanyData(number="00000001", profile=profile, today=date(2026, 10, 29))
+    data.insolvency = {"cases": [{"type": "compulsory-liquidation",
+                                  "dates": [{"type": "wound-up-on", "date": "2018-01-15"}]}]}
+    data.gazette_notices = NOT_COVERED
+    result = check_insolvency(data)
+    assert result.status == CheckStatus.FLAG
+    assert "Not every source answered" not in result.summary
+    assert {"insolvency_history", "not_covered_gazette"} <= {f.rule_id for f in result.findings}
+
+
 def test_insolvency_on_record_stays_flagged_when_the_gazette_is_down():
     """Carillion, live 29 Oct: the check said "couldn't check" beside a liquidation on record.
     A missing source can't undo a finding, so the flag stays and the gap is named in the summary."""

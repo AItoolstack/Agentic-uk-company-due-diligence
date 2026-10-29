@@ -637,7 +637,7 @@ function statusBar(r) {
       : "Up to 30 pre-screens an hour on this service · reports kept 90 days unless decided or watched";
     el.innerHTML = `${by}<span>${text}</span>`; return;
   }
-  const srcs = (r.sources_read || []).map(s => `${esc(s.label)} ${s.state === "skip" ? "not needed" : s.state === "error" ? "incomplete " + fmtTime(s.read_at) : fmtTime(s.read_at)}`);
+  const srcs = (r.sources_read || []).map(s => `${esc(s.label)} ${s.state === "skip" ? esc(s.detail || "not needed") : s.state === "error" ? "incomplete " + fmtTime(s.read_at) : fmtTime(s.read_at)}`);
   el.innerHTML = `${by}<span class="mono">${esc(r.report_id)}</span><span>Run ${esc(fmtWhen(r.created_at))} · ${Number(r.elapsed_seconds || 0).toFixed(1)} s</span><span>Policy <a class="mono" href="/api/prescreen/config">${esc(r.rules_version)}</a></span>
     ${srcs.length ? `<span>Registers read: ${srcs.join(" · ")}</span>` : `<span>Registers read at the run time</span>`}`;
 }

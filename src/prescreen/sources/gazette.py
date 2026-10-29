@@ -24,6 +24,8 @@ import httpx
 from src.prescreen.sources.http import NOT_FOUND, SourceError, get_json
 
 SOURCE = "The Gazette"
+# Stands in for the notices when The Gazette is switched off for a deployment (GAZETTE_ENABLED=false).
+NOT_COVERED = "not_covered"
 SEARCH = "https://www.thegazette.co.uk/insolvency/notice/data.json"
 NOTICE_NAMES = {
     "2450": "Petition to wind up",

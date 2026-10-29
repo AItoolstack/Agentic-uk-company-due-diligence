@@ -30,7 +30,7 @@ from src.prescreen.models import CheckResult, CheckStatus, PreScreenReport, PreS
 from src.prescreen.rules import RULES_VERSION, decide
 from src.prescreen.sources.companies_house import CompaniesHouse
 from src.prescreen.sources.fca import FCARegister
-from src.prescreen.sources.gazette import Gazette
+from src.prescreen.sources.gazette import NOT_COVERED as GAZETTE_NOT_COVERED, Gazette
 from src.prescreen.sources.http import NOT_FOUND, SourceError
 from src.prescreen.sources.news import NewsSearch
 from src.prescreen.sic import label as sic_label
@@ -67,6 +67,7 @@ class Services:
     sanctions: Any  # async callable returning SanctionsList, or a SanctionsList / SourceError
     gazette: Gazette | None = None
     today: date | None = None
+    gazette_not_covered: bool = False  # declared out of scope for this deployment, not a failed search
 
 
 async def _safe(coro: Awaitable[Any]) -> Any:
@@ -229,7 +230,8 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
         _safe(ch.charges(number)) if ("charges" in links or profile.get("has_charges")) else _none(),
         _safe(ch.insolvency(number)) if ("insolvency" in links or profile.get("has_insolvency_history")) else _none(),
         _safe(ch.filing_history(number, "gazette")) if strike_off else _none(),
-        _safe(gazette.insolvency_notices(number, profile.get("company_name", ""))) if gazette
+        _gazette_not_covered() if services.gazette_not_covered
+        else _safe(gazette.insolvency_notices(number, profile.get("company_name", ""))) if gazette
         else _gazette_missing(),
         _sanctions(services),
     )
@@ -237,7 +239,10 @@ async def run_prescreen(req: PreScreenRequest, services: Services, progress: Pro
                          psc_statements=statements, charges=charges, insolvency=insolvency,
                          gazette_filings=gazette_filings, gazette_notices=notices)
     tick("companies_house", "error" if isinstance(officers, SourceError) or isinstance(pscs, SourceError) else "done")
-    tick("gazette", "error" if isinstance(notices, SourceError) else "done")
+    if notices == GAZETTE_NOT_COVERED:
+        tick("gazette", "skip", "not searched on this deployment")
+    else:
+        tick("gazette", "error" if isinstance(notices, SourceError) else "done")
     tick("sanctions", "error" if isinstance(sanctions_list, SourceError) else "done",
          f"{sanctions_list.size:,} entries" if isinstance(sanctions_list, SanctionsList) else "")
     tick("directors", "start")
@@ -462,3 +467,7 @@ def _timeline(data: C.CompanyData) -> list[dict[str, Any]]:
 
 async def _gazette_missing() -> SourceError:
     return SourceError("The Gazette", "no_key", "not connected")
+
+
+async def _gazette_not_covered() -> str:
+    return GAZETTE_NOT_COVERED

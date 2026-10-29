@@ -356,6 +356,10 @@ async def gazette_notices(company_number: str, company_name: str = "") -> dict[s
     """Insolvency notices in The Gazette for one company (winding-up petitions, liquidations, administrations)."""
     async with _client() as client:
         services, _ = build_services(client, company_number.upper())
+        if services.gazette_not_covered:
+            return {"source": "The Gazette", "not_covered": True,
+                    "reason": "The Gazette isn't searched on this deployment (it refuses the server).",
+                    "means": "Not checked, and out of scope here. This is not a clear result."}
         if services.gazette is None:
             return _err("The Gazette", "not connected")
         try:

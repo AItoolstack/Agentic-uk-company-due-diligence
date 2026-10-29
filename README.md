@@ -77,7 +77,8 @@ For live data set `USE_MOCK_DATA=false` and the keys below.
 | `PRESCREEN_ACCESS_TOKEN` | optional access code for the API and UI; set it on any shared deployment |
 | `PRESCREEN_RUNS_PER_HOUR` | service-wide cap (default 30) |
 
-The Gazette and the UK Sanctions List need no key.
+The Gazette and the UK Sanctions List need no key. Set `GAZETTE_ENABLED=false` only where The Gazette
+refuses your server; it's then declared not covered instead of "couldn't check" on every run.
 
 ## Use it from an agent (MCP)
 
@@ -180,8 +181,10 @@ Why it was rebuilt, with the live runs that showed the problems, is in `docs/reb
   pre-screen, not a substitute for the insurer's own sanctions process.
 - Registered societies (co-operatives) aren't covered: Companies House doesn't hold their directors
   or owners, so the tool says so and checks nothing.
-- The Gazette refuses requests from the Hugging Face Space (since late October 2026), so live cases
-  on the public demo show insolvency as couldn't check. It answers from a home connection.
+- The public demo doesn't search The Gazette, which has refused requests from the Hugging Face Space
+  since late October 2026. There it's declared not covered (`GAZETTE_ENABLED=false`), like CCJs, so a
+  winding-up petition that appears in The Gazette before Companies House records an insolvency won't
+  show on the demo. Local runs search it.
 - Not a decision: the underwriter decides.
 
 ---

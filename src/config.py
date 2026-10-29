@@ -65,6 +65,9 @@ class Settings(BaseSettings):
 
     # Feature flags
     use_mock_data: bool = Field(default=True, alias="USE_MOCK_DATA")
+    # false on the public demo: The Gazette refuses the Hugging Face Space's servers (HTTP 403 since late
+    # October 2026), so it's declared "not covered" there, like CCJs, instead of "couldn't check" on every run.
+    gazette_enabled: bool = Field(default=True, alias="GAZETTE_ENABLED")
     max_followup_iterations: int = Field(
         default=2,
         ge=1,

@@ -82,10 +82,11 @@ def build_services(client: httpx.AsyncClient, company_number: str = "",
                                         settings.companies_house_base_url)),
         fca=FCARegister(client, settings.fca_api_key, settings.fca_api_email, settings.fca_base_url),
         news=NewsSearch(client, brave_key=settings.brave_search_api_key),
-        gazette=Gazette(client),
+        gazette=Gazette(client) if settings.gazette_enabled else None,
         llm=_llm(client, free_only),
         sanctions=lambda: load_list(client, CACHE),
         today=date.today(),
+        gazette_not_covered=not settings.gazette_enabled,
     )
     return services, {"data": "live"}
 

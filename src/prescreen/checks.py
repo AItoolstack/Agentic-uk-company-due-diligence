@@ -24,7 +24,7 @@ from src.prescreen.identity import normalise_name
 from src.prescreen.models import CheckResult, CheckStatus, Finding, PreScreenRequest, Route, SourceRef
 from src.prescreen.rules import THRESHOLDS as T
 from src.prescreen.sources.companies_house import PUBLIC_SITE, public_url
-from src.prescreen.sources.gazette import NOTICE_NAMES
+from src.prescreen.sources.gazette import NOT_COVERED as GAZETTE_NOT_COVERED, NOTICE_NAMES
 from src.prescreen.sources.http import NOT_FOUND, SourceError
 from src.prescreen.sources.sanctions import PUBLIC_URL as SANCTIONS_URL
 from src.prescreen.sources.sanctions import SanctionsList, Screened, screen
@@ -412,7 +412,14 @@ def check_insolvency(data: CompanyData) -> CheckResult:
                                         detail=case, sources=src[:1]))
 
     notices = data.gazette_notices
-    if isinstance(notices, SourceError) or notices is None:
+    gazette_off = notices == GAZETTE_NOT_COVERED
+    if gazette_off:
+        # Declared out of scope for this deployment (GAZETTE_ENABLED=false), like CCJs: not a failed search.
+        findings.append(Finding(rule_id="not_covered_gazette", route=Route.NOTE,
+                                text="The Gazette isn't searched on this deployment, so a winding-up petition "
+                                     "published there before Companies House records it won't show here.",
+                                sources=src[1:]))
+    elif isinstance(notices, SourceError) or notices is None:
         problems.append(f"The Gazette couldn't be searched ({_err_text(notices)})")
     else:
         recent_cut = data.today - timedelta(days=T["gazette_recent_days"])
@@ -434,9 +441,11 @@ def check_insolvency(data: CompanyData) -> CheckResult:
                                         text=f"Gazette: {name}, {published:%d %b %Y}.", sources=nsrc))
     if problems and not findings:
         return _couldnt("insolvency", title, "; ".join(problems), True, src)
-    result = _finish("insolvency", title, findings,
-                     f"No insolvency record on Companies House and no Gazette insolvency notices in the last "
-                     f"{T['director_lookback_years']} years.", src, critical=True)
+    clear_text = (f"No insolvency record on Companies House and no Gazette insolvency notices in the last "
+                  f"{T['director_lookback_years']} years.")
+    if gazette_off:
+        clear_text = "No insolvency record on Companies House. The Gazette isn't searched on this deployment."
+    result = _finish("insolvency", title, findings, clear_text, src, critical=True)
     if problems:
         gap = "; ".join(problems)
         if result.status == CheckStatus.FLAG:
