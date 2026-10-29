@@ -1,5 +1,6 @@
 ---
 title: UK Company Pre-Screen
+short_description: Public-record pre-screen of UK companies for underwriters
 colorFrom: green
 colorTo: gray
 sdk: docker
@@ -21,7 +22,7 @@ It recommends a route. The underwriter decides, and the decision and reason are 
 | Note only | Nothing on the record changes the route. Read the notes. |
 | Refer | Needs a senior underwriter, or a question to the broker. |
 | Outside appetite | Decline unless a senior underwriter overrides with reasons. |
-| Compliance hold | A sanctions match confirmed by date of birth. Don't bind; compliance decides. |
+| Compliance hold | A possible sanctions match on name and date of birth. Don't bind; compliance reviews it and decides. |
 
 ## What it checks
 
@@ -149,12 +150,23 @@ through the agents on the guest model, with sections finished, failed calls and 
 
 ## How it's built
 
+![UK Company Pre-Screen reference architecture: clients and access layer, the agent layer (LangGraph supervisor, three specialists inside a guardrail, tool allowlist), the MCP server, a read-only boundary, and the deterministic core where rules set the route](docs/assets/prescreen-reference-architecture.png)
+
+Written rules set the route; agents explain it, through MCP, inside guardrails; a named person decides.
+The diagram is explained on the [system page](https://www.ai-toolstack.com/projects/uk-company-prescreen/).
+
 `src/prescreen/`: `identity.py` (the identity gate), `sources/` (one small client per source; a
 source returns data, NOT_FOUND, or raises SourceError, never an empty "all clear"), `checks.py`
 (plain functions over the fetched data), `rules.py` (thresholds and route), `media.py` (the only
 model call), `engine.py` (fetches in parallel and runs the checks), `service.py` (wiring and storage).
-The UI is `frontend/prescreen.html`, served at `/`. The original agentic research UI is kept at
-`/legacy` for comparison.
+`src/agents_v2/`: the agent layer. `supervisor.py` (a LangGraph graph: load case, plan, specialists
+in parallel, assemble in code), `specialists.py` (three bounded tool loops), `toolbox.py` (each
+agent's MCP tool allowlist; a call outside it never reaches the server), `guardrail.py` (four code
+rules and an optional model judge; one rewrite, then withheld) and `trace.py`. The MCP server is
+`src/prescreen/mcp_server.py`; none of its nine tools records a decision or changes a route.
+
+The UI is `frontend/case.html`, served at `/` and `/case/<id>`. The previous page is kept at `/old`
+and the original agentic research UI at `/legacy`, for comparison.
 
 Why it was rebuilt, with the live runs that showed the problems, is in `docs/rebuild/`.
 
@@ -166,6 +178,10 @@ Why it was rebuilt, with the live runs that showed the problems, is in `docs/reb
   files under `output/`, which a Hugging Face Space loses when it restarts.
 - The sanctions screen is a name and date-of-birth match against the UK list only; it is a
   pre-screen, not a substitute for the insurer's own sanctions process.
+- Registered societies (co-operatives) aren't covered: Companies House doesn't hold their directors
+  or owners, so the tool says so and checks nothing.
+- The Gazette refuses requests from the Hugging Face Space (since late October 2026), so live cases
+  on the public demo show insolvency as couldn't check. It answers from a home connection.
 - Not a decision: the underwriter decides.
 
 ---
