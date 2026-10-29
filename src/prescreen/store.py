@@ -77,7 +77,7 @@ def _writable_dir() -> Path:
         return Path(tempfile.gettempdir()) / "prescreen"
 
 
-def _summary(report_id: str, p: dict[str, Any]) -> dict[str, Any]:
+def _example_summary(report_id: str, p: dict[str, Any]) -> dict[str, Any]:
     return {"report_id": report_id, "company_name": p.get("company_name"), "company_number": p.get("company_number"),
             "route": p.get("route"), "created_at": p.get("created_at"), "rules_version": p.get("rules_version")}
 
@@ -117,7 +117,7 @@ class FileStore:
         for rid in report_ids:
             p = await self.load_report(rid)
             if p:
-                out.append(_summary(rid, p))
+                out.append(_example_summary(rid, p))
         return out
 
     async def add_decision(self, report_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:
@@ -286,7 +286,7 @@ class PgStore:
             return []
         rows = await self._exec("select id, payload from reports where id = any(%s)", (ids,), "all")
         by_id = {r["id"]: r["payload"] for r in rows}
-        return [_summary(rid, by_id[rid]) for rid in ids if rid in by_id]
+        return [_example_summary(rid, by_id[rid]) for rid in ids if rid in by_id]
 
     async def add_decision(self, report_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:
         row = await self._exec("select 1 from reports where id = %s", (report_id,), "one")
