@@ -127,6 +127,17 @@ def test_guest_sees_own_cases_and_examples_only(env):
         assert {r["report_id"] for r in c.get("/api/prescreen/recent", headers=h).json()} == {mine["report_id"]}
 
 
+def test_example_list_keeps_its_order_and_skips_unknown_ids(env):
+    # One store call for the whole list (the desk waited ~14 s when each example was loaded in full).
+    with _client() as c:
+        a = _run(c, OWNER).json()
+        b = _run(c, OWNER, "ZZ000004").json()
+        env.setenv("PRESCREEN_PUBLIC_EXAMPLES", f"{b['report_id']},0123456789abcdef,{a['report_id']}")
+        ex = c.get("/api/prescreen/config").json()["examples"]
+        assert [e["report_id"] for e in ex] == [b["report_id"], a["report_id"]]
+        assert ex[0]["company_number"] == "ZZ000004" and ex[0]["route"] and ex[0]["created_at"]
+
+
 def test_examples_are_public_and_read_only(env):
     with _client() as c:
         ex = _run(c, OWNER).json()

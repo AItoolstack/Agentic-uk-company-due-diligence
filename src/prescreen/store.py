@@ -32,6 +32,7 @@ class Store(Protocol):
 
     async def save_report(self, payload: dict[str, Any]) -> None: ...
     async def load_report(self, report_id: str) -> dict[str, Any] | None: ...
+    async def report_summaries(self, report_ids: list[str]) -> list[dict[str, Any]]: ...
     async def add_decision(self, report_id: str, entry: dict[str, Any]) -> dict[str, Any] | None: ...
     async def recent(self, limit: int = 12) -> list[dict[str, Any]]: ...
     async def case_rows(self, limit: int = 200) -> list[dict[str, Any]]: ...
@@ -76,6 +77,11 @@ def _writable_dir() -> Path:
         return Path(tempfile.gettempdir()) / "prescreen"
 
 
+def _summary(report_id: str, p: dict[str, Any]) -> dict[str, Any]:
+    return {"report_id": report_id, "company_name": p.get("company_name"), "company_number": p.get("company_number"),
+            "route": p.get("route"), "created_at": p.get("created_at"), "rules_version": p.get("rules_version")}
+
+
 class FileStore:
     kind = "files"
 
@@ -104,6 +110,15 @@ class FileStore:
         if not REPORT_ID.fullmatch(report_id or ""):
             return None
         return self._read(self.reports / f"{report_id}.json", None)
+
+    async def report_summaries(self, report_ids: list[str]) -> list[dict[str, Any]]:
+        """Name, number, route and date for each id, in the order given; unknown ids are skipped."""
+        out = []
+        for rid in report_ids:
+            p = await self.load_report(rid)
+            if p:
+                out.append(_summary(rid, p))
+        return out
 
     async def add_decision(self, report_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:
         payload = await self.load_report(report_id)
@@ -262,6 +277,16 @@ class PgStore:
         payload = row["payload"]
         payload["decisions"] = [{**d, "recorded_at": d["recorded_at"].isoformat()} for d in decisions]
         return payload
+
+    async def report_summaries(self, report_ids: list[str]) -> list[dict[str, Any]]:
+        """One query for the public example list. Loading each report in full opened two connections
+        per example (18 for nine), and the desk waited about 14 s for them (29 Oct, live)."""
+        ids = [r for r in report_ids if REPORT_ID.fullmatch(r or "")]
+        if not ids:
+            return []
+        rows = await self._exec("select id, payload from reports where id = any(%s)", (ids,), "all")
+        by_id = {r["id"]: r["payload"] for r in rows}
+        return [_summary(rid, by_id[rid]) for rid in ids if rid in by_id]
 
     async def add_decision(self, report_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:
         row = await self._exec("select 1 from reports where id = %s", (report_id,), "one")

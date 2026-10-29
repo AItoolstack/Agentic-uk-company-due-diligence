@@ -104,14 +104,7 @@ def _client() -> httpx.AsyncClient:
 @router.get("/config")
 async def config(who: Caller = Depends(require_access)) -> dict:
     live = not demo_mode()
-    examples = []
-    if not who.is_owner:
-        for rid in access.public_examples():
-            p = await load_report(rid)
-            if p:
-                examples.append({"report_id": rid, "company_name": p.get("company_name"),
-                                 "company_number": p.get("company_number"), "route": p.get("route"),
-                                 "created_at": p.get("created_at"), "rules_version": p.get("rules_version")})
+    examples = [] if who.is_owner else await get_store().report_summaries(access.public_examples())
     return {
         "caller": {"role": who.role, "label": who.label, "expires": who.expires,
                    "allowance": access.allowance(who), "request_url": access.request_url(),

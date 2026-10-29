@@ -272,6 +272,24 @@ def test_gazette_down_makes_insolvency_couldnt_check():
     assert report.route == Route.REFER
 
 
+def test_insolvency_on_record_stays_flagged_when_the_gazette_is_down():
+    """Carillion, live 29 Oct: the check said "couldn't check" beside a liquidation on record.
+    A missing source can't undo a finding, so the flag stays and the gap is named in the summary."""
+    from datetime import date
+
+    from src.prescreen.checks import CompanyData, check_insolvency
+    profile = {"company_number": "00000001", "company_name": "EXAMPLE PLC", "company_status": "liquidation",
+               "has_insolvency_history": True, "links": {"insolvency": "/x"}}
+    data = CompanyData(number="00000001", profile=profile, today=date(2026, 10, 29))
+    data.insolvency = {"cases": [{"type": "compulsory-liquidation",
+                                  "dates": [{"type": "wound-up-on", "date": "2018-01-15"}]}]}
+    data.gazette_notices = SourceError("The Gazette", "refused", "HTTP 403")
+    result = check_insolvency(data)
+    assert result.status == CheckStatus.FLAG
+    assert "compulsory liquidation" in result.summary
+    assert "The Gazette couldn't be searched" in result.summary
+
+
 def test_model_skipping_results_is_couldnt_check_not_clear():
     report = _run("09446231", llm_answers=[json.dumps({"items": []})])
     media = _check(report, "media")

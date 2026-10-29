@@ -438,8 +438,14 @@ def check_insolvency(data: CompanyData) -> CheckResult:
                      f"No insolvency record on Companies House and no Gazette insolvency notices in the last "
                      f"{T['director_lookback_years']} years.", src, critical=True)
     if problems:
-        result.status = CheckStatus.COULDNT_CHECK
-        result.not_checked_reason = "; ".join(problems)
+        gap = "; ".join(problems)
+        if result.status == CheckStatus.FLAG:
+            # Something was found, and a missing source can't undo it: keep the flag, name the gap
+            # (Carillion, live 29 Oct: "couldn't check" beside a liquidation on record).
+            result.summary = f"{result.summary} Not every source answered: {gap}."
+        else:
+            result.status = CheckStatus.COULDNT_CHECK
+            result.not_checked_reason = gap
     return result
 
 
