@@ -376,4 +376,26 @@ def decorate(payload: dict[str, Any]) -> dict[str, Any]:
     payload["stale"] = is_stale(payload.get("created_at"))
     payload.setdefault("sources_read", [])
     payload.setdefault("rerun_of", "")
+    mark_reasons(payload)
     return payload
+
+
+def mark_reasons(payload: dict[str, Any]) -> None:
+    """Mark each finding with counts_as_reason, so the page lists exactly the reasons the rules gave.
+
+    rules.decide() leaves some findings out of route_reasons: consequences of a company having ended
+    (Carillion: overdue accounts and no PSC under "in liquidation"), Gazette notices for an insolvency
+    already on record, collapse news for a company already shown as ended. The page used to list every
+    finding above a note, so Carillion showed 5 referral reasons where the rules gave 3 (29 Oct).
+    Several directors' insolvent links are merged into one reason; each of those findings counts.
+    Reports saved without route_reasons are left alone (the page then falls back to its old filter).
+    """
+    reasons = payload.get("route_reasons")
+    if reasons is None:
+        return
+    texts = set(reasons)
+    merged_directors = any("directors were directors of companies" in r for r in reasons)
+    for c in payload.get("checks") or []:
+        for f in c.get("findings") or []:
+            f["counts_as_reason"] = f.get("route") != "note" and (
+                f.get("text") in texts or (merged_directors and f.get("rule_id") == "director_insolvent_links"))

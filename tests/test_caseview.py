@@ -256,3 +256,54 @@ def test_case_deep_links_serve_the_page(demo_client):
     assert home.status_code == 200 and "parseMoney" in home.text  # the case page is the main page now
     old = demo_client.get("/old")
     assert old.status_code == 200 and "parseMoney" not in old.text  # the previous page, kept for comparison
+
+
+# --- referral reasons on the page match the rules (Carillion, 29 Oct: page 5, rules 3) ---------------
+
+def _f(rule_id, route, text):
+    return {"rule_id": rule_id, "route": route, "text": text}
+
+
+def test_mark_reasons_leaves_consequences_of_ending_out():
+    payload = {"route_reasons": ["Company is in liquidation.", "Insolvency case on record: compulsory liquidation"],
+               "checks": [{"findings": [_f("company_insolvent", "outside_appetite", "Company is in liquidation."),
+                                        _f("insolvency_history", "refer",
+                                           "Insolvency case on record: compulsory liquidation"),
+                                        _f("accounts_overdue_serious", "refer", "Accounts are overdue by 3040 days"),
+                                        _f("no_psc", "refer", "No person with significant control"),
+                                        _f("company_old", "note", "Incorporated 1999")]}]}
+    V.mark_reasons(payload)
+    counted = {f["rule_id"]: f["counts_as_reason"] for f in payload["checks"][0]["findings"]}
+    assert counted == {"company_insolvent": True, "insolvency_history": True, "accounts_overdue_serious": False,
+                       "no_psc": False, "company_old": False}
+
+
+def test_mark_reasons_counts_each_director_when_the_rules_merged_them():
+    payload = {"route_reasons": ["2 directors were directors of companies that became insolvent in the last 5 years "
+                                 "(4 in all): Smith (3), Jones (1). Details under Directors: other companies."],
+               "checks": [{"findings": [_f("director_insolvent_links", "refer", "Smith: 3 insolvent companies"),
+                                        _f("director_insolvent_links", "refer", "Jones: 1 insolvent company")]}]}
+    V.mark_reasons(payload)
+    assert all(f["counts_as_reason"] for f in payload["checks"][0]["findings"])
+
+
+def test_mark_reasons_leaves_old_reports_without_route_reasons_alone():
+    payload = {"checks": [{"findings": [_f("no_psc", "refer", "No person with significant control")]}]}
+    V.mark_reasons(payload)
+    assert "counts_as_reason" not in payload["checks"][0]["findings"][0]
+
+
+def test_page_reasons_match_the_rules_for_every_offline_demo_case():
+    """For every offline demo case: the findings the page counts are exactly the finding-based reasons
+    the rules gave (route_reasons minus couldn't-check lines and the combination rule)."""
+    from src.prescreen import demo_cases
+    from tests.test_prescreen import _run
+    for number in demo_cases.cases():
+        payload = V.decorate(_run(number).model_dump(mode="json"))
+        counted = [f["text"] for c in payload["checks"] for f in c["findings"] if f.get("counts_as_reason")]
+        other = [r for r in payload["route_reasons"] if "couldn't be checked" in r or r.startswith("Accounts more than")
+                 or "directors were directors of companies" in r or r.startswith("New company and a director")]
+        assert set(counted) <= set(payload["route_reasons"]) | {f["text"] for c in payload["checks"]
+                                                               for f in c["findings"]
+                                                               if f["rule_id"] == "director_insolvent_links"}, number
+        assert set(payload["route_reasons"]) - set(other) <= set(counted), number

@@ -957,12 +957,14 @@ function allFindings(r) {
 }
 function reasonsOf(r) {
   const hold = isHold(r);
-  return allFindings(r).filter(f => f.route !== "note" && !COMPLIANCE_ONLY.has(f.rule_id) && !(hold && SANCTIONS_RULES.has(f.rule_id)))
+  // counts_as_reason comes from the server (caseview.mark_reasons), so this list matches the rules' reasons.
+  return allFindings(r).filter(f => f.route !== "note" && f.counts_as_reason !== false && !COMPLIANCE_ONLY.has(f.rule_id) && !(hold && SANCTIONS_RULES.has(f.rule_id)))
     .sort((a, b) => RANK[b.route] - RANK[a.route] || String(b.event_date || "").localeCompare(String(a.event_date || "")));
 }
 const SKIP_NOTES = new Set(["director_link_not_counted", "director_dissolved_context", "news_fallback"]);
 function notesOf(r) {
-  return allFindings(r).filter(f => f.route === "note" && !SANCTIONS_RULES.has(f.rule_id) && !SKIP_NOTES.has(f.rule_id));
+  // Findings the rules didn't count as reasons (e.g. overdue accounts once a company is in liquidation) are notes.
+  return allFindings(r).filter(f => (f.route === "note" || f.counts_as_reason === false) && !SANCTIONS_RULES.has(f.rule_id) && !SKIP_NOTES.has(f.rule_id));
 }
 function primarySource(f) {
   const links = (f.detail || {}).links;
